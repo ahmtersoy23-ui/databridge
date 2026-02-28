@@ -39,15 +39,27 @@ async function runInventorySync(): Promise<void> {
   isSyncing = true;
   try {
     const eligibleMarketplaces = await getEligibleMarketplaces();
-    logger.info(`[Scheduler] Inventory sync: ${eligibleMarketplaces.length} eligible marketplaces`);
 
+    // Group by credential_id + warehouse — same credential+warehouse returns identical inventory
+    // e.g. DE/FR/IT/ES all share credential 4 + warehouse EU → one call covers all
+    const byGroup = new Map<string, MarketplaceConfig[]>();
     for (const mp of eligibleMarketplaces) {
+      const key = `${mp.credential_id}|${mp.warehouse}`;
+      if (!byGroup.has(key)) byGroup.set(key, []);
+      byGroup.get(key)!.push(mp);
+    }
+
+    logger.info(`[Scheduler] Inventory sync: ${byGroup.size} unique credential+warehouse groups (${eligibleMarketplaces.length} marketplaces)`);
+
+    for (const [key, group] of byGroup) {
+      const representative = group[0];
+      const channels = group.map(m => m.country_code).join(',');
       try {
-        await syncInventoryForMarketplace(mp);
+        logger.info(`[Scheduler] Inventory sync ${key}: ${channels} (via ${representative.country_code})`);
+        await syncInventoryForMarketplace(representative);
       } catch (err: any) {
-        logger.error(`[Scheduler] Inventory sync failed for ${mp.country_code}:`, err.message);
+        logger.error(`[Scheduler] Inventory sync failed for ${key} (${representative.country_code}):`, err.message);
       }
-      // Brief pause between marketplaces
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   } finally {
