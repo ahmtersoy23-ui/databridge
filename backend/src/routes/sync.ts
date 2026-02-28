@@ -62,9 +62,16 @@ router.post('/trigger', authMiddleware, validateBody(triggerSchema), async (req:
         res.status(404).json({ success: false, error: `Marketplace not found: ${marketplace}` });
         return;
       }
-      // Run backfill in background
+
+      // Check for sibling marketplaces sharing the same credential
+      // SP-API returns all orders for the entire region in one call
+      const siblings = await getSiblingMarketplaces(mp);
+      const siblingNote = siblings.length > 0
+        ? ` (covers ${[mp.country_code, ...siblings.map(s => s.country_code)].join(',')} via sales-channel mapping)`
+        : '';
+
       backfillSales(mp, months || 13).catch(err => logger.error('[Sync] Backfill error:', err));
-      res.json({ success: true, message: `Sales backfill started for ${marketplace} (${months || 13} months)` });
+      res.json({ success: true, message: `Sales backfill started for ${marketplace}${siblingNote} (${months || 13} months)` });
     }
   } catch (err: any) {
     logger.error('[Sync] Trigger error:', err.message);
@@ -94,6 +101,15 @@ async function getMarketplaceByCode(code: string) {
     [code.toUpperCase()]
   );
   return result.rows[0] || null;
+}
+
+async function getSiblingMarketplaces(mp: any) {
+  if (!mp.credential_id) return [];
+  const result = await pool.query(
+    'SELECT country_code FROM marketplace_config WHERE credential_id = $1 AND marketplace_id <> $2 AND is_active = true',
+    [mp.credential_id, mp.marketplace_id]
+  );
+  return result.rows;
 }
 
 export default router;

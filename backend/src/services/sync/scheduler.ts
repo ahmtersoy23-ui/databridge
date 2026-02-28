@@ -64,13 +64,26 @@ async function runSalesSync(): Promise<void> {
   isSyncing = true;
   try {
     const eligibleMarketplaces = await getEligibleMarketplaces();
-    logger.info(`[Scheduler] Sales sync: ${eligibleMarketplaces.length} eligible marketplaces`);
 
+    // Group by credential_id — SP-API returns all orders for the entire region
+    // in a single call, so we only need one call per credential
+    const byCredential = new Map<number, MarketplaceConfig[]>();
     for (const mp of eligibleMarketplaces) {
+      const credId = mp.credential_id!; // guaranteed non-null by getEligibleMarketplaces JOIN
+      if (!byCredential.has(credId)) byCredential.set(credId, []);
+      byCredential.get(credId)!.push(mp);
+    }
+
+    logger.info(`[Scheduler] Sales sync: ${byCredential.size} credentials (${eligibleMarketplaces.length} marketplaces)`);
+
+    for (const [credId, group] of byCredential) {
+      const representative = group[0];
+      const channels = group.map(m => m.channel).join(',');
       try {
-        await syncSalesForMarketplace(mp);
+        logger.info(`[Scheduler] Syncing credential ${credId}: ${channels} (via ${representative.country_code})`);
+        await syncSalesForMarketplace(representative);
       } catch (err: any) {
-        logger.error(`[Scheduler] Sales sync failed for ${mp.country_code}:`, err.message);
+        logger.error(`[Scheduler] Sales sync failed for credential ${credId} (${representative.country_code}):`, err.message);
       }
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
