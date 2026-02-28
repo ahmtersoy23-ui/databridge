@@ -4,7 +4,29 @@ import logger from '../config/logger';
 
 const router = Router();
 
-const VALID_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa'];
+const VALID_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'eu'];
+const EU_CHANNELS = ['de', 'fr', 'it', 'es'];
+
+const ROLLING_WINDOW_COLUMNS = `
+  COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::numeric as "last7",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::numeric as "last30",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::numeric as "last90",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 180 THEN o.quantity END), 0)::numeric as "last180",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 366 THEN o.quantity END), 0)::numeric as "last366",
+
+  -- Previous year: same lookback periods
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 7 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast7",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 30 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast30",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 90 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast90",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 180 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast180",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 365 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast365",
+
+  -- Previous year: forward-looking periods (for forecast basis)
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 7 THEN o.quantity END), 0)::numeric as "preYearNext7",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 30 THEN o.quantity END), 0)::numeric as "preYearNext30",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::numeric as "preYearNext90",
+  COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::numeric as "preYearNext180"
+`;
 
 // GET /api/v1/amazonsales/:channel
 // StockPulse-compatible: returns array of sales objects with rolling windows
@@ -17,35 +39,51 @@ router.get('/:channel', async (req: Request, res: Response) => {
   }
 
   try {
-    const result = await pool.query(`
-      SELECT
-        COALESCE(o.iwasku, o.sku) as iwasku,
-        o.asin,
-        COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::numeric as "last7",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::numeric as "last30",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::numeric as "last90",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 180 THEN o.quantity END), 0)::numeric as "last180",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 366 THEN o.quantity END), 0)::numeric as "last366",
+    let result;
 
-        -- Previous year: same lookback periods
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 7 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast7",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 30 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast30",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 90 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast90",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 180 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast180",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 365 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::numeric as "preYearLast365",
-
-        -- Previous year: forward-looking periods (for forecast basis)
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 7 THEN o.quantity END), 0)::numeric as "preYearNext7",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 30 THEN o.quantity END), 0)::numeric as "preYearNext30",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::numeric as "preYearNext90",
-        COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::numeric as "preYearNext180"
-      FROM raw_orders o
-      WHERE o.channel = $1
-        AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
-        AND o.sku NOT LIKE 'amzn.gr.%'
-      GROUP BY COALESCE(o.iwasku, o.sku), o.asin
-      ORDER BY COALESCE(o.iwasku, o.sku)
-    `, [channel]);
+    if (channel === 'eu') {
+      // EU aggregate: sum across de/fr/it/es, pick ASIN with highest last30
+      result = await pool.query(`
+        WITH per_sku AS (
+          SELECT
+            COALESCE(o.iwasku, o.sku) as iwasku,
+            o.asin,
+            ${ROLLING_WINDOW_COLUMNS}
+          FROM raw_orders o
+          WHERE o.channel = ANY($1)
+            AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
+            AND o.sku NOT LIKE 'amzn.gr.%'
+          GROUP BY COALESCE(o.iwasku, o.sku), o.asin
+        )
+        SELECT
+          iwasku,
+          (array_agg(asin ORDER BY "last30" DESC))[1] as asin,
+          SUM("last7")::numeric as "last7", SUM("last30")::numeric as "last30",
+          SUM("last90")::numeric as "last90", SUM("last180")::numeric as "last180",
+          SUM("last366")::numeric as "last366",
+          SUM("preYearLast7")::numeric as "preYearLast7", SUM("preYearLast30")::numeric as "preYearLast30",
+          SUM("preYearLast90")::numeric as "preYearLast90", SUM("preYearLast180")::numeric as "preYearLast180",
+          SUM("preYearLast365")::numeric as "preYearLast365",
+          SUM("preYearNext7")::numeric as "preYearNext7", SUM("preYearNext30")::numeric as "preYearNext30",
+          SUM("preYearNext90")::numeric as "preYearNext90", SUM("preYearNext180")::numeric as "preYearNext180"
+        FROM per_sku
+        GROUP BY iwasku
+        ORDER BY iwasku
+      `, [EU_CHANNELS]);
+    } else {
+      result = await pool.query(`
+        SELECT
+          COALESCE(o.iwasku, o.sku) as iwasku,
+          o.asin,
+          ${ROLLING_WINDOW_COLUMNS}
+        FROM raw_orders o
+        WHERE o.channel = $1
+          AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
+          AND o.sku NOT LIKE 'amzn.gr.%'
+        GROUP BY COALESCE(o.iwasku, o.sku), o.asin
+        ORDER BY COALESCE(o.iwasku, o.sku)
+      `, [channel]);
+    }
 
     logger.info(`[Sales] Serving ${channel}: ${result.rows.length} items`);
     res.json(result.rows);

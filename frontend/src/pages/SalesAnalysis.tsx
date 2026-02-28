@@ -10,7 +10,9 @@ interface SalesRow {
   preYearNext7: number; preYearNext30: number; preYearNext90: number; preYearNext180: number;
 }
 
-const CHANNELS = ['us', 'au', 'ae', 'sa', 'uk', 'de', 'fr', 'it', 'es'];
+const CHANNELS = ['us', 'ca', 'au', 'ae', 'sa', 'uk', 'de', 'fr', 'it', 'es', 'eu'];
+
+const CHANNEL_LABELS: Record<string, string> = { eu: 'EU (All)' };
 
 const cardStyle = {
   background: '#fff',
@@ -150,7 +152,7 @@ export default function SalesAnalysis() {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {CHANNELS.map(ch => (
               <button key={ch} onClick={() => setChannel(ch)} style={tabStyle(channel === ch)}>
-                {ch.toUpperCase()}
+                {CHANNEL_LABELS[ch] || ch.toUpperCase()}
               </button>
             ))}
           </div>

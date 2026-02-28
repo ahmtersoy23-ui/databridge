@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { pool } from '../../config/database';
 import { syncInventoryForMarketplace } from './inventorySync';
 import { syncSalesForMarketplace } from './salesSync';
+import { writeSalesData } from './salesDataWriter';
 import logger from '../../config/logger';
 import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
@@ -73,6 +74,13 @@ async function runSalesSync(): Promise<void> {
       }
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
+
+    // Refresh aggregated sales_data in pricelab_db after all marketplace syncs
+    try {
+      await writeSalesData();
+    } catch (err: any) {
+      logger.error('[Scheduler] writeSalesData error:', err.message);
+    }
   } finally {
     isSyncing = false;
   }
@@ -99,4 +107,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, getActiveMarketplaces, isSyncing };
+export { runInventorySync, runSalesSync, getActiveMarketplaces, isSyncing, writeSalesData };
