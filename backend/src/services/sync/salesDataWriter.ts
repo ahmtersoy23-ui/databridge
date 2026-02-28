@@ -1,8 +1,8 @@
 import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
 
-const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa'];
-const EU_CHANNELS = ['de', 'fr', 'it', 'es'];
+const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'others'];
+const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
 
 // Aggregate per iwasku (not per iwasku+asin) since sales_data has UNIQUE(iwasku, channel)
 // Uses CTE to first aggregate per (iwasku, asin), then merges by iwasku picking best ASIN

@@ -70,6 +70,12 @@ export const SALES_CHANNEL_TO_CHANNEL: Record<string, string> = {
   'Amazon.com.au': 'au',
   'Amazon.ae': 'ae',
   'Amazon.sa': 'sa',
+  // Others — unmapped EU marketplaces
+  'Amazon.se': 'others',
+  'Amazon.nl': 'others',
+  'Amazon.pl': 'others',
+  'Amazon.com.be': 'others',
+  'Amazon.com.tr': 'others',
 };
 
 // Timezone offsets for marketplace date conversion
@@ -84,4 +90,5 @@ export const MARKETPLACE_TIMEZONE_OFFSETS: Record<string, number> = {
   au: 10,
   ae: 4,
   sa: 3,
+  others: 1,
 };

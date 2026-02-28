@@ -51,7 +51,7 @@ export async function fetchOrdersByDateRange(
 
     // Resolve actual channel from sales-channel field (handles AE/SA sharing same report)
     const salesChannel = row['sales-channel'] || row['SalesChannel'] || '';
-    const resolvedChannel = SALES_CHANNEL_TO_CHANNEL[salesChannel] || marketplace.channel;
+    const resolvedChannel = SALES_CHANNEL_TO_CHANNEL[salesChannel] || 'others';
 
     // Use resolved channel's timezone for local date conversion
     const tzOffset = MARKETPLACE_TIMEZONE_OFFSETS[resolvedChannel] ?? marketplace.timezone_offset;
