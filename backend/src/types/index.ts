@@ -2,6 +2,7 @@ export interface SpApiCredentials {
   id: number;
   region: string;
   seller_id: string;
+  account_name: string;
   refresh_token: string;
   client_id: string;
   client_secret: string;
@@ -16,6 +17,7 @@ export interface MarketplaceConfig {
   region: string;
   timezone_offset: number;
   is_active: boolean;
+  credential_id: number | null;
 }
 
 export interface SyncJob {

@@ -17,12 +17,16 @@ async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   return result.rows;
 }
 
-async function hasCredentials(region: string): Promise<boolean> {
-  const result = await pool.query(
-    'SELECT COUNT(*) as count FROM sp_api_credentials WHERE region = $1 AND is_active = true',
-    [region]
-  );
-  return parseInt(result.rows[0].count) > 0;
+async function getEligibleMarketplaces(): Promise<MarketplaceConfig[]> {
+  // Only return marketplaces that have an active linked credential
+  const result = await pool.query(`
+    SELECT mc.*
+    FROM marketplace_config mc
+    JOIN sp_api_credentials cred ON mc.credential_id = cred.id AND cred.is_active = true
+    WHERE mc.is_active = true
+    ORDER BY mc.country_code
+  `);
+  return result.rows;
 }
 
 async function runInventorySync(): Promise<void> {
@@ -33,21 +37,8 @@ async function runInventorySync(): Promise<void> {
 
   isSyncing = true;
   try {
-    const marketplaces = await getActiveMarketplaces();
-
-    // Group by region to check credentials
-    const regions = [...new Set(marketplaces.map(m => m.region))];
-    const activeRegions: string[] = [];
-
-    for (const region of regions) {
-      if (await hasCredentials(region)) {
-        activeRegions.push(region);
-      } else {
-        logger.warn(`[Scheduler] No credentials for region ${region}, skipping`);
-      }
-    }
-
-    const eligibleMarketplaces = marketplaces.filter(m => activeRegions.includes(m.region));
+    const eligibleMarketplaces = await getEligibleMarketplaces();
+    logger.info(`[Scheduler] Inventory sync: ${eligibleMarketplaces.length} eligible marketplaces`);
 
     for (const mp of eligibleMarketplaces) {
       try {
@@ -71,17 +62,8 @@ async function runSalesSync(): Promise<void> {
 
   isSyncing = true;
   try {
-    const marketplaces = await getActiveMarketplaces();
-    const regions = [...new Set(marketplaces.map(m => m.region))];
-    const activeRegions: string[] = [];
-
-    for (const region of regions) {
-      if (await hasCredentials(region)) {
-        activeRegions.push(region);
-      }
-    }
-
-    const eligibleMarketplaces = marketplaces.filter(m => activeRegions.includes(m.region));
+    const eligibleMarketplaces = await getEligibleMarketplaces();
+    logger.info(`[Scheduler] Sales sync: ${eligibleMarketplaces.length} eligible marketplaces`);
 
     for (const mp of eligibleMarketplaces) {
       try {

@@ -1,5 +1,5 @@
 import { SellingPartner } from 'amazon-sp-api';
-import { getSpApiClient } from './client';
+import { getSpApiClient, getSpApiClientByRegion } from './client';
 import logger from '../../config/logger';
 import { SALES_CHANNEL_TO_CHANNEL, MARKETPLACE_TIMEZONE_OFFSETS } from '../../config/constants';
 import type { MarketplaceConfig, RawOrder } from '../../types';
@@ -9,7 +9,9 @@ export async function fetchOrdersByDateRange(
   startDate: Date,
   endDate: Date
 ): Promise<RawOrder[]> {
-  const client = await getSpApiClient(marketplace.region.toLowerCase());
+  const client = marketplace.credential_id
+    ? await getSpApiClient(marketplace.credential_id)
+    : await getSpApiClientByRegion(marketplace.region.toLowerCase());
 
   // Request the report
   logger.info(`[SP-API] Requesting orders report for ${marketplace.country_code}: ${startDate.toISOString()} - ${endDate.toISOString()}`);

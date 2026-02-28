@@ -1,4 +1,4 @@
-import { getSpApiClient } from './client';
+import { getSpApiClient, getSpApiClientByRegion } from './client';
 import logger from '../../config/logger';
 import type { SpApiInventorySummary } from './types';
 import type { FbaInventoryItem, MarketplaceConfig } from '../../types';
@@ -6,7 +6,9 @@ import type { FbaInventoryItem, MarketplaceConfig } from '../../types';
 export async function fetchFbaInventory(
   marketplace: MarketplaceConfig
 ): Promise<FbaInventoryItem[]> {
-  const client = await getSpApiClient(marketplace.region.toLowerCase());
+  const client = marketplace.credential_id
+    ? await getSpApiClient(marketplace.credential_id)
+    : await getSpApiClientByRegion(marketplace.region.toLowerCase());
   const items: FbaInventoryItem[] = [];
   let nextToken: string | undefined;
 

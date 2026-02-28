@@ -33,17 +33,11 @@ router.get('/', authMiddleware, async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/v1/credentials - Add/update credentials
+// POST /api/v1/credentials - Add credentials
 router.post('/', authMiddleware, validateBody(credentialSchema), async (req: Request, res: Response) => {
   const { region, seller_id, refresh_token, client_id, client_secret, account_name } = req.body;
 
   try {
-    // Deactivate existing credentials for this region
-    await pool.query(
-      'UPDATE sp_api_credentials SET is_active = false WHERE region = $1',
-      [region]
-    );
-
     const result = await pool.query(`
       INSERT INTO sp_api_credentials (region, seller_id, refresh_token, client_id, client_secret, account_name)
       VALUES ($1, $2, $3, $4, $5, $6)
@@ -53,7 +47,7 @@ router.post('/', authMiddleware, validateBody(credentialSchema), async (req: Req
     // Clear cached SP-API clients
     clearClientCache();
 
-    logger.info(`[Credentials] Added credentials for region: ${region}`);
+    logger.info(`[Credentials] Added credentials for region: ${region} (${account_name || 'unnamed'})`);
     res.json({ success: true, data: result.rows[0] });
   } catch (err: any) {
     logger.error('[Credentials] Error saving:', err.message);
@@ -111,6 +105,26 @@ router.put('/:id', authMiddleware, validateBody(updateSchema), async (req: Reque
     res.json({ success: true, data: result.rows[0] });
   } catch (err: any) {
     logger.error('[Credentials] Error updating:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PATCH /api/v1/credentials/:id/toggle - Toggle active status
+router.patch('/:id/toggle', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      'UPDATE sp_api_credentials SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING id, region, seller_id, account_name, is_active',
+      [req.params.id]
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ success: false, error: 'Credential not found' });
+      return;
+    }
+    clearClientCache();
+    const cred = result.rows[0];
+    logger.info(`[Credentials] Toggled credential ${cred.id} (${cred.account_name}): is_active=${cred.is_active}`);
+    res.json({ success: true, data: cred });
+  } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });

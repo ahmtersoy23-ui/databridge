@@ -80,6 +80,15 @@ export default function Settings() {
     setMessage('');
   };
 
+  const handleToggle = async (id: number) => {
+    try {
+      await axios.patch(`/api/v1/credentials/${id}/toggle`);
+      fetchCredentials();
+    } catch {
+      // ignore
+    }
+  };
+
   const handleDelete = async (id: number, region: string) => {
     if (!confirm(`Delete ${region} credentials?`)) return;
     setDeleting(id);
@@ -157,6 +166,9 @@ export default function Settings() {
                   </td>
                   <td style={{ padding: '0.5rem' }}>{new Date(c.created_at).toLocaleDateString()}</td>
                   <td style={{ padding: '0.5rem' }}>
+                    <button onClick={() => handleToggle(c.id)} style={btnStyle(c.is_active ? '#d97706' : '#059669')}>
+                      {c.is_active ? 'Deactivate' : 'Activate'}
+                    </button>
                     <button onClick={() => handleEdit(c)} style={btnStyle('#2563eb')}>Edit</button>
                     <button
                       onClick={() => handleDelete(c.id, c.region)}

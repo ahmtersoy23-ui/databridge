@@ -19,7 +19,7 @@ interface InvRow {
   inbound_receiving_quantity: number;
 }
 
-const WAREHOUSES = ['US', 'AU', 'AE', 'SA'];
+const WAREHOUSES = ['US', 'AU', 'AE', 'SA', 'UK', 'EU'];
 
 const cardStyle = {
   background: '#fff',

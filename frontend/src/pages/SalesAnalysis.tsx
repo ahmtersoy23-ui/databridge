@@ -10,7 +10,7 @@ interface SalesRow {
   preYearNext7: number; preYearNext30: number; preYearNext90: number; preYearNext180: number;
 }
 
-const CHANNELS = ['us', 'au', 'ae', 'sa'];
+const CHANNELS = ['us', 'au', 'ae', 'sa', 'uk', 'de', 'fr', 'it', 'es'];
 
 const cardStyle = {
   background: '#fff',
