@@ -50,8 +50,10 @@ export async function fetchFbaInventory(
       });
     }
 
-    nextToken = response?.pagination?.nextToken;
-    logger.debug(`[SP-API] Inventory batch: ${summaries.length} items, nextToken: ${!!nextToken}`);
+    nextToken = response?.nextToken
+      || response?.pagination?.nextToken
+      || response?.payload?.pagination?.nextToken;
+    logger.info(`[SP-API] Inventory batch: ${summaries.length} items, hasMore: ${!!nextToken}`);
   } while (nextToken);
 
   logger.info(`[SP-API] Fetched ${items.length} inventory items for ${marketplace.country_code}`);

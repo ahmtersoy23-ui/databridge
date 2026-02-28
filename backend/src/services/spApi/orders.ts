@@ -1,6 +1,7 @@
 import { SellingPartner } from 'amazon-sp-api';
 import { getSpApiClient } from './client';
 import logger from '../../config/logger';
+import { SALES_CHANNEL_TO_CHANNEL, MARKETPLACE_TIMEZONE_OFFSETS } from '../../config/constants';
 import type { MarketplaceConfig, RawOrder } from '../../types';
 
 export async function fetchOrdersByDateRange(
@@ -46,15 +47,20 @@ export async function fetchOrdersByDateRange(
     const purchaseDate = new Date(row['purchase-date'] || row['PurchaseDate']);
     if (isNaN(purchaseDate.getTime())) continue;
 
-    // Convert to marketplace local date
-    const localDate = toMarketplaceLocalDate(purchaseDate, marketplace.timezone_offset);
+    // Resolve actual channel from sales-channel field (handles AE/SA sharing same report)
+    const salesChannel = row['sales-channel'] || row['SalesChannel'] || '';
+    const resolvedChannel = SALES_CHANNEL_TO_CHANNEL[salesChannel] || marketplace.channel;
+
+    // Use resolved channel's timezone for local date conversion
+    const tzOffset = MARKETPLACE_TIMEZONE_OFFSETS[resolvedChannel] ?? marketplace.timezone_offset;
+    const localDate = toMarketplaceLocalDate(purchaseDate, tzOffset);
 
     const qty = parseInt(row['quantity'] || row['item-quantity'] || '0') || 0;
     if (qty === 0) continue;
 
     orders.push({
       marketplace_id: marketplace.marketplace_id,
-      channel: marketplace.channel,
+      channel: resolvedChannel,
       amazon_order_id: row['amazon-order-id'] || row['AmazonOrderId'] || '',
       purchase_date: purchaseDate,
       purchase_date_local: localDate,

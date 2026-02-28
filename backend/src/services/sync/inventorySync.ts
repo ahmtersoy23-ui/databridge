@@ -17,9 +17,9 @@ export async function syncInventoryForMarketplace(marketplace: MarketplaceConfig
       return 0;
     }
 
-    // 2. Map SKUs to iwasku
+    // 2. Map SKUs to iwasku (with ASIN fallback)
     const skuMappings = await mapBulkSkusToIwasku(
-      items.map(i => ({ sku: i.sku, countryCode: marketplace.country_code }))
+      items.map(i => ({ sku: i.sku, countryCode: marketplace.country_code, asin: i.asin }))
     );
 
     for (const item of items) {

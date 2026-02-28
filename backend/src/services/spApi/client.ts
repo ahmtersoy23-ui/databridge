@@ -9,7 +9,7 @@ const CLIENT_CACHE_TTL = 30 * 60 * 1000; // 30 min
 
 export async function getCredentials(region: string): Promise<SpApiCredentials | null> {
   const result = await pool.query(
-    'SELECT * FROM sp_api_credentials WHERE region = $1 AND is_active = true LIMIT 1',
+    'SELECT * FROM sp_api_credentials WHERE UPPER(region) = UPPER($1) AND is_active = true LIMIT 1',
     [region]
   );
   return result.rows[0] || null;

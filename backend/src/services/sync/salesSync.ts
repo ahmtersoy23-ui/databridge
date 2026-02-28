@@ -25,9 +25,9 @@ export async function syncSalesForMarketplace(
       return 0;
     }
 
-    // 2. Map SKUs to iwasku
+    // 2. Map SKUs to iwasku (with ASIN fallback)
     const skuMappings = await mapBulkSkusToIwasku(
-      orders.map(o => ({ sku: o.sku, countryCode: marketplace.country_code }))
+      orders.map(o => ({ sku: o.sku, countryCode: marketplace.country_code, asin: o.asin }))
     );
 
     for (const order of orders) {
@@ -48,13 +48,15 @@ export async function syncSalesForMarketplace(
 }
 
 export async function backfillSales(marketplace: MarketplaceConfig, months: number = 13): Promise<number> {
+  const jobId = await createSyncJob('sales_backfill', marketplace.country_code);
+  await updateSyncJob(jobId, 'running');
+
   logger.info(`[Sync] Starting sales backfill for ${marketplace.country_code}: ${months} months`);
 
   let totalOrders = 0;
   const now = new Date();
 
-  // Process month by month to avoid huge report requests
-  for (let m = 0; m < months; m++) {
+  for (let m = months - 1; m >= 0; m--) {
     const endDate = new Date(now);
     endDate.setMonth(endDate.getMonth() - m);
 
@@ -62,25 +64,55 @@ export async function backfillSales(marketplace: MarketplaceConfig, months: numb
     startDate.setMonth(startDate.getMonth() - 1);
 
     try {
-      const count = await syncSalesForMarketplace(marketplace, 30);
-      totalOrders += count;
-      logger.info(`[Sync] Backfill month ${m + 1}/${months} for ${marketplace.country_code}: ${count} orders`);
+      // Fetch orders for this specific month
+      const orders = await fetchOrdersByDateRange(marketplace, startDate, endDate);
 
-      // Respect rate limits between months
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      if (orders.length > 0) {
+        const skuMappings = await mapBulkSkusToIwasku(
+          orders.map(o => ({ sku: o.sku, countryCode: marketplace.country_code, asin: o.asin }))
+        );
+        for (const order of orders) {
+          order.iwasku = skuMappings.get(order.sku) || null;
+        }
+        await upsertOrders(orders);
+      }
+
+      totalOrders += orders.length;
+      logger.info(`[Sync] Backfill ${months - m}/${months} (${startDate.toISOString().split('T')[0]} → ${endDate.toISOString().split('T')[0]}): ${orders.length} orders`);
+
+      // Wait between months to respect rate limits
+      if (m > 0) await new Promise(resolve => setTimeout(resolve, 5000));
     } catch (err: any) {
-      logger.error(`[Sync] Backfill month ${m + 1} failed for ${marketplace.country_code}:`, err.message);
+      logger.error(`[Sync] Backfill month ${months - m}/${months} failed for ${marketplace.country_code}: ${err.message}`);
+      // Continue with next month
     }
   }
 
+  await updateSyncJob(jobId, 'completed', totalOrders);
+  logger.info(`[Sync] Backfill completed for ${marketplace.country_code}: ${totalOrders} total orders`);
   return totalOrders;
 }
 
 async function upsertOrders(orders: RawOrder[]): Promise<void> {
+  // Deduplicate by (amazon_order_id, sku) — keep last occurrence (most recent data)
+  const seen = new Map<string, RawOrder>();
+  for (const order of orders) {
+    const key = `${order.amazon_order_id}|${order.sku}`;
+    const existing = seen.get(key);
+    if (existing) {
+      // Aggregate quantity for same order+sku
+      existing.quantity += order.quantity;
+      existing.item_price += order.item_price;
+    } else {
+      seen.set(key, { ...order });
+    }
+  }
+  const dedupedOrders = Array.from(seen.values());
+
   const BATCH_SIZE = 500;
 
-  for (let i = 0; i < orders.length; i += BATCH_SIZE) {
-    const batch = orders.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < dedupedOrders.length; i += BATCH_SIZE) {
+    const batch = dedupedOrders.slice(i, i + BATCH_SIZE);
     const values: string[] = [];
     const params: any[] = [];
 
@@ -113,6 +145,7 @@ async function upsertOrders(orders: RawOrder[]): Promise<void> {
         currency, order_status, fulfillment_channel, created_at
       ) VALUES ${values.join(', ')}
       ON CONFLICT (amazon_order_id, sku) DO UPDATE SET
+        channel = EXCLUDED.channel,
         iwasku = EXCLUDED.iwasku,
         quantity = EXCLUDED.quantity,
         item_price = EXCLUDED.item_price,

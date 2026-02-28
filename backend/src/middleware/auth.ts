@@ -21,6 +21,13 @@ const getSSOVerifyUrl = () => process.env.SSO_VERIFY_URL || 'https://apps.iwa.we
 const getSSOAppCode = () => process.env.SSO_APP_CODE || 'databridge';
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // Skip auth in development
+  if (process.env.NODE_ENV === 'development') {
+    req.user = { id: 0, email: 'dev@local', name: 'Developer', role: 'admin' };
+    next();
+    return;
+  }
+
   const authHeader = req.headers.authorization;
   const token = authHeader?.replace('Bearer ', '');
 

@@ -42,6 +42,7 @@ router.get('/:channel', async (req: Request, res: Response) => {
       FROM raw_orders o
       WHERE o.channel = $1
         AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
+        AND o.sku NOT LIKE 'amzn.gr.%'
       GROUP BY COALESCE(o.iwasku, o.sku), o.asin
       ORDER BY COALESCE(o.iwasku, o.sku)
     `, [channel]);

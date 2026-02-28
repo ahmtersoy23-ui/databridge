@@ -4,7 +4,7 @@ import logger from '../config/logger';
 
 const router = Router();
 
-const VALID_WAREHOUSES = ['US', 'UK', 'EU', 'CA', 'AU'];
+const VALID_WAREHOUSES = ['US', 'UK', 'EU', 'CA', 'AU', 'AE', 'SA'];
 
 // GET /api/v1/amazonfba/:warehouse
 // StockPulse-compatible: returns array of inventory objects
@@ -36,6 +36,7 @@ router.get('/:warehouse', async (req: Request, res: Response) => {
         inbound_receiving_quantity
       FROM fba_inventory
       WHERE warehouse = $1
+        AND sku NOT LIKE 'amzn.gr.%'
       ORDER BY COALESCE(iwasku, sku)
     `, [warehouse]);
 

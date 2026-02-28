@@ -27,13 +27,51 @@ router.get('/', async (_req: Request, res: Response) => {
       GROUP BY region
     `);
 
-    // Data counts
+    // Data counts (exclude amzn.gr return SKUs)
     const counts = await pool.query(`
       SELECT
-        (SELECT COUNT(*) FROM raw_orders) as total_orders,
-        (SELECT COUNT(*) FROM fba_inventory) as total_inventory,
+        (SELECT COUNT(*) FROM raw_orders WHERE sku NOT LIKE 'amzn.gr.%') as total_orders,
+        (SELECT COUNT(*) FROM fba_inventory WHERE sku NOT LIKE 'amzn.gr.%') as total_inventory,
         (SELECT COUNT(DISTINCT channel) FROM raw_orders) as channels_with_data,
         (SELECT COUNT(DISTINCT warehouse) FROM fba_inventory) as warehouses_with_data
+    `);
+
+    // SKU match quality (exclude amzn.gr return SKUs)
+    const skuMatch = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN iwasku IS NOT NULL THEN 1 END) as matched,
+        COUNT(CASE WHEN iwasku IS NULL THEN 1 END) as unmatched
+      FROM raw_orders
+      WHERE sku NOT LIKE 'amzn.gr.%'
+    `);
+
+    const unmatchedSkus = await pool.query(`
+      SELECT sku, asin, channel, COUNT(*) as order_count,
+             SUM(quantity) as total_qty
+      FROM raw_orders
+      WHERE iwasku IS NULL AND sku NOT LIKE 'amzn.gr.%'
+      GROUP BY sku, asin, channel
+      ORDER BY order_count DESC
+      LIMIT 20
+    `);
+
+    // Inventory match quality (exclude amzn.gr return SKUs)
+    const invMatch = await pool.query(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN iwasku IS NOT NULL THEN 1 END) as matched,
+        COUNT(CASE WHEN iwasku IS NULL THEN 1 END) as unmatched
+      FROM fba_inventory
+      WHERE sku NOT LIKE 'amzn.gr.%'
+    `);
+
+    const unmatchedInv = await pool.query(`
+      SELECT sku, asin, warehouse, fulfillable_quantity
+      FROM fba_inventory
+      WHERE iwasku IS NULL AND sku NOT LIKE 'amzn.gr.%'
+      ORDER BY fulfillable_quantity DESC
+      LIMIT 20
     `);
 
     res.json({
@@ -43,6 +81,12 @@ router.get('/', async (_req: Request, res: Response) => {
         marketplaces: marketplaces.rows,
         credentials: credentials.rows,
         dataCounts: counts.rows[0],
+        skuQuality: {
+          orders: skuMatch.rows[0],
+          unmatchedOrders: unmatchedSkus.rows,
+          inventory: invMatch.rows[0],
+          unmatchedInventory: unmatchedInv.rows,
+        },
       },
     });
   } catch (err: any) {

@@ -2,6 +2,10 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
+import Orders from './pages/Orders';
+import Inventory from './pages/Inventory';
+import SalesAnalysis from './pages/SalesAnalysis';
+import InventoryAnalysis from './pages/InventoryAnalysis';
 
 const navStyle = {
   display: 'flex',
@@ -37,6 +41,18 @@ export default function App() {
         <NavLink to="/settings" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Settings
         </NavLink>
+        <NavLink to="/orders" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Orders
+        </NavLink>
+        <NavLink to="/inventory" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Inventory
+        </NavLink>
+        <NavLink to="/sales-analysis" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Sales Analysis
+        </NavLink>
+        <NavLink to="/inventory-analysis" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Inv. Analysis
+        </NavLink>
         <NavLink to="/logs" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Logs
         </NavLink>
@@ -45,6 +61,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/sales-analysis" element={<SalesAnalysis />} />
+          <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
       </main>

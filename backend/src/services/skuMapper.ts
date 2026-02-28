@@ -32,6 +32,11 @@ export async function loadSkuMappings(): Promise<Map<string, SkuMapping>> {
     if (!map.has(row.sku)) {
       map.set(row.sku, row);
     }
+    // Also index by "asin|country_code" for ASIN fallback
+    const asinKey = `asin:${row.asin}|${row.country_code}`;
+    if (!map.has(asinKey)) {
+      map.set(asinKey, row);
+    }
   }
 
   skuCache = map;
@@ -40,36 +45,64 @@ export async function loadSkuMappings(): Promise<Map<string, SkuMapping>> {
   return map;
 }
 
-export async function mapSkuToIwasku(sku: string, countryCode: string): Promise<string | null> {
+export async function mapSkuToIwasku(sku: string, countryCode: string, asin?: string): Promise<string | null> {
   const mappings = await loadSkuMappings();
+  const cc = countryCode.toUpperCase();
 
-  // Try precise match first: sku + country_code
-  const preciseKey = `${sku}|${countryCode.toUpperCase()}`;
+  // 1. Precise match: sku + country_code
+  const preciseKey = `${sku}|${cc}`;
   const precise = mappings.get(preciseKey);
   if (precise) return precise.iwasku;
 
-  // Fallback: just SKU
+  // 2. SKU-only fallback
   const fallback = mappings.get(sku);
   if (fallback) return fallback.iwasku;
+
+  // 3. ASIN fallback: asin + country_code
+  if (asin) {
+    const asinKey = `asin:${asin}|${cc}`;
+    const asinFallback = mappings.get(asinKey);
+    if (asinFallback) return asinFallback.iwasku;
+  }
 
   return null;
 }
 
 export async function mapBulkSkusToIwasku(
-  items: Array<{ sku: string; countryCode: string }>
+  items: Array<{ sku: string; countryCode: string; asin?: string }>
 ): Promise<Map<string, string | null>> {
   const mappings = await loadSkuMappings();
   const result = new Map<string, string | null>();
 
   for (const item of items) {
-    const preciseKey = `${item.sku}|${item.countryCode.toUpperCase()}`;
+    const cc = item.countryCode.toUpperCase();
+
+    // 1. Precise match: sku + country_code
+    const preciseKey = `${item.sku}|${cc}`;
     const precise = mappings.get(preciseKey);
     if (precise) {
       result.set(item.sku, precise.iwasku);
-    } else {
-      const fallback = mappings.get(item.sku);
-      result.set(item.sku, fallback?.iwasku || null);
+      continue;
     }
+
+    // 2. SKU-only fallback
+    const skuFallback = mappings.get(item.sku);
+    if (skuFallback) {
+      result.set(item.sku, skuFallback.iwasku);
+      continue;
+    }
+
+    // 3. ASIN fallback: asin + country_code
+    if (item.asin) {
+      const asinKey = `asin:${item.asin}|${cc}`;
+      const asinFallback = mappings.get(asinKey);
+      if (asinFallback) {
+        result.set(item.sku, asinFallback.iwasku);
+        continue;
+      }
+    }
+
+    result.set(item.sku, null);
   }
 
   return result;

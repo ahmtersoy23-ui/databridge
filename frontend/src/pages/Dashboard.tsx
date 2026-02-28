@@ -11,11 +11,19 @@ interface SyncInfo {
   error_message: string | null;
 }
 
+interface SkuQuality {
+  orders: { total: string; matched: string; unmatched: string };
+  unmatchedOrders: Array<{ sku: string; asin: string; channel: string; order_count: string; total_qty: string }>;
+  inventory: { total: string; matched: string; unmatched: string };
+  unmatchedInventory: Array<{ sku: string; asin: string; warehouse: string; fulfillable_quantity: number }>;
+}
+
 interface StatusData {
   lastSyncs: SyncInfo[];
   marketplaces: Array<{ country_code: string; channel: string; warehouse: string; region: string; is_active: boolean }>;
   credentials: Array<{ region: string; count: string; has_active: boolean }>;
   dataCounts: { total_orders: string; total_inventory: string; channels_with_data: string; warehouses_with_data: string };
+  skuQuality?: SkuQuality;
 }
 
 const cardStyle = {
@@ -156,6 +164,124 @@ export default function Dashboard() {
           </tbody>
         </table>
       </div>
+
+      {/* SKU Match Quality */}
+      {status.skuQuality && (
+        <div style={cardStyle}>
+          <h2 style={{ marginBottom: '1rem' }}>SKU Match Quality</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            {/* Orders */}
+            <div>
+              <h3 style={{ fontSize: '0.95rem', color: '#475569', marginBottom: '0.5rem' }}>Orders</h3>
+              {(() => {
+                const q = status.skuQuality!.orders;
+                const total = parseInt(q.total);
+                const matched = parseInt(q.matched);
+                const pct = total > 0 ? ((matched / total) * 100).toFixed(1) : '0';
+                return (
+                  <div>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem' }}>
+                      <span><strong>{Number(q.total).toLocaleString()}</strong> total</span>
+                      <span style={{ color: '#059669' }}><strong>{Number(q.matched).toLocaleString()}</strong> matched</span>
+                      <span style={{ color: parseInt(q.unmatched) > 0 ? '#d97706' : '#059669' }}><strong>{q.unmatched}</strong> unmatched</span>
+                      <span style={{ color: '#2563eb', fontWeight: 600 }}>{pct}%</span>
+                    </div>
+                    <div style={{ background: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                      <div style={{ background: '#059669', height: '100%', width: `${pct}%`, borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+            {/* Inventory */}
+            <div>
+              <h3 style={{ fontSize: '0.95rem', color: '#475569', marginBottom: '0.5rem' }}>Inventory</h3>
+              {(() => {
+                const q = status.skuQuality!.inventory;
+                const total = parseInt(q.total);
+                const matched = parseInt(q.matched);
+                const pct = total > 0 ? ((matched / total) * 100).toFixed(1) : '0';
+                return (
+                  <div>
+                    <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem' }}>
+                      <span><strong>{Number(q.total).toLocaleString()}</strong> total</span>
+                      <span style={{ color: '#059669' }}><strong>{Number(q.matched).toLocaleString()}</strong> matched</span>
+                      <span style={{ color: parseInt(q.unmatched) > 0 ? '#d97706' : '#059669' }}><strong>{q.unmatched}</strong> unmatched</span>
+                      <span style={{ color: '#2563eb', fontWeight: 600 }}>{pct}%</span>
+                    </div>
+                    <div style={{ background: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
+                      <div style={{ background: '#059669', height: '100%', width: `${pct}%`, borderRadius: '4px' }} />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Unmatched details */}
+          {(status.skuQuality!.unmatchedOrders.length > 0 || status.skuQuality!.unmatchedInventory.length > 0) && (
+            <details style={{ marginTop: '1rem' }}>
+              <summary style={{ cursor: 'pointer', color: '#d97706', fontWeight: 500 }}>
+                Unmatched SKUs ({parseInt(status.skuQuality!.orders.unmatched) + parseInt(status.skuQuality!.inventory.unmatched)} total)
+              </summary>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '0.75rem' }}>
+                {status.skuQuality!.unmatchedOrders.length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>Unmatched Orders</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>SKU</th>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>ASIN</th>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>CH</th>
+                          <th style={{ textAlign: 'right', padding: '0.25rem' }}>Orders</th>
+                          <th style={{ textAlign: 'right', padding: '0.25rem' }}>Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {status.skuQuality!.unmatchedOrders.map((u, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.25rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.sku}>{u.sku}</td>
+                            <td style={{ padding: '0.25rem' }}>{u.asin}</td>
+                            <td style={{ padding: '0.25rem' }}>{u.channel}</td>
+                            <td style={{ padding: '0.25rem', textAlign: 'right' }}>{u.order_count}</td>
+                            <td style={{ padding: '0.25rem', textAlign: 'right' }}>{u.total_qty}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {status.skuQuality!.unmatchedInventory.length > 0 && (
+                  <div>
+                    <h4 style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.5rem' }}>Unmatched Inventory</h4>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>SKU</th>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>ASIN</th>
+                          <th style={{ textAlign: 'left', padding: '0.25rem' }}>WH</th>
+                          <th style={{ textAlign: 'right', padding: '0.25rem' }}>FBA Qty</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {status.skuQuality!.unmatchedInventory.map((u, i) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.25rem', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={u.sku}>{u.sku}</td>
+                            <td style={{ padding: '0.25rem' }}>{u.asin}</td>
+                            <td style={{ padding: '0.25rem' }}>{u.warehouse}</td>
+                            <td style={{ padding: '0.25rem', textAlign: 'right' }}>{u.fulfillable_quantity}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
 
       {/* Last syncs */}
       {lastSyncs.length > 0 && (

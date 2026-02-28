@@ -40,6 +40,8 @@ export const CHANNEL_WAREHOUSE_MAP: Record<string, string> = {
   it: 'EU',
   es: 'EU',
   au: 'AU',
+  ae: 'AE',
+  sa: 'SA',
 };
 
 // Marketplace → channel mapping
@@ -52,6 +54,22 @@ export const MARKETPLACE_CHANNEL_MAP: Record<string, string> = {
   APJ6JRA9NG5V4: 'it',
   A1RKKUPIHCS9HS: 'es',
   A39IBJ37TRP1C6: 'au',
+  A2VIGQ35RCS4UG: 'ae',
+  A17E79C6D8DWNP: 'sa',
+};
+
+// Amazon sales-channel → internal channel mapping
+export const SALES_CHANNEL_TO_CHANNEL: Record<string, string> = {
+  'Amazon.com': 'us',
+  'Amazon.ca': 'ca',
+  'Amazon.co.uk': 'uk',
+  'Amazon.de': 'de',
+  'Amazon.fr': 'fr',
+  'Amazon.it': 'it',
+  'Amazon.es': 'es',
+  'Amazon.com.au': 'au',
+  'Amazon.ae': 'ae',
+  'Amazon.sa': 'sa',
 };
 
 // Timezone offsets for marketplace date conversion
