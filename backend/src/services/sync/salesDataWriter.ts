@@ -29,6 +29,7 @@ const ROLLING_WINDOW_SQL = `
     WHERE o.channel = $1
       AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
       AND o.sku NOT LIKE 'amzn.gr.%'
+      AND o.item_price > 0
     GROUP BY COALESCE(o.iwasku, o.sku), o.asin
   )
   SELECT
@@ -68,9 +69,10 @@ const EU_AGGREGATE_SQL = `
       COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::int as pre_year_next90,
       COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::int as pre_year_next180
     FROM raw_orders o
-    WHERE o.channel IN ('de', 'fr', 'it', 'es')
+    WHERE o.channel IN ('de', 'fr', 'it', 'es', 'others')
       AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
       AND o.sku NOT LIKE 'amzn.gr.%'
+      AND o.item_price > 0
     GROUP BY COALESCE(o.iwasku, o.sku), o.asin
   )
   SELECT
