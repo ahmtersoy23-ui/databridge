@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="mainGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d9488" />
+      <stop offset="100%" style="stop-color:#2dd4bf" />
+    </linearGradient>
+    <linearGradient id="dotGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b" />
+      <stop offset="100%" style="stop-color:#fbbf24" />
+    </linearGradient>
+  </defs>
+
+  <!-- Left pillar -->
+  <rect x="22" y="38" width="12" height="32" rx="3" fill="url(#mainGrad)"/>
+
+  <!-- Right pillar -->
+  <rect x="66" y="38" width="12" height="32" rx="3" fill="url(#mainGrad)"/>
+
+  <!-- Bridge arch -->
+  <path d="M 28 40 C 28 18, 72 18, 72 40"
+        fill="none" stroke="url(#mainGrad)" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Data flow dots on the bridge -->
+  <circle cx="36" cy="28" r="2.5" fill="url(#dotGrad)" opacity="0.85"/>
+  <circle cx="50" cy="21" r="3" fill="url(#dotGrad)"/>
+  <circle cx="64" cy="28" r="2.5" fill="url(#dotGrad)" opacity="0.85"/>
+
+  <!-- Base/ground -->
+  <rect x="16" y="70" width="68" height="3" rx="1.5" fill="url(#mainGrad)" opacity="0.5"/>
+</svg>
