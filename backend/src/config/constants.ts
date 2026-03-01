@@ -7,9 +7,9 @@ export const SHARED_DB_MAX_CONNECTIONS = 5;
 export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 min
 export const RATE_LIMIT_MAX_REQUESTS = 200;
 
-export const SYNC_INVENTORY_CRON = '0 */4 * * *'; // Every 4 hours
+export const SYNC_INVENTORY_CRON = '0 */8 * * *'; // Every 8 hours
 export const SYNC_SALES_CRON = '0 3 * * *';        // Daily at 03:00 UTC
-export const SALES_OVERLAP_DAYS = 2;                // Fetch last 2 days for overlap
+export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for overlap
 
 export const SP_API_REGIONS = {
   NA: { endpoint: 'https://sellingpartnerapi-na.amazon.com', awsRegion: 'us-east-1' },
