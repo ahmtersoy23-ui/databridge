@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, getActiveMarketplaces, writeSalesData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace } from '../services/sync/salesSync';
 import { backfillSales } from '../services/sync/salesSync';
@@ -12,7 +12,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'refresh_sales_data']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'refresh_sales_data', 'refresh_inventory_data']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -52,6 +52,9 @@ router.post('/trigger', authMiddleware, validateBody(triggerSchema), async (req:
     } else if (type === 'refresh_sales_data') {
       await writeSalesData();
       res.json({ success: true, message: 'Sales data refreshed to pricelab_db.sales_data' });
+    } else if (type === 'refresh_inventory_data') {
+      await writeInventoryData();
+      res.json({ success: true, message: 'Inventory data refreshed to pricelab_db.fba_inventory' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

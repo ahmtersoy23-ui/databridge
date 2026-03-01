@@ -3,6 +3,7 @@ import { pool } from '../../config/database';
 import { syncInventoryForMarketplace } from './inventorySync';
 import { syncSalesForMarketplace } from './salesSync';
 import { writeSalesData } from './salesDataWriter';
+import { writeInventoryData } from './inventoryDataWriter';
 import logger from '../../config/logger';
 import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
@@ -61,6 +62,13 @@ async function runInventorySync(): Promise<void> {
         logger.error(`[Scheduler] Inventory sync failed for ${key} (${representative.country_code}):`, err.message);
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    // Refresh aggregated fba_inventory in pricelab_db after all warehouse syncs
+    try {
+      await writeInventoryData();
+    } catch (err: any) {
+      logger.error('[Scheduler] writeInventoryData error:', err.message);
     }
   } finally {
     isSyncing = false;
@@ -132,4 +140,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, getActiveMarketplaces, isSyncing, writeSalesData };
+export { runInventorySync, runSalesSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
