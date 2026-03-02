@@ -73,7 +73,8 @@ async function fetchAllProducts(token: string, apiUrl: string): Promise<Wisersel
       { headers: { Authorization: `Bearer ${token}` }, timeout: 30_000 }
     );
 
-    const items: WisersellProduct[] = Array.isArray(res.data) ? res.data : [];
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.rows ?? []);
+    const items: WisersellProduct[] = rows;
     if (items.length === 0) break;
     all.push(...items);
     if (items.length < 100) break;
