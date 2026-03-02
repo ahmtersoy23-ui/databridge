@@ -80,7 +80,7 @@ export default function NJWarehouse() {
   const COL_BLUE = '#2563eb';
   const COL_ORANGE = '#d97706';
 
-  const thStyle = (key: SortKey, align: 'left' | 'right' = 'right') => ({
+  const thStyle = (_key: SortKey, align: 'left' | 'right' = 'right') => ({
     padding: '0.5rem',
     textAlign: align as 'left' | 'right',
     cursor: 'pointer' as const,
