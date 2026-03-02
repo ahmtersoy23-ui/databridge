@@ -78,7 +78,7 @@ export default function Catalog() {
     });
   }, [rows, search, sortKey, sortAsc]);
 
-  const thStyle = (key: SortKey, align: 'left' | 'right' = 'left') => ({
+  const thStyle = (_key: SortKey, align: 'left' | 'right' = 'left') => ({
     padding: '0.5rem',
     textAlign: align as 'left' | 'right',
     cursor: 'pointer' as const,
