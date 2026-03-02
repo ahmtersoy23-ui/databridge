@@ -95,8 +95,11 @@ async function enrichWithFnsku(rows: NJWarehouseRow[]): Promise<EnrichedNJRow[]>
 async function upsertNJWarehouse(rows: EnrichedNJRow[]): Promise<void> {
   const BATCH_SIZE = 500;
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  // Deduplicate by fnsku (CSV may have duplicate rows)
+  const deduped = [...new Map(rows.map(r => [r.fnsku, r])).values()];
+
+  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+    const batch = deduped.slice(i, i + BATCH_SIZE);
     const values: string[] = [];
     const params: any[] = [];
 
