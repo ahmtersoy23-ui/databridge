@@ -6,7 +6,6 @@ import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace } from '../services/sync/salesSync';
 import { backfillSales } from '../services/sync/salesSync';
 import { validateBody } from '../middleware/validate';
-import { authMiddleware } from '../middleware/auth';
 import logger from '../config/logger';
 
 const router = Router();
@@ -17,8 +16,8 @@ const triggerSchema = z.object({
   months: z.number().min(1).max(24).optional(),
 });
 
-// POST /api/v1/sync/trigger - Manual sync trigger (auth required)
-router.post('/trigger', authMiddleware, validateBody(triggerSchema), async (req: Request, res: Response) => {
+// POST /api/v1/sync/trigger - Manual sync trigger (no auth — internal tool)
+router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: Response) => {
   const { type, marketplace, months } = req.body;
 
   try {
@@ -85,8 +84,8 @@ router.post('/trigger', authMiddleware, validateBody(triggerSchema), async (req:
   }
 });
 
-// GET /api/v1/sync/jobs - Recent sync jobs
-router.get('/jobs', authMiddleware, async (_req: Request, res: Response) => {
+// GET /api/v1/sync/jobs - Recent sync jobs (no auth — internal tool)
+router.get('/jobs', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT id, job_type, marketplace, status, started_at, completed_at,
