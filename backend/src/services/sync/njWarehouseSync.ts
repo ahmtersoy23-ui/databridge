@@ -117,7 +117,7 @@ async function upsertNJWarehouse(rows: EnrichedNJRow[]): Promise<void> {
 
     await pool.query(`
       INSERT INTO nj_warehouse_inventory
-        (fnsku, name, category, count_in_ship, count_in_raf, total_count, iwasku, asin, synced_at)
+        (fnsku, name, category, count_in_ship, count_in_raf, total_count, iwasku, asin)
       VALUES ${values.join(', ')}
       ON CONFLICT (fnsku) DO UPDATE SET
         name = EXCLUDED.name,
