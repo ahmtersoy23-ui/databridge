@@ -183,11 +183,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
   logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
 
-  // Initial NJ warehouse sync on startup
-  logger.info('[Scheduler] Running initial NJ warehouse sync...');
-  runNJWarehouseSync().catch(err => logger.error('[Scheduler] Initial NJ warehouse sync error:', err));
-
-  // Wisersell sync is rate-limited (1 req/5min on /token) — no startup sync, use manual trigger or daily cron
+  // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
 export function stopScheduler(): void {
