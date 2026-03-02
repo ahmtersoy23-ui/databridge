@@ -46,8 +46,8 @@ async function getToken(): Promise<string> {
     password: creds.password,
   }, { timeout: 15_000 });
 
-  const token: string = res.data.taken; // API typo: "taken" instead of "token"
-  if (!token) throw new Error('Wisersell token response missing "taken" field');
+  const token: string = res.data.token;
+  if (!token) throw new Error('Wisersell token response missing "token" field');
 
   // Decode JWT exp claim
   try {
