@@ -187,9 +187,7 @@ export function startScheduler(): void {
   logger.info('[Scheduler] Running initial NJ warehouse sync...');
   runNJWarehouseSync().catch(err => logger.error('[Scheduler] Initial NJ warehouse sync error:', err));
 
-  // Initial Wisersell sync on startup
-  logger.info('[Scheduler] Running initial Wisersell catalog sync...');
-  runWisersellSync().catch(err => logger.error('[Scheduler] Initial Wisersell sync error:', err));
+  // Wisersell sync is rate-limited (1 req/5min on /token) — no startup sync, use manual trigger or daily cron
 }
 
 export function stopScheduler(): void {
