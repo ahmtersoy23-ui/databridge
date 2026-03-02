@@ -115,6 +115,13 @@ export default function Dashboard() {
           >
             {syncing === 'sales' ? 'Syncing...' : 'Sync Sales'}
           </button>
+          <button
+            onClick={() => triggerSync('nj_warehouse')}
+            disabled={!!syncing}
+            style={{ padding: '0.5rem 1.5rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            {syncing === 'nj_warehouse' ? 'Syncing...' : 'Sync NJ Warehouse'}
+          </button>
         </div>
       </div>
 

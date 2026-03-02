@@ -4,13 +4,16 @@ import { syncInventoryForMarketplace } from './inventorySync';
 import { syncSalesForMarketplace } from './salesSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
+import { syncNJWarehouse } from './njWarehouseSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_NJ_WAREHOUSE_CRON } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
 let salesTask: cron.ScheduledTask | null = null;
+let njWarehouseTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
+let isNJSyncing = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -119,6 +122,22 @@ async function runSalesSync(): Promise<void> {
   }
 }
 
+async function runNJWarehouseSync(): Promise<void> {
+  if (isNJSyncing) {
+    logger.warn('[Scheduler] Skipping NJ warehouse sync - another sync is in progress');
+    return;
+  }
+
+  isNJSyncing = true;
+  try {
+    await syncNJWarehouse();
+  } catch (err: any) {
+    logger.error('[Scheduler] NJ warehouse sync failed:', err.message);
+  } finally {
+    isNJSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     logger.info('[Scheduler] Starting scheduled inventory sync');
@@ -130,14 +149,25 @@ export function startScheduler(): void {
     runSalesSync().catch(err => logger.error('[Scheduler] Sales sync error:', err));
   });
 
+  njWarehouseTask = cron.schedule(SYNC_NJ_WAREHOUSE_CRON, () => {
+    logger.info('[Scheduler] Starting scheduled NJ warehouse sync');
+    runNJWarehouseSync().catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
+  });
+
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
+  logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
+
+  // Initial NJ warehouse sync on startup
+  logger.info('[Scheduler] Running initial NJ warehouse sync...');
+  runNJWarehouseSync().catch(err => logger.error('[Scheduler] Initial NJ warehouse sync error:', err));
 }
 
 export function stopScheduler(): void {
   inventoryTask?.stop();
   salesTask?.stop();
+  njWarehouseTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runNJWarehouseSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };

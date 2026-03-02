@@ -17,8 +17,8 @@ const credentialSchema = z.object({
   account_name: z.string().optional().default(''),
 });
 
-// GET /api/v1/credentials - List credentials (masked)
-router.get('/', authMiddleware, async (_req: Request, res: Response) => {
+// GET /api/v1/credentials - List credentials (masked, no auth — sensitive fields are previews only)
+router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT id, region, seller_id, account_name, is_active, created_at, updated_at,

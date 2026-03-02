@@ -9,7 +9,10 @@ export const RATE_LIMIT_MAX_REQUESTS = 200;
 
 export const SYNC_INVENTORY_CRON = '0 */8 * * *'; // Every 8 hours
 export const SYNC_SALES_CRON = '0 3 * * *';        // Daily at 03:00 UTC
+export const SYNC_NJ_WAREHOUSE_CRON = '0 6 * * *'; // Daily at 06:00 UTC
 export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for overlap
+
+export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
 
 export const SP_API_REGIONS = {
   NA: { endpoint: 'https://sellingpartnerapi-na.amazon.com', awsRegion: 'us-east-1' },

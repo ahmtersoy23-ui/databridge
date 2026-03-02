@@ -6,6 +6,7 @@ import Orders from './pages/Orders';
 import Inventory from './pages/Inventory';
 import SalesAnalysis from './pages/SalesAnalysis';
 import InventoryAnalysis from './pages/InventoryAnalysis';
+import NJWarehouse from './pages/NJWarehouse';
 
 const navStyle = {
   display: 'flex',
@@ -53,6 +54,9 @@ export default function App() {
         <NavLink to="/inventory-analysis" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Inv. Analysis
         </NavLink>
+        <NavLink to="/nj-warehouse" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          NJ Warehouse
+        </NavLink>
         <NavLink to="/logs" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Logs
         </NavLink>
@@ -65,6 +69,7 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/sales-analysis" element={<SalesAnalysis />} />
           <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
+          <Route path="/nj-warehouse" element={<NJWarehouse />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
       </main>
