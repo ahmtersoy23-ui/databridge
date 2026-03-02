@@ -74,26 +74,17 @@ async function getToken(): Promise<string> {
 }
 
 async function fetchAllProducts(token: string, apiUrl: string): Promise<WisersellProduct[]> {
-  const all: WisersellProduct[] = [];
-  let page = 0;
   const url = apiUrl.replace(/\/$/, '');
 
-  while (true) {
-    const res = await axios.post(
-      `${url}/product/search`,
-      { page, pageSize: 100 },
-      { headers: { Authorization: `Bearer ${token}` }, timeout: 30_000 }
-    );
+  // Single large request — API returns up to ~14k products per page regardless of pageSize
+  const res = await axios.post(
+    `${url}/product/search`,
+    { page: 0, pageSize: 20000 },
+    { headers: { Authorization: `Bearer ${token}` }, timeout: 60_000 }
+  );
 
-    const rows = Array.isArray(res.data) ? res.data : (res.data?.rows ?? []);
-    const items: WisersellProduct[] = rows;
-    if (items.length === 0) break;
-    all.push(...items);
-    if (items.length < 100) break;
-    page++;
-  }
-
-  return all;
+  const rows = Array.isArray(res.data) ? res.data : (res.data?.rows ?? []);
+  return rows as WisersellProduct[];
 }
 
 async function upsertProducts(products: WisersellProduct[]): Promise<void> {
