@@ -41,10 +41,22 @@ async function getToken(): Promise<string> {
   const creds = await getCredentials();
   const apiUrl = creds.api_url.replace(/\/$/, '');
 
-  const res = await axios.post(`${apiUrl}/token`, {
-    email: creds.email,
-    password: creds.password,
-  }, { timeout: 15_000 });
+  let res;
+  try {
+    res = await axios.post(`${apiUrl}/token`, {
+      email: creds.email,
+      password: creds.password,
+    }, { timeout: 15_000 });
+  } catch (err: any) {
+    if (err.response?.status === 429) {
+      const retryAfter = err.response.headers['retry-after'];
+      const resetAt = err.response.headers['x-ratelimit-reset'];
+      const waitSec = retryAfter ? Math.ceil(Number(retryAfter)) : 300;
+      const resetTime = resetAt ? new Date(Number(resetAt) * 1000).toISOString() : 'unknown';
+      throw new Error(`Wisersell token rate-limited (429). Retry after ${waitSec}s (resets at ${resetTime})`);
+    }
+    throw err;
+  }
 
   const token: string = res.data.token;
   if (!token) throw new Error('Wisersell token response missing "token" field');
