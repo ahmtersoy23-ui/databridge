@@ -6,6 +6,8 @@ import statusRouter from './status';
 import credentialsRouter from './credentials';
 import ordersRouter from './orders';
 import inventoryDetailRouter from './inventoryDetail';
+import catalogRouter from './catalog';
+import wisersellSettingsRouter from './wisersellSettings';
 
 const router = Router();
 
@@ -16,6 +18,10 @@ router.use('/amazonfba', inventoryRouter);
 // Browse endpoints (management UI)
 router.use('/orders', ordersRouter);
 router.use('/inventory-detail', inventoryDetailRouter);
+
+// Catalog endpoint
+router.use('/catalog', catalogRouter);
+router.use('/wisersell-settings', wisersellSettingsRouter);
 
 // Management endpoints (auth required)
 router.use('/sync', syncRouter);

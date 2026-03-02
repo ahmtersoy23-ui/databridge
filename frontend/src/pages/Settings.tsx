@@ -1,6 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+interface WisersellConfig {
+  configured: boolean;
+  email?: string;
+  api_url?: string;
+  updated_at?: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -42,6 +49,8 @@ const btnStyle = (bg: string) => ({
   marginRight: '0.25rem',
 });
 
+const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
+
 export default function Settings() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -49,6 +58,11 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [deleting, setDeleting] = useState<number | null>(null);
+
+  const [wisersellConfig, setWisersellConfig] = useState<WisersellConfig | null>(null);
+  const [wisersellForm, setWisersellForm] = useState(emptyWisersellForm);
+  const [wisersellSaving, setWisersellSaving] = useState(false);
+  const [wisersellMessage, setWisersellMessage] = useState('');
 
   const fetchCredentials = async () => {
     try {
@@ -59,7 +73,19 @@ export default function Settings() {
     }
   };
 
-  useEffect(() => { fetchCredentials(); }, []);
+  const fetchWisersellConfig = async () => {
+    try {
+      const res = await axios.get('/api/v1/wisersell-settings');
+      setWisersellConfig(res.data);
+      if (res.data.configured) {
+        setWisersellForm(prev => ({ ...prev, email: res.data.email, api_url: res.data.api_url }));
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -130,6 +156,21 @@ export default function Settings() {
     }
   };
 
+  const handleWisersellSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWisersellSaving(true);
+    setWisersellMessage('');
+    try {
+      await axios.post('/api/v1/wisersell-settings', wisersellForm);
+      setWisersellMessage('Saved successfully!');
+      fetchWisersellConfig();
+    } catch (err: any) {
+      setWisersellMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setWisersellSaving(false);
+    }
+  };
+
   return (
     <div>
       <h1 style={{ marginBottom: '1.5rem' }}>Settings</h1>
@@ -183,6 +224,65 @@ export default function Settings() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Wisersell credentials */}
+      <div style={cardStyle}>
+        <h2 style={{ marginBottom: '0.5rem' }}>Wisersell API</h2>
+        {wisersellConfig?.configured && (
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+            Current: <strong>{wisersellConfig.email}</strong> — {wisersellConfig.api_url}
+            {wisersellConfig.updated_at && ` (updated ${new Date(wisersellConfig.updated_at).toLocaleDateString()})`}
+          </p>
+        )}
+        <form onSubmit={handleWisersellSubmit}>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Email</label>
+          <input
+            type="email"
+            placeholder="wisersell@example.com"
+            value={wisersellForm.email}
+            onChange={e => setWisersellForm({ ...wisersellForm, email: e.target.value })}
+            style={inputStyle}
+            required
+          />
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Password</label>
+          <input
+            type="password"
+            placeholder={wisersellConfig?.configured ? 'Leave blank to keep current' : 'Password'}
+            value={wisersellForm.password}
+            onChange={e => setWisersellForm({ ...wisersellForm, password: e.target.value })}
+            style={inputStyle}
+            required={!wisersellConfig?.configured}
+          />
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>API URL</label>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <button type="button"
+              onClick={() => setWisersellForm({ ...wisersellForm, api_url: 'https://dev2.wisersell.com/restapi' })}
+              style={{ ...btnStyle(wisersellForm.api_url.includes('dev2') ? '#2563eb' : '#94a3b8'), fontSize: '0.75rem' }}>
+              Dev
+            </button>
+            <button type="button"
+              onClick={() => setWisersellForm({ ...wisersellForm, api_url: 'https://www.wisersell.com/restapi' })}
+              style={{ ...btnStyle(!wisersellForm.api_url.includes('dev2') ? '#059669' : '#94a3b8'), fontSize: '0.75rem' }}>
+              Prod
+            </button>
+            <input
+              type="text"
+              value={wisersellForm.api_url}
+              onChange={e => setWisersellForm({ ...wisersellForm, api_url: e.target.value })}
+              style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+            />
+          </div>
+          {wisersellMessage && (
+            <p style={{ color: wisersellMessage.includes('success') ? '#059669' : '#dc2626', marginBottom: '0.75rem' }}>
+              {wisersellMessage}
+            </p>
+          )}
+          <button type="submit" disabled={wisersellSaving}
+            style={{ padding: '0.5rem 2rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+            {wisersellSaving ? 'Saving...' : wisersellConfig?.configured ? 'Update' : 'Save'}
+          </button>
+        </form>
       </div>
 
       {/* Add/Edit credentials form */}

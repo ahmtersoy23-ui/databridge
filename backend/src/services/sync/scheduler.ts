@@ -5,15 +5,18 @@ import { syncSalesForMarketplace } from './salesSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
 import { syncNJWarehouse } from './njWarehouseSync';
+import { syncWisersell } from './wisersellSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_NJ_WAREHOUSE_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
 let salesTask: cron.ScheduledTask | null = null;
 let njWarehouseTask: cron.ScheduledTask | null = null;
+let wisersellTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isNJSyncing = false;
+let isWisersellSyncing = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -138,6 +141,22 @@ async function runNJWarehouseSync(): Promise<void> {
   }
 }
 
+async function runWisersellSync(): Promise<void> {
+  if (isWisersellSyncing) {
+    logger.warn('[Scheduler] Skipping Wisersell sync - another sync is in progress');
+    return;
+  }
+
+  isWisersellSyncing = true;
+  try {
+    await syncWisersell();
+  } catch (err: any) {
+    logger.error('[Scheduler] Wisersell sync failed:', err.message);
+  } finally {
+    isWisersellSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     logger.info('[Scheduler] Starting scheduled inventory sync');
@@ -154,20 +173,31 @@ export function startScheduler(): void {
     runNJWarehouseSync().catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
   });
 
+  wisersellTask = cron.schedule(SYNC_WISERSELL_CRON, () => {
+    logger.info('[Scheduler] Starting scheduled Wisersell catalog sync');
+    runWisersellSync().catch(err => logger.error('[Scheduler] Wisersell sync error:', err));
+  });
+
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
   logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
+  logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
 
   // Initial NJ warehouse sync on startup
   logger.info('[Scheduler] Running initial NJ warehouse sync...');
   runNJWarehouseSync().catch(err => logger.error('[Scheduler] Initial NJ warehouse sync error:', err));
+
+  // Initial Wisersell sync on startup
+  logger.info('[Scheduler] Running initial Wisersell catalog sync...');
+  runWisersellSync().catch(err => logger.error('[Scheduler] Initial Wisersell sync error:', err));
 }
 
 export function stopScheduler(): void {
   inventoryTask?.stop();
   salesTask?.stop();
   njWarehouseTask?.stop();
+  wisersellTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runNJWarehouseSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runNJWarehouseSync, runWisersellSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };

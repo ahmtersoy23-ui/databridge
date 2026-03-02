@@ -1,0 +1,171 @@
+import { useState, useEffect, useMemo } from 'react';
+import axios from 'axios';
+
+interface WisersellProduct {
+  id: number;
+  name: string | null;
+  code: string | null;
+  weight: number | null;
+  deci: number | null;
+  width: number | null;
+  length: number | null;
+  height: number | null;
+  arr_sku: string[] | null;
+  category_id: number | null;
+  synced_at: string | null;
+}
+
+const cardStyle = {
+  background: '#fff',
+  borderRadius: '8px',
+  padding: '1.5rem',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  marginBottom: '1rem',
+} as const;
+
+const COL_GRAY = '#6b7280';
+const COL_ZERO = '#d1d5db';
+
+type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_id';
+
+export default function Catalog() {
+  const [rows, setRows] = useState<WisersellProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('code');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    axios.get('/api/v1/catalog')
+      .then(res => setRows(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+
+  const sortArrow = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
+
+  const summary = useMemo(() => ({
+    total: rows.length,
+    withCode: rows.filter(r => r.code).length,
+    withSkus: rows.filter(r => r.arr_sku && r.arr_sku.length > 0).length,
+  }), [rows]);
+
+  const filtered = useMemo(() => {
+    let data = rows;
+    if (search) {
+      const q = search.toLowerCase();
+      data = data.filter(r =>
+        r.name?.toLowerCase().includes(q) ||
+        r.code?.toLowerCase().includes(q) ||
+        r.arr_sku?.some(s => s.toLowerCase().includes(q))
+      );
+    }
+    return [...data].sort((a, b) => {
+      const av = a[sortKey] ?? '';
+      const bv = b[sortKey] ?? '';
+      if (sortKey === 'id' || sortKey === 'deci' || sortKey === 'category_id') {
+        return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av);
+      }
+      return sortAsc
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av));
+    });
+  }, [rows, search, sortKey, sortAsc]);
+
+  const thStyle = (key: SortKey, align: 'left' | 'right' = 'left') => ({
+    padding: '0.5rem',
+    textAlign: align as 'left' | 'right',
+    cursor: 'pointer' as const,
+    userSelect: 'none' as const,
+    whiteSpace: 'nowrap' as const,
+    color: '#475569',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+  });
+
+  return (
+    <div>
+      <h1 style={{ marginBottom: '1.5rem' }}>Catalog</h1>
+
+      {/* Summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+        {[
+          { label: 'Total Products', value: summary.total, color: '#334155' },
+          { label: 'With Code', value: summary.withCode, color: '#059669' },
+          { label: 'With SKUs', value: summary.withSkus, color: '#2563eb' },
+        ].map(c => (
+          <div key={c.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
+            <div style={{ fontSize: '0.75rem', color: COL_GRAY, marginBottom: '0.25rem' }}>{c.label}</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: c.color }}>{c.value.toLocaleString()}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Search */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name / code / SKU..."
+            style={{ padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', flex: 1 }}
+          />
+          <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>{filtered.length} items</span>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ ...cardStyle, overflowX: 'auto', padding: 0 }}>
+        {loading ? (
+          <p style={{ padding: '1.5rem', color: COL_GRAY }}>Loading...</p>
+        ) : filtered.length === 0 ? (
+          <p style={{ padding: '1.5rem', color: COL_GRAY }}>No data found.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                <th onClick={() => handleSort('id')} style={thStyle('id', 'right')}>ID{sortArrow('id')}</th>
+                <th onClick={() => handleSort('code')} style={thStyle('code')}>Code{sortArrow('code')}</th>
+                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
+                <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
+                <th onClick={() => handleSort('category_id')} style={thStyle('category_id', 'right')}>Cat ID{sortArrow('category_id')}</th>
+                <th style={{ ...thStyle('id'), cursor: 'default' }}>SKUs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(r => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: COL_GRAY, fontFamily: 'monospace', fontSize: '0.78rem' }}>
+                    {r.id}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
+                    {r.code || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
+                    {r.name || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: r.deci ? '#1e293b' : COL_ZERO }}>
+                    {r.deci ?? '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: COL_GRAY }}>
+                    {r.category_id ?? '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO }}>
+                    {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
