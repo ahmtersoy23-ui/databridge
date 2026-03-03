@@ -28,6 +28,7 @@ const cardStyle = {
 
 const COL_GRAY = '#6b7280';
 const COL_ZERO = '#d1d5db';
+const PAGE_SIZE = 200;
 
 type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_name' | 'size' | 'color';
 
@@ -37,6 +38,7 @@ export default function Catalog() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('code');
   const [sortAsc, setSortAsc] = useState(true);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -45,6 +47,9 @@ export default function Catalog() {
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
   }, []);
+
+  // Reset to page 0 when search or sort changes
+  useEffect(() => { setPage(0); }, [search, sortKey, sortAsc]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -83,6 +88,9 @@ export default function Catalog() {
         : String(bv).localeCompare(String(av));
     });
   }, [rows, search, sortKey, sortAsc]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const thStyle = (_key: SortKey, align: 'left' | 'right' = 'left') => ({
     padding: '0.5rem',
@@ -123,7 +131,7 @@ export default function Catalog() {
         ))}
       </div>
 
-      {/* Search */}
+      {/* Search + pagination info */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <input
@@ -133,7 +141,26 @@ export default function Catalog() {
             placeholder="Search name / code / SKU / category / size / color..."
             style={{ padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', flex: 1 }}
           />
-          <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>{filtered.length} items</span>
+          <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>
+            {filtered.length.toLocaleString()} items
+          </span>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <button
+                onClick={() => setPage(p => Math.max(0, p - 1))}
+                disabled={page === 0}
+                style={{ padding: '0.25rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '4px', cursor: page === 0 ? 'default' : 'pointer', background: '#fff', color: page === 0 ? COL_ZERO : '#334155', fontSize: '0.8rem' }}
+              >‹</button>
+              <span style={{ fontSize: '0.8rem', color: COL_GRAY }}>
+                {page + 1} / {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+                style={{ padding: '0.25rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '4px', cursor: page >= totalPages - 1 ? 'default' : 'pointer', background: '#fff', color: page >= totalPages - 1 ? COL_ZERO : '#334155', fontSize: '0.8rem' }}
+              >›</button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -160,7 +187,7 @@ export default function Catalog() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(r => (
+              {pageRows.map(r => (
                 <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
                     {r.code || '—'}
