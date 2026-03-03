@@ -16,6 +16,8 @@ interface WisersellProduct {
   size: string | null;
   color: string | null;
   synced_at: string | null;
+  identifier?: string | null;
+  product_name?: string | null;
 }
 
 const cardStyle = {
@@ -77,14 +79,14 @@ export default function Catalog() {
         r.color?.toLowerCase().includes(q)
       );
     }
-    const withComputed = data.map(r => {
-      const m = r.code?.match(/^([A-Za-z]+)([0-9]{3})/);
-      const identifier = m ? `${m[1]}-${m[2]}` : null;
-      const parent_name = identifier && r.name
-        ? r.name.replace(/^[A-Za-z]+-?\s*[0-9]{3}\s+/i, '') || r.name
-        : r.name;
-      return { ...r, identifier, parent_name };
-    });
+    const withComputed = data.map(r => ({
+      ...r,
+      identifier: r.identifier ?? (() => {
+        const m = r.code?.match(/^([A-Za-z]+)([0-9]{3})/);
+        return m ? `${m[1]}-${m[2]}` : null;
+      })(),
+      parent_name: r.product_name || r.name,
+    }));
     return [...withComputed].sort((a, b) => {
       const av = (a as any)[sortKey] ?? '';
       const bv = (b as any)[sortKey] ?? '';
@@ -183,8 +185,8 @@ export default function Catalog() {
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
                 <th onClick={() => handleSort('identifier')} style={thStyle('identifier')}>Identifier{sortArrow('identifier')}</th>
-                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Product Name{sortArrow('parent_name')}</th>
-                <th onClick={() => handleSort('name')} style={thStyle('name')}>Key{sortArrow('name')}</th>
+                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Parent Name{sortArrow('parent_name')}</th>
+                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
                 <th onClick={() => handleSort('code')} style={thStyle('code')}>SKU{sortArrow('code')}</th>
                 <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
                 <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
