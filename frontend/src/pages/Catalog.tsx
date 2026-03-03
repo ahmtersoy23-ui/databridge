@@ -205,10 +205,10 @@ export default function Catalog() {
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: row.identifier ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
                     {row.identifier || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.parent_name ?? ''}>
+                  <td style={{ padding: '0.4rem 0.5rem', minWidth: '160px' }}>
                     {row.parent_name || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
+                  <td style={{ padding: '0.4rem 0.5rem', minWidth: '160px' }}>
                     {r.name || '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
@@ -238,7 +238,7 @@ export default function Catalog() {
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.height ? '#334155' : COL_ZERO }}>
                     {r.height != null ? Number(r.height).toFixed(1) : '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO }}>
+                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO, minWidth: '120px', wordBreak: 'break-word' }}>
                     {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
                   </td>
                 </tr>
