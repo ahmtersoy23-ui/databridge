@@ -81,10 +81,7 @@ export default function Catalog() {
     }
     const withComputed = data.map(r => ({
       ...r,
-      identifier: r.identifier ?? (() => {
-        const m = r.code?.match(/^([A-Za-z]+)([0-9]{3})/);
-        return m ? `${m[1]}-${m[2]}` : null;
-      })(),
+      identifier: r.identifier ?? (r.name?.split(' ')[0] || null),
       parent_name: r.product_name || r.name,
     }));
     return [...withComputed].sort((a, b) => {

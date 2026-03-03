@@ -31,11 +31,10 @@ router.get('/', async (_req: Request, res: Response) => {
 
     const rows = result.rows;
 
-    // Group names by identifier
+    // Group names by identifier (first word of name, e.g. "AHM-002A")
     const groups = new Map<string, string[]>();
     for (const row of rows) {
-      const m = row.code?.match(/^([A-Za-z]+)([0-9]{3})/);
-      const id = m ? `${m[1]}-${m[2]}` : null;
+      const id = row.name?.split(' ')[0] || null;
       if (id) {
         if (!groups.has(id)) groups.set(id, []);
         groups.get(id)!.push(row.name || '');
@@ -50,8 +49,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
     // Enrich rows with identifier + product_name
     const enriched = rows.map(row => {
-      const m = row.code?.match(/^([A-Za-z]+)([0-9]{3})/);
-      const identifier = m ? `${m[1]}-${m[2]}` : null;
+      const identifier = row.name?.split(' ')[0] || null;
       return {
         ...row,
         identifier,
