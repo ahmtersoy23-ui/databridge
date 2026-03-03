@@ -16,9 +16,16 @@ interface WisersellProduct {
   extradata: Record<string, unknown> | null;
 }
 
+interface WisersellCategory {
+  id: number;
+  name: string;
+}
+
 // In-memory token cache
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function clearWisersellTokenCache(): void {
   cachedToken = null;
@@ -51,7 +58,7 @@ async function getToken(): Promise<string> {
     if (err.response?.status === 429) {
       const retryAfter = err.response.headers['retry-after'];
       const resetAt = err.response.headers['x-ratelimit-reset'];
-      const waitSec = retryAfter ? Math.ceil(Number(retryAfter)) : 300;
+      const waitSec = retryAfter ? Math.ceil(Number(retryAfter)) : 60;
       const resetTime = resetAt ? new Date(Number(resetAt) * 1000).toISOString() : 'unknown';
       throw new Error(`Wisersell token rate-limited (429). Retry after ${waitSec}s (resets at ${resetTime})`);
     }
@@ -73,18 +80,51 @@ async function getToken(): Promise<string> {
   return token;
 }
 
+// pageSize max 100 per Wisersell API docs. Paginate with 1100ms delay between pages (1 req/sec limit).
 async function fetchAllProducts(token: string, apiUrl: string): Promise<WisersellProduct[]> {
   const url = apiUrl.replace(/\/$/, '');
+  const all: WisersellProduct[] = [];
+  let page = 0;
 
-  // Single large request — API returns up to ~14k products per page regardless of pageSize
-  const res = await axios.post(
-    `${url}/product/search`,
-    { page: 0, pageSize: 20000 },
-    { headers: { Authorization: `Bearer ${token}` }, timeout: 60_000 }
-  );
+  while (true) {
+    const res = await axios.post(
+      `${url}/product/search`,
+      { page, pageSize: 100 },
+      { headers: { Authorization: `Bearer ${token}` }, timeout: 60_000 }
+    );
+    const rows: WisersellProduct[] = Array.isArray(res.data) ? res.data : (res.data?.rows ?? []);
+    if (rows.length === 0) break;
+    all.push(...rows);
+    logger.info(`[WisersellSync] Page ${page}: ${rows.length} products (total: ${all.length})`);
+    if (rows.length < 100) break;
+    page++;
+    await delay(1100); // respect 1 req/sec rate limit
+  }
+  return all;
+}
 
-  const rows = Array.isArray(res.data) ? res.data : (res.data?.rows ?? []);
-  return rows as WisersellProduct[];
+async function fetchCategories(token: string, apiUrl: string): Promise<WisersellCategory[]> {
+  const url = apiUrl.replace(/\/$/, '');
+  const res = await axios.get(`${url}/category`, {
+    headers: { Authorization: `Bearer ${token}` },
+    timeout: 30_000,
+  });
+  return Array.isArray(res.data) ? res.data : [];
+}
+
+async function upsertCategories(categories: WisersellCategory[]): Promise<void> {
+  if (categories.length === 0) return;
+  const values: string[] = [];
+  const params: unknown[] = [];
+  categories.forEach((c, idx) => {
+    values.push(`($${idx * 2 + 1}, $${idx * 2 + 2})`);
+    params.push(c.id, c.name || null);
+  });
+  await pool.query(`
+    INSERT INTO wisersell_categories (id, name)
+    VALUES ${values.join(', ')}
+    ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, synced_at = NOW()
+  `, params);
 }
 
 async function upsertProducts(products: WisersellProduct[]): Promise<void> {
@@ -96,28 +136,30 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
     const params: unknown[] = [];
 
     batch.forEach((p, idx) => {
-      const offset = idx * 11;
+      const offset = idx * 13;
       values.push(
-        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11})`
+        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`
       );
       params.push(
         p.id,
         p.name || null,
         p.code || null,
-        p.weight ?? null,
-        p.deci ?? null,
-        p.width ?? null,
-        p.length ?? null,
-        p.height ?? null,
+        p.weight != null ? parseFloat(String(p.weight)) : null,
+        p.deci != null ? parseFloat(String(p.deci)) : null,
+        p.width != null ? parseFloat(String(p.width)) : null,
+        p.length != null ? parseFloat(String(p.length)) : null,
+        p.height != null ? parseFloat(String(p.height)) : null,
         p.arrsku ? JSON.stringify(p.arrsku) : null,
         p.categoryId ?? null,
         p.extradata ? JSON.stringify(p.extradata) : null,
+        p.extradata?.['Size'] != null ? String(p.extradata['Size']) : null,
+        p.extradata?.['Color'] != null ? String(p.extradata['Color']) : null,
       );
     });
 
     await pool.query(`
       INSERT INTO wisersell_products
-        (id, name, code, weight, deci, width, length, height, arr_sku, category_id, extra_data)
+        (id, name, code, weight, deci, width, length, height, arr_sku, category_id, extra_data, size, color)
       VALUES ${values.join(', ')}
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
@@ -130,6 +172,8 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
         arr_sku = EXCLUDED.arr_sku,
         category_id = EXCLUDED.category_id,
         extra_data = EXCLUDED.extra_data,
+        size = EXCLUDED.size,
+        color = EXCLUDED.color,
         synced_at = NOW()
     `, params);
   }
@@ -143,7 +187,14 @@ export async function syncWisersell(): Promise<number> {
 
     const creds = await getCredentials();
     const token = await getToken();
+    await delay(1100); // respect 1 req/sec after token fetch
+
     const products = await fetchAllProducts(token, creds.api_url);
+    await delay(1100); // respect 1 req/sec before categories
+
+    const categories = await fetchCategories(token, creds.api_url);
+    logger.info(`[WisersellSync] Fetched ${categories.length} categories`);
+    await upsertCategories(categories);
 
     if (products.length === 0) {
       await updateSyncJob(jobId, 'completed', 0);
@@ -153,7 +204,7 @@ export async function syncWisersell(): Promise<number> {
     await upsertProducts(products);
 
     await updateSyncJob(jobId, 'completed', products.length);
-    logger.info(`[WisersellSync] Completed: ${products.length} products`);
+    logger.info(`[WisersellSync] Completed: ${products.length} products, ${categories.length} categories`);
     return products.length;
   } catch (err: any) {
     logger.error('[WisersellSync] Failed:', err.message);

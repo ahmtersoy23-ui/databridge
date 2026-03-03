@@ -12,6 +12,9 @@ interface WisersellProduct {
   height: number | null;
   arr_sku: string[] | null;
   category_id: number | null;
+  category_name: string | null;
+  size: string | null;
+  color: string | null;
   synced_at: string | null;
 }
 
@@ -26,7 +29,7 @@ const cardStyle = {
 const COL_GRAY = '#6b7280';
 const COL_ZERO = '#d1d5db';
 
-type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_id';
+type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_name' | 'size' | 'color';
 
 export default function Catalog() {
   const [rows, setRows] = useState<WisersellProduct[]>([]);
@@ -63,13 +66,16 @@ export default function Catalog() {
       data = data.filter(r =>
         r.name?.toLowerCase().includes(q) ||
         r.code?.toLowerCase().includes(q) ||
-        r.arr_sku?.some(s => s.toLowerCase().includes(q))
+        r.arr_sku?.some(s => s.toLowerCase().includes(q)) ||
+        r.category_name?.toLowerCase().includes(q) ||
+        r.size?.toLowerCase().includes(q) ||
+        r.color?.toLowerCase().includes(q)
       );
     }
     return [...data].sort((a, b) => {
       const av = a[sortKey] ?? '';
       const bv = b[sortKey] ?? '';
-      if (sortKey === 'id' || sortKey === 'deci' || sortKey === 'category_id') {
+      if (sortKey === 'id' || sortKey === 'deci') {
         return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av);
       }
       return sortAsc
@@ -83,6 +89,16 @@ export default function Catalog() {
     textAlign: align as 'left' | 'right',
     cursor: 'pointer' as const,
     userSelect: 'none' as const,
+    whiteSpace: 'nowrap' as const,
+    color: '#475569',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+  });
+
+  const thStylePlain = (align: 'left' | 'right' = 'left') => ({
+    padding: '0.5rem',
+    textAlign: align as 'left' | 'right',
+    cursor: 'default' as const,
     whiteSpace: 'nowrap' as const,
     color: '#475569',
     fontSize: '0.8rem',
@@ -114,7 +130,7 @@ export default function Catalog() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search name / code / SKU..."
+            placeholder="Search name / code / SKU / category / size / color..."
             style={{ padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', flex: 1 }}
           />
           <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>{filtered.length} items</span>
@@ -131,31 +147,41 @@ export default function Catalog() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                <th onClick={() => handleSort('id')} style={thStyle('id', 'right')}>ID{sortArrow('id')}</th>
                 <th onClick={() => handleSort('code')} style={thStyle('code')}>Code{sortArrow('code')}</th>
                 <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
+                <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
+                <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
+                <th onClick={() => handleSort('color')} style={thStyle('color')}>Color{sortArrow('color')}</th>
                 <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
-                <th onClick={() => handleSort('category_id')} style={thStyle('category_id', 'right')}>Cat ID{sortArrow('category_id')}</th>
-                <th style={{ ...thStyle('id'), cursor: 'default' }}>SKUs</th>
+                <th style={thStylePlain('right')}>W×L×H</th>
+                <th style={thStylePlain()}>SKUs</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(r => (
                 <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: COL_GRAY, fontFamily: 'monospace', fontSize: '0.78rem' }}>
-                    {r.id}
-                  </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
                     {r.code || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
+                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
                     {r.name || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: r.category_name ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
+                    {r.category_name || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: r.size ? '#1e293b' : COL_ZERO }}>
+                    {r.size || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', color: r.color ? '#1e293b' : COL_ZERO }}>
+                    {r.color || '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: r.deci ? '#1e293b' : COL_ZERO }}>
                     {r.deci ?? '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: COL_GRAY }}>
-                    {r.category_id ?? '—'}
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.width ? '#334155' : COL_ZERO, whiteSpace: 'nowrap' }}>
+                    {r.width && r.length && r.height
+                      ? `${r.width}×${r.length}×${r.height}`
+                      : '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO }}>
                     {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
