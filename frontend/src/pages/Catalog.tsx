@@ -180,7 +180,7 @@ export default function Catalog() {
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.width ? '#334155' : COL_ZERO, whiteSpace: 'nowrap' }}>
                     {r.width && r.length && r.height
-                      ? `${r.width}×${r.length}×${r.height}`
+                      ? `${Number(r.width).toFixed(1)}×${Number(r.length).toFixed(1)}×${Number(r.height).toFixed(1)}`
                       : '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO }}>
