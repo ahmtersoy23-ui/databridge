@@ -184,6 +184,7 @@ export default function Catalog() {
               <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
                 <th onClick={() => handleSort('identifier')} style={thStyle('identifier')}>Identifier{sortArrow('identifier')}</th>
                 <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Parent Name{sortArrow('parent_name')}</th>
+                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
                 <th onClick={() => handleSort('code')} style={thStyle('code')}>Code{sortArrow('code')}</th>
                 <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
                 <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
@@ -204,8 +205,11 @@ export default function Catalog() {
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: row.identifier ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
                     {row.identifier || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.parent_name ?? ''}>
+                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.parent_name ?? ''}>
                     {row.parent_name || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
+                    {r.name || '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
                     {r.code || '—'}
