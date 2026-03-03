@@ -30,7 +30,7 @@ const COL_GRAY = '#6b7280';
 const COL_ZERO = '#d1d5db';
 const PAGE_SIZE = 200;
 
-type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_name' | 'size' | 'color';
+type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_name' | 'size' | 'color' | 'weight' | 'identifier' | 'parent_name';
 
 export default function Catalog() {
   const [rows, setRows] = useState<WisersellProduct[]>([]);
@@ -77,10 +77,18 @@ export default function Catalog() {
         r.color?.toLowerCase().includes(q)
       );
     }
-    return [...data].sort((a, b) => {
-      const av = a[sortKey] ?? '';
-      const bv = b[sortKey] ?? '';
-      if (sortKey === 'id' || sortKey === 'deci') {
+    const withComputed = data.map(r => {
+      const m = r.code?.match(/^([A-Za-z]+)([0-9]{3})/);
+      const identifier = m ? `${m[1]}-${m[2]}` : null;
+      const parent_name = identifier && r.name
+        ? r.name.replace(/^[A-Za-z]+-?\s*[0-9]{3}\s+/i, '') || r.name
+        : r.name;
+      return { ...r, identifier, parent_name };
+    });
+    return [...withComputed].sort((a, b) => {
+      const av = (a as any)[sortKey] ?? '';
+      const bv = (b as any)[sortKey] ?? '';
+      if (sortKey === 'id' || sortKey === 'deci' || sortKey === 'weight') {
         return sortAsc ? Number(av) - Number(bv) : Number(bv) - Number(av);
       }
       return sortAsc
@@ -174,11 +182,13 @@ export default function Catalog() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
+                <th onClick={() => handleSort('identifier')} style={thStyle('identifier')}>Identifier{sortArrow('identifier')}</th>
+                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Parent Name{sortArrow('parent_name')}</th>
                 <th onClick={() => handleSort('code')} style={thStyle('code')}>Code{sortArrow('code')}</th>
-                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
                 <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
                 <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
                 <th onClick={() => handleSort('color')} style={thStyle('color')}>Color{sortArrow('color')}</th>
+                <th onClick={() => handleSort('weight')} style={thStyle('weight', 'right')}>Weight{sortArrow('weight')}</th>
                 <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
                 <th style={thStylePlain('right')}>W</th>
                 <th style={thStylePlain('right')}>L</th>
@@ -187,13 +197,18 @@ export default function Catalog() {
               </tr>
             </thead>
             <tbody>
-              {pageRows.map(r => (
+              {pageRows.map(r => {
+                const row = r as any;
+                return (
                 <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: row.identifier ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
+                    {row.identifier || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.parent_name ?? ''}>
+                    {row.parent_name || '—'}
+                  </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
                     {r.code || '—'}
-                  </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name ?? ''}>
-                    {r.name || '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', color: r.category_name ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
                     {r.category_name || '—'}
@@ -203,6 +218,9 @@ export default function Catalog() {
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', color: r.color ? '#1e293b' : COL_ZERO }}>
                     {r.color || '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.weight ? '#334155' : COL_ZERO }}>
+                    {r.weight != null ? `${Number(r.weight).toFixed(1)} kg` : '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: r.deci ? '#1e293b' : COL_ZERO }}>
                     {r.deci ?? '—'}
@@ -220,7 +238,8 @@ export default function Catalog() {
                     {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}
