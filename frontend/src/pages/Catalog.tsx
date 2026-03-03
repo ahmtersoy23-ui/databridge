@@ -183,18 +183,17 @@ export default function Catalog() {
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
                 <th onClick={() => handleSort('identifier')} style={thStyle('identifier')}>Identifier{sortArrow('identifier')}</th>
-                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Parent Name{sortArrow('parent_name')}</th>
-                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
-                <th onClick={() => handleSort('code')} style={thStyle('code')}>Code{sortArrow('code')}</th>
+                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Product Name{sortArrow('parent_name')}</th>
+                <th onClick={() => handleSort('name')} style={thStyle('name')}>Key{sortArrow('name')}</th>
+                <th onClick={() => handleSort('code')} style={thStyle('code')}>SKU{sortArrow('code')}</th>
                 <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
                 <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
                 <th onClick={() => handleSort('color')} style={thStyle('color')}>Color{sortArrow('color')}</th>
                 <th onClick={() => handleSort('weight')} style={thStyle('weight', 'right')}>Weight{sortArrow('weight')}</th>
                 <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
-                <th style={thStylePlain('right')}>W</th>
-                <th style={thStylePlain('right')}>L</th>
-                <th style={thStylePlain('right')}>H</th>
-                <th style={thStylePlain()}>SKUs</th>
+                <th style={thStylePlain('right')}>Width</th>
+                <th style={thStylePlain('right')}>Length</th>
+                <th style={thStylePlain('right')}>Height</th>
               </tr>
             </thead>
             <tbody>
@@ -238,9 +237,7 @@ export default function Catalog() {
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.height ? '#334155' : COL_ZERO }}>
                     {r.height != null ? Number(r.height).toFixed(1) : '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO, minWidth: '120px', wordBreak: 'break-word' }}>
-                    {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
-                  </td>
+
                 </tr>
                 );
               })}
