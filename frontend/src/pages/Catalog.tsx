@@ -153,7 +153,9 @@ export default function Catalog() {
                 <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
                 <th onClick={() => handleSort('color')} style={thStyle('color')}>Color{sortArrow('color')}</th>
                 <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
-                <th style={thStylePlain('right')}>W×L×H</th>
+                <th style={thStylePlain('right')}>W</th>
+                <th style={thStylePlain('right')}>L</th>
+                <th style={thStylePlain('right')}>H</th>
                 <th style={thStylePlain()}>SKUs</th>
               </tr>
             </thead>
@@ -178,10 +180,14 @@ export default function Catalog() {
                   <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: r.deci ? '#1e293b' : COL_ZERO }}>
                     {r.deci ?? '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.width ? '#334155' : COL_ZERO, whiteSpace: 'nowrap' }}>
-                    {r.width && r.length && r.height
-                      ? `${Number(r.width).toFixed(1)}×${Number(r.length).toFixed(1)}×${Number(r.height).toFixed(1)}`
-                      : '—'}
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.width ? '#334155' : COL_ZERO }}>
+                    {r.width != null ? Number(r.width).toFixed(1) : '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.length ? '#334155' : COL_ZERO }}>
+                    {r.length != null ? Number(r.length).toFixed(1) : '—'}
+                  </td>
+                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.height ? '#334155' : COL_ZERO }}>
+                    {r.height != null ? Number(r.height).toFixed(1) : '—'}
                   </td>
                   <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.75rem', color: r.arr_sku?.length ? '#334155' : COL_ZERO }}>
                     {r.arr_sku?.length ? r.arr_sku.join(', ') : '—'}
