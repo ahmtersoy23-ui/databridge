@@ -1,4 +1,4 @@
-import { sharedPool } from '../config/database';
+import { sharedPool, pool } from '../config/database';
 import logger from '../config/logger';
 
 interface SkuMapping {
@@ -65,6 +65,16 @@ export async function mapSkuToIwasku(sku: string, countryCode: string, asin?: st
     if (asinFallback) return asinFallback.iwasku;
   }
 
+  // 4. Wisersell code fallback: strip _Fba suffix → look up wisersell_products.code
+  const stripped = sku.replace(/_Fba$/i, '');
+  if (stripped !== sku) {
+    const res = await pool.query(
+      'SELECT code FROM wisersell_products WHERE code = $1',
+      [stripped]
+    );
+    if (res.rows.length > 0) return res.rows[0].code;
+  }
+
   return null;
 }
 
@@ -103,6 +113,29 @@ export async function mapBulkSkusToIwasku(
     }
 
     result.set(item.sku, null);
+  }
+
+  // 4. Wisersell code fallback: strip _Fba suffix → look up wisersell_products.code
+  const unmatchedItems = items.filter(i => result.get(i.sku) === null);
+  if (unmatchedItems.length > 0) {
+    const candidates = new Map<string, string>(); // stripped code → original sku
+    for (const item of unmatchedItems) {
+      const stripped = item.sku.replace(/_Fba$/i, '');
+      if (stripped !== item.sku) {
+        candidates.set(stripped, item.sku);
+      }
+    }
+    if (candidates.size > 0) {
+      const codes = Array.from(candidates.keys());
+      const res = await pool.query(
+        'SELECT code FROM wisersell_products WHERE code = ANY($1)',
+        [codes]
+      );
+      for (const row of res.rows) {
+        const originalSku = candidates.get(row.code)!;
+        result.set(originalSku, row.code);
+      }
+    }
   }
 
   return result;
