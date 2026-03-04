@@ -8,6 +8,7 @@ import SalesAnalysis from './pages/SalesAnalysis';
 import InventoryAnalysis from './pages/InventoryAnalysis';
 import NJWarehouse from './pages/NJWarehouse';
 import Catalog from './pages/Catalog';
+import WayfairMappings from './pages/WayfairMappings';
 
 const navStyle = {
   display: 'flex',
@@ -61,6 +62,9 @@ export default function App() {
         <NavLink to="/catalog" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Catalog
         </NavLink>
+        <NavLink to="/wayfair" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
+          Wayfair
+        </NavLink>
         <NavLink to="/logs" style={({ isActive }) => isActive ? activeLinkStyle : linkStyle}>
           Logs
         </NavLink>
@@ -75,6 +79,7 @@ export default function App() {
           <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
           <Route path="/nj-warehouse" element={<NJWarehouse />} />
           <Route path="/catalog" element={<Catalog />} />
+          <Route path="/wayfair" element={<WayfairMappings />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
       </main>

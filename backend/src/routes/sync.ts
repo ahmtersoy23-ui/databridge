@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runNJWarehouseSync, runWisersellSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace } from '../services/sync/salesSync';
 import { backfillSales } from '../services/sync/salesSync';
@@ -11,7 +11,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -60,6 +60,9 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     } else if (type === 'wisersell') {
       runWisersellSync().catch(err => logger.error('[Sync] Manual Wisersell sync error:', err));
       res.json({ success: true, message: 'Wisersell catalog sync started' });
+    } else if (type === 'wayfair') {
+      runWayfairSync().catch(err => logger.error('[Sync] Manual Wayfair sync error:', err));
+      res.json({ success: true, message: 'Wayfair CastleGate sync started' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

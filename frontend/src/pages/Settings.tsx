@@ -8,6 +8,13 @@ interface WisersellConfig {
   updated_at?: string;
 }
 
+interface WayfairConfig {
+  configured: boolean;
+  client_id?: string;
+  use_sandbox?: boolean;
+  updated_at?: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -50,6 +57,7 @@ const btnStyle = (bg: string) => ({
 });
 
 const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
+const emptyWayfairForm = { client_id: '', client_secret: '', use_sandbox: true };
 
 export default function Settings() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -63,6 +71,12 @@ export default function Settings() {
   const [wisersellForm, setWisersellForm] = useState(emptyWisersellForm);
   const [wisersellSaving, setWisersellSaving] = useState(false);
   const [wisersellMessage, setWisersellMessage] = useState('');
+
+  const [wayfairConfig, setWayfairConfig] = useState<WayfairConfig | null>(null);
+  const [wayfairForm, setWayfairForm] = useState(emptyWayfairForm);
+  const [wayfairSaving, setWayfairSaving] = useState(false);
+  const [wayfairMessage, setWayfairMessage] = useState('');
+  const [wayfairTesting, setWayfairTesting] = useState(false);
 
   const fetchCredentials = async () => {
     try {
@@ -85,7 +99,19 @@ export default function Settings() {
     }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); }, []);
+  const fetchWayfairConfig = async () => {
+    try {
+      const res = await axios.get('/api/v1/wayfair/settings');
+      setWayfairConfig(res.data);
+      if (res.data.configured) {
+        setWayfairForm(prev => ({ ...prev, client_id: res.data.client_id, use_sandbox: res.data.use_sandbox }));
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairConfig(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -153,6 +179,34 @@ export default function Settings() {
       setMessage(err.response?.data?.error || 'Failed to save credentials');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleWayfairSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWayfairSaving(true);
+    setWayfairMessage('');
+    try {
+      await axios.post('/api/v1/wayfair/settings', wayfairForm);
+      setWayfairMessage('Saved successfully!');
+      fetchWayfairConfig();
+    } catch (err: any) {
+      setWayfairMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setWayfairSaving(false);
+    }
+  };
+
+  const handleWayfairTest = async () => {
+    setWayfairTesting(true);
+    setWayfairMessage('');
+    try {
+      const res = await axios.post('/api/v1/wayfair/settings/test');
+      setWayfairMessage(`Connection OK (${res.data.sandbox ? 'Sandbox' : 'Production'})`);
+    } catch (err: any) {
+      setWayfairMessage(err.response?.data?.error || 'Connection failed');
+    } finally {
+      setWayfairTesting(false);
     }
   };
 
@@ -282,6 +336,67 @@ export default function Settings() {
             style={{ padding: '0.5rem 2rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
             {wisersellSaving ? 'Saving...' : wisersellConfig?.configured ? 'Update' : 'Save'}
           </button>
+        </form>
+      </div>
+
+      {/* Wayfair credentials */}
+      <div style={cardStyle}>
+        <h2 style={{ marginBottom: '0.5rem' }}>Wayfair CastleGate API</h2>
+        {wayfairConfig?.configured && (
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+            Current: <strong>{wayfairConfig.client_id}</strong> — {wayfairConfig.use_sandbox ? 'Sandbox' : 'Production'}
+            {wayfairConfig.updated_at && ` (updated ${new Date(wayfairConfig.updated_at).toLocaleDateString()})`}
+          </p>
+        )}
+        <form onSubmit={handleWayfairSubmit}>
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client ID</label>
+          <input
+            type="text"
+            placeholder="Wayfair Partner Portal Client ID"
+            value={wayfairForm.client_id}
+            onChange={e => setWayfairForm({ ...wayfairForm, client_id: e.target.value })}
+            style={inputStyle}
+            required
+          />
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client Secret</label>
+          <input
+            type="password"
+            placeholder={wayfairConfig?.configured ? 'Leave blank to keep current' : 'Client Secret'}
+            value={wayfairForm.client_secret}
+            onChange={e => setWayfairForm({ ...wayfairForm, client_secret: e.target.value })}
+            style={inputStyle}
+            required={!wayfairConfig?.configured}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={wayfairForm.use_sandbox}
+                onChange={e => setWayfairForm({ ...wayfairForm, use_sandbox: e.target.checked })}
+              />
+              <span style={{ fontWeight: 500 }}>Sandbox mode</span>
+            </label>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              {wayfairForm.use_sandbox ? 'sandbox.api.wayfair.com' : 'api.wayfair.com'}
+            </span>
+          </div>
+          {wayfairMessage && (
+            <p style={{ color: wayfairMessage.includes('OK') || wayfairMessage.includes('success') ? '#059669' : '#dc2626', marginBottom: '0.75rem' }}>
+              {wayfairMessage}
+            </p>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="submit" disabled={wayfairSaving}
+              style={{ padding: '0.5rem 2rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              {wayfairSaving ? 'Saving...' : wayfairConfig?.configured ? 'Update' : 'Save'}
+            </button>
+            {wayfairConfig?.configured && (
+              <button type="button" disabled={wayfairTesting} onClick={handleWayfairTest}
+                style={{ padding: '0.5rem 1.5rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                {wayfairTesting ? 'Testing...' : 'Test Connection'}
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
