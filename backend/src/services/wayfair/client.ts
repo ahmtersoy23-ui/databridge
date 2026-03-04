@@ -45,7 +45,7 @@ async function getToken(): Promise<{ token: string; apiBase: string }> {
   let res;
   try {
     res = await axios.post(
-      'https://auth.api.wayfair.com/v1/oauth/token',
+      'https://sso.auth.wayfair.com/oauth/token',
       new URLSearchParams({
         grant_type: 'client_credentials',
         client_id: creds.client_id,
