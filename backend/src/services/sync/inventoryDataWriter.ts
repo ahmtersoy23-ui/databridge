@@ -67,69 +67,67 @@ const BATCH_SIZE = 500;
 async function upsertInventoryData(warehouse: string, rows: InventoryRow[]): Promise<number> {
   if (rows.length === 0) return 0;
 
-  let written = 0;
+  const client = await sharedPool.connect();
+  try {
+    await client.query('BEGIN');
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    const values: string[] = [];
-    const params: any[] = [];
+    // Delete all existing rows for this warehouse first — this cleans up orphaned rows
+    // (e.g. _Fba rows that were written before the 12-char iwasku normalization fix)
+    await client.query('DELETE FROM fba_inventory WHERE warehouse = $1', [warehouse]);
 
-    batch.forEach((row, idx) => {
-      const offset = idx * 24;
-      const placeholders = Array.from({ length: 24 }, (_, j) => `$${offset + j + 1}`);
-      values.push(`(${placeholders.join(', ')})`);
-      params.push(
-        row.iwasku, row.asin || null, warehouse, row.fnsku || null,
-        row.sku_list || null, row.total_quantity,
-        row.fc_processing_quantity, row.total_reserved_quantity,
-        row.pending_customer_order_quantity, row.pending_transshipment_quantity,
-        row.fulfillable_quantity,
-        0, 0, 0, 0, 0, // total_researching, future_supply_buyable, reserved_future_supply, expired, defective
-        0, // carrier_damaged
-        row.customer_damaged_quantity, row.warehouse_damaged_quantity,
-        row.distributor_damaged_quantity, row.total_unfulfillable_quantity,
-        row.inbound_shipped_quantity, row.inbound_working_quantity, row.inbound_receiving_quantity,
-      );
-    });
+    let written = 0;
 
-    await sharedPool.query(`
-      INSERT INTO fba_inventory (
-        iwasku, asin, warehouse, fnsku,
-        sku_list, total_quantity,
-        fc_processing_quantity, total_reserved_quantity,
-        pending_customer_order_quantity, pending_transshipment_quantity,
-        fulfillable_quantity,
-        total_researching_quantity, future_supply_buyable_quantity,
-        reserved_future_supply_quantity, expired_quantity, defective_quantity,
-        carrier_damaged_quantity,
-        customer_damaged_quantity, warehouse_damaged_quantity,
-        distributor_damaged_quantity, total_unfulfillable_quantity,
-        inbound_shipped_quantity, inbound_working_quantity, inbound_receiving_quantity
-      ) VALUES ${values.join(', ')}
-      ON CONFLICT (iwasku, warehouse) DO UPDATE SET
-        asin = EXCLUDED.asin,
-        fnsku = EXCLUDED.fnsku,
-        sku_list = EXCLUDED.sku_list,
-        total_quantity = EXCLUDED.total_quantity,
-        fc_processing_quantity = EXCLUDED.fc_processing_quantity,
-        total_reserved_quantity = EXCLUDED.total_reserved_quantity,
-        pending_customer_order_quantity = EXCLUDED.pending_customer_order_quantity,
-        pending_transshipment_quantity = EXCLUDED.pending_transshipment_quantity,
-        fulfillable_quantity = EXCLUDED.fulfillable_quantity,
-        customer_damaged_quantity = EXCLUDED.customer_damaged_quantity,
-        warehouse_damaged_quantity = EXCLUDED.warehouse_damaged_quantity,
-        distributor_damaged_quantity = EXCLUDED.distributor_damaged_quantity,
-        total_unfulfillable_quantity = EXCLUDED.total_unfulfillable_quantity,
-        inbound_shipped_quantity = EXCLUDED.inbound_shipped_quantity,
-        inbound_working_quantity = EXCLUDED.inbound_working_quantity,
-        inbound_receiving_quantity = EXCLUDED.inbound_receiving_quantity,
-        updated_at = NOW()
-    `, params);
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: any[] = [];
 
-    written += batch.length;
+      batch.forEach((row, idx) => {
+        const offset = idx * 24;
+        const placeholders = Array.from({ length: 24 }, (_, j) => `$${offset + j + 1}`);
+        values.push(`(${placeholders.join(', ')})`);
+        params.push(
+          row.iwasku, row.asin || null, warehouse, row.fnsku || null,
+          row.sku_list || null, row.total_quantity,
+          row.fc_processing_quantity, row.total_reserved_quantity,
+          row.pending_customer_order_quantity, row.pending_transshipment_quantity,
+          row.fulfillable_quantity,
+          0, 0, 0, 0, 0, // total_researching, future_supply_buyable, reserved_future_supply, expired, defective
+          0, // carrier_damaged
+          row.customer_damaged_quantity, row.warehouse_damaged_quantity,
+          row.distributor_damaged_quantity, row.total_unfulfillable_quantity,
+          row.inbound_shipped_quantity, row.inbound_working_quantity, row.inbound_receiving_quantity,
+        );
+      });
+
+      await client.query(`
+        INSERT INTO fba_inventory (
+          iwasku, asin, warehouse, fnsku,
+          sku_list, total_quantity,
+          fc_processing_quantity, total_reserved_quantity,
+          pending_customer_order_quantity, pending_transshipment_quantity,
+          fulfillable_quantity,
+          total_researching_quantity, future_supply_buyable_quantity,
+          reserved_future_supply_quantity, expired_quantity, defective_quantity,
+          carrier_damaged_quantity,
+          customer_damaged_quantity, warehouse_damaged_quantity,
+          distributor_damaged_quantity, total_unfulfillable_quantity,
+          inbound_shipped_quantity, inbound_working_quantity, inbound_receiving_quantity
+        ) VALUES ${values.join(', ')}
+        ON CONFLICT (iwasku, warehouse) DO NOTHING
+      `, params);
+
+      written += batch.length;
+    }
+
+    await client.query('COMMIT');
+    return written;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  return written;
 }
 
 export async function writeInventoryData(): Promise<void> {
