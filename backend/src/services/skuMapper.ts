@@ -65,12 +65,12 @@ export async function mapSkuToIwasku(sku: string, countryCode: string, asin?: st
     if (asinFallback) return asinFallback.iwasku;
   }
 
-  // 4. Wisersell code fallback: strip _Fba suffix → look up wisersell_products.code
-  const stripped = sku.replace(/_Fba$/i, '');
-  if (stripped !== sku) {
+  // 4. Wisersell code fallback: first 12 chars → look up wisersell_products.code
+  if (sku.length > 12) {
+    const prefix = sku.slice(0, 12);
     const res = await pool.query(
       'SELECT code FROM wisersell_products WHERE code = $1',
-      [stripped]
+      [prefix]
     );
     if (res.rows.length > 0) return res.rows[0].code;
   }
@@ -120,9 +120,9 @@ export async function mapBulkSkusToIwasku(
   if (unmatchedItems.length > 0) {
     const candidates = new Map<string, string>(); // stripped code → original sku
     for (const item of unmatchedItems) {
-      const stripped = item.sku.replace(/_Fba$/i, '');
-      if (stripped !== item.sku) {
-        candidates.set(stripped, item.sku);
+      if (item.sku.length > 12) {
+        const prefix = item.sku.slice(0, 12);
+        candidates.set(prefix, item.sku);
       }
     }
     if (candidates.size > 0) {
