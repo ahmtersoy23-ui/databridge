@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
+interface WayfairLineItem {
+  partNumber: string;
+  quantity: number;
+  unitPrice?: number;
+}
+
+interface WayfairPurchaseOrder {
+  poNumber: string;
+  status: string;
+  orderDate: string;
+  expectedShipDate?: string;
+  lineItems: WayfairLineItem[];
+}
+
 interface MappingRow {
   part_number: string;
   iwasku: string | null;
@@ -24,7 +38,129 @@ const cardStyle = {
   marginBottom: '1rem',
 } as const;
 
+function WayfairOrders() {
+  const [orders, setOrders] = useState<WayfairPurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.get('/api/v1/wayfair/orders');
+      setOrders(res.data.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchOrders(); }, []);
+
+  const statusColor = (status: string) => {
+    if (status === 'Unacknowledged') return { bg: '#fef3c7', color: '#92400e' };
+    if (status === 'Acknowledged') return { bg: '#dbeafe', color: '#1e40af' };
+    if (status === 'Shipped') return { bg: '#dcfce7', color: '#166534' };
+    return { bg: '#f1f5f9', color: '#475569' };
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        <button onClick={fetchOrders} disabled={loading}
+          style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+          {error}
+        </div>
+      )}
+
+      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading orders...</div>
+        ) : orders.length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+            No orders found.{' '}
+            <span style={{ fontSize: '0.85rem' }}>Sandbox mode may not return real purchase orders.</span>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>PO Number</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Order Date</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Ship By</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(order => {
+                const sc = statusColor(order.status);
+                return (
+                  <>
+                    <tr
+                      key={order.poNumber}
+                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.poNumber ? '#f8fafc' : undefined }}
+                      onClick={() => setExpanded(expanded === order.poNumber ? null : order.poNumber)}
+                    >
+                      <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>{order.poNumber}</td>
+                      <td style={{ padding: '0.6rem 0.5rem' }}>
+                        <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem', background: sc.bg, color: sc.color }}>
+                          {order.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
+                        {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
+                        {order.expectedShipDate ? new Date(order.expectedShipDate).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.lineItems.length} item{order.lineItems.length !== 1 ? 's' : ''}</td>
+                    </tr>
+                    {expanded === order.poNumber && (
+                      <tr key={`${order.poNumber}-detail`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <td colSpan={5} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                            <thead>
+                              <tr style={{ color: '#64748b' }}>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Part Number</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Qty</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Unit Price</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {order.lineItems.map((li, i) => (
+                                <tr key={i}>
+                                  <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{li.partNumber}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantity}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.unitPrice != null ? `$${li.unitPrice.toFixed(2)}` : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function WayfairMappings() {
+  const [activeTab, setActiveTab] = useState<'mappings' | 'orders'>('mappings');
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, pages: 1 });
   const [loading, setLoading] = useState(true);
@@ -147,7 +283,26 @@ export default function WayfairMappings() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Wayfair CastleGate Mappings</h1>
+      <h1 style={{ marginBottom: '1rem' }}>Wayfair CastleGate</h1>
+
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0' }}>
+        {(['mappings', 'orders'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveTab(tab)}
+            style={{
+              padding: '0.5rem 1.25rem', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: '0.9rem', fontWeight: 500,
+              color: activeTab === tab ? '#0891b2' : '#64748b',
+              borderBottom: activeTab === tab ? '2px solid #0891b2' : '2px solid transparent',
+              marginBottom: '-2px',
+            }}>
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'orders' && <WayfairOrders />}
+      {activeTab === 'mappings' && <>
 
       {/* Toolbar */}
       <div style={{ ...cardStyle, display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -305,6 +460,7 @@ export default function WayfairMappings() {
           </tbody>
         </table>
       </div>
+      </>}
     </div>
   );
 }

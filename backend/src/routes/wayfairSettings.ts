@@ -63,6 +63,19 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
   }
 });
 
+// GET /api/v1/wayfair/settings/schema — list available GraphQL query names
+router.get('/schema', async (_req: Request, res: Response) => {
+  try {
+    const result = await graphqlQuery<{
+      __schema: { queryType: { fields: { name: string; description: string }[] } }
+    }>(`{ __schema { queryType { fields { name description } } } }`);
+    const fields = result.__schema.queryType.fields.map(f => ({ name: f.name, description: f.description }));
+    res.json({ fields });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/v1/wayfair/settings/test — test token + discover supplier ID
 router.post('/test', async (_req: Request, res: Response) => {
   try {
