@@ -57,13 +57,13 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
   let page = 0;
 
   while (true) {
-    const result = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
+    const result: InventoryResponse = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
       supplierId,
       first: 100,
       cursor: cursor ?? undefined,
     });
 
-    const conn = result.integrationsSupplierPartsInventory;
+    const conn: InventoryResponse['integrationsSupplierPartsInventory'] = result.integrationsSupplierPartsInventory;
     if (!conn?.edges?.length) break;
 
     for (const { node } of conn.edges) {
