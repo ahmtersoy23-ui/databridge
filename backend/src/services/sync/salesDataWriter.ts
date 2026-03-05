@@ -115,48 +115,54 @@ const BATCH_SIZE = 500;
 async function upsertSalesData(channel: string, rows: SalesRow[]): Promise<number> {
   if (rows.length === 0) return 0;
 
-  let written = 0;
+  const client = await sharedPool.connect();
+  try {
+    await client.query('BEGIN');
 
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
-    const values: string[] = [];
-    const params: any[] = [];
+    // Delete all existing rows for this channel first — cleans up orphaned rows
+    // (e.g. _Fba rows from before the 12-char iwasku normalization was applied retroactively)
+    await client.query('DELETE FROM sales_data WHERE channel = $1', [channel]);
 
-    batch.forEach((row, idx) => {
-      const offset = idx * 17;
-      const placeholders = Array.from({ length: 17 }, (_, j) => `$${offset + j + 1}`);
-      values.push(`(${placeholders.join(', ')})`);
-      params.push(
-        channel, row.iwasku, row.asin || null,
-        row.last7, row.last30, row.last90, row.last180, row.last366,
-        row.pre_year_last7, row.pre_year_last30, row.pre_year_last90,
-        row.pre_year_last180, row.pre_year_last365,
-        row.pre_year_next7, row.pre_year_next30, row.pre_year_next90, row.pre_year_next180
-      );
-    });
+    let written = 0;
 
-    await sharedPool.query(`
-      INSERT INTO sales_data (channel, iwasku, asin,
-        last7, last30, last90, last180, last366,
-        pre_year_last7, pre_year_last30, pre_year_last90, pre_year_last180, pre_year_last365,
-        pre_year_next7, pre_year_next30, pre_year_next90, pre_year_next180)
-      VALUES ${values.join(', ')}
-      ON CONFLICT (iwasku, channel) DO UPDATE SET
-        asin = EXCLUDED.asin,
-        last7 = EXCLUDED.last7, last30 = EXCLUDED.last30, last90 = EXCLUDED.last90,
-        last180 = EXCLUDED.last180, last366 = EXCLUDED.last366,
-        pre_year_last7 = EXCLUDED.pre_year_last7, pre_year_last30 = EXCLUDED.pre_year_last30,
-        pre_year_last90 = EXCLUDED.pre_year_last90, pre_year_last180 = EXCLUDED.pre_year_last180,
-        pre_year_last365 = EXCLUDED.pre_year_last365,
-        pre_year_next7 = EXCLUDED.pre_year_next7, pre_year_next30 = EXCLUDED.pre_year_next30,
-        pre_year_next90 = EXCLUDED.pre_year_next90, pre_year_next180 = EXCLUDED.pre_year_next180,
-        updated_at = NOW()
-    `, params);
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: any[] = [];
 
-    written += batch.length;
+      batch.forEach((row, idx) => {
+        const offset = idx * 17;
+        const placeholders = Array.from({ length: 17 }, (_, j) => `$${offset + j + 1}`);
+        values.push(`(${placeholders.join(', ')})`);
+        params.push(
+          channel, row.iwasku, row.asin || null,
+          row.last7, row.last30, row.last90, row.last180, row.last366,
+          row.pre_year_last7, row.pre_year_last30, row.pre_year_last90,
+          row.pre_year_last180, row.pre_year_last365,
+          row.pre_year_next7, row.pre_year_next30, row.pre_year_next90, row.pre_year_next180
+        );
+      });
+
+      await client.query(`
+        INSERT INTO sales_data (channel, iwasku, asin,
+          last7, last30, last90, last180, last366,
+          pre_year_last7, pre_year_last30, pre_year_last90, pre_year_last180, pre_year_last365,
+          pre_year_next7, pre_year_next30, pre_year_next90, pre_year_next180)
+        VALUES ${values.join(', ')}
+        ON CONFLICT (iwasku, channel) DO NOTHING
+      `, params);
+
+      written += batch.length;
+    }
+
+    await client.query('COMMIT');
+    return written;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  return written;
 }
 
 export async function writeSalesData(): Promise<void> {
