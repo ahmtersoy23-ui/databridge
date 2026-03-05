@@ -43,6 +43,8 @@ function WayfairOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [schemaFields, setSchemaFields] = useState<{ name: string; description: string }[] | null>(null);
+  const [schemaLoading, setSchemaLoading] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -57,6 +59,18 @@ function WayfairOrders() {
     }
   };
 
+  const fetchSchema = async () => {
+    setSchemaLoading(true);
+    try {
+      const res = await axios.get('/api/v1/wayfair/settings/schema');
+      setSchemaFields(res.data.fields);
+    } catch (err: any) {
+      setSchemaFields([{ name: 'Error', description: err.response?.data?.error || 'Failed to fetch schema' }]);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
   useEffect(() => { fetchOrders(); }, []);
 
   const statusColor = (status: string) => {
@@ -68,12 +82,33 @@ function WayfairOrders() {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button onClick={fetchSchema} disabled={schemaLoading}
+          style={{ padding: '0.4rem 1rem', background: '#64748b', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {schemaLoading ? 'Loading...' : 'View API Schema'}
+        </button>
         <button onClick={fetchOrders} disabled={loading}
           style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
+
+      {schemaFields && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>Available GraphQL Queries ({schemaFields.length})</strong>
+            <span onClick={() => setSchemaFields(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+            {schemaFields.map(f => (
+              <div key={f.name} style={{ padding: '0.2rem 0', borderBottom: '1px solid #334155' }}>
+                <span style={{ color: '#7dd3fc' }}>{f.name}</span>
+                {f.description && <span style={{ color: '#64748b', marginLeft: '1rem' }}>{f.description}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>

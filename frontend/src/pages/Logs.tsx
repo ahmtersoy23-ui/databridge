@@ -30,6 +30,7 @@ const statusColors: Record<string, string> = {
 export default function Logs() {
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedError, setExpandedError] = useState<number | null>(null);
 
   const fetchJobs = async () => {
     try {
@@ -99,8 +100,22 @@ export default function Logs() {
                   <td style={{ padding: '0.5rem' }}>{job.records_processed}</td>
                   <td style={{ padding: '0.5rem' }}>{formatDuration(job.started_at, job.completed_at)}</td>
                   <td style={{ padding: '0.5rem' }}>{new Date(job.created_at).toLocaleString()}</td>
-                  <td style={{ padding: '0.5rem', color: '#dc2626', fontSize: '0.85rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {job.error_message || '-'}
+                  <td style={{ padding: '0.5rem', fontSize: '0.85rem', maxWidth: '400px' }}>
+                    {job.error_message ? (
+                      <span
+                        onClick={() => setExpandedError(expandedError === job.id ? null : job.id)}
+                        style={{
+                          color: '#dc2626', cursor: 'pointer',
+                          whiteSpace: expandedError === job.id ? 'normal' : 'nowrap',
+                          overflow: expandedError === job.id ? 'visible' : 'hidden',
+                          textOverflow: expandedError === job.id ? 'clip' : 'ellipsis',
+                          display: 'block', wordBreak: 'break-word',
+                        }}
+                        title="Click to expand"
+                      >
+                        {job.error_message}
+                      </span>
+                    ) : '-'}
                   </td>
                 </tr>
               ))}
