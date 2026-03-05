@@ -12,6 +12,7 @@ interface WayfairConfig {
   configured: boolean;
   client_id?: string;
   use_sandbox?: boolean;
+  supplier_id?: number;
   updated_at?: string;
 }
 
@@ -345,6 +346,7 @@ export default function Settings() {
         {wayfairConfig?.configured && (
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
             Current: <strong>{wayfairConfig.client_id}</strong> — {wayfairConfig.use_sandbox ? 'Sandbox' : 'Production'}
+            {wayfairConfig.supplier_id && ` — Supplier ID: ${wayfairConfig.supplier_id}`}
             {wayfairConfig.updated_at && ` (updated ${new Date(wayfairConfig.updated_at).toLocaleDateString()})`}
           </p>
         )}
@@ -377,7 +379,7 @@ export default function Settings() {
               <span style={{ fontWeight: 500 }}>Sandbox mode</span>
             </label>
             <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              {wayfairForm.use_sandbox ? 'sandbox.api.wayfair.com' : 'api.wayfair.com'}
+              {wayfairForm.use_sandbox ? 'api.wayfair.io/sandbox/...' : 'api.wayfair.io/...'}
             </span>
           </div>
           {wayfairMessage && (

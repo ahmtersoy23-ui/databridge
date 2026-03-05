@@ -1,4 +1,4 @@
-import { graphqlQuery } from './client';
+import { graphqlQuery, getSupplierId } from './client';
 import logger from '../../config/logger';
 
 export interface WayfairInventoryItem {
@@ -8,68 +8,39 @@ export interface WayfairInventoryItem {
   quantity: number;
 }
 
-// CastleGate inventory query — will be validated/adjusted against real sandbox schema
-// Wayfair GraphQL schema uses inventoryOverview or similar; adjust field names after sandbox test
 const INVENTORY_QUERY = `
-  query GetCastlegateInventory($supplierPartNumbers: [String]) {
-    inventoryOverview(supplierPartNumbers: $supplierPartNumbers) {
-      supplierPartNumber
-      quantityOnHand
-      quantityOnOrder
-      warehouses {
-        warehouseId
-        warehouseName
-        quantityOnHand
+  query GetInventory($supplierId: Int!, $first: Int!, $cursor: String) {
+    integrationsSupplierPartsInventory(
+      supplierId: $supplierId
+      filter: {}
+      page: { first: $first, after: $cursor }
+    ) {
+      edges {
+        node {
+          supplierPartNumber
+          inventoryPosition {
+            totalFulfillableQty
+            castleGate { onHandQty }
+          }
+        }
       }
+      pageInfo { hasNextPage endCursor }
     }
   }
 `;
 
-// Alternative query for full inventory list (no filter)
-const INVENTORY_ALL_QUERY = `
-  query GetAllInventory {
-    inventory {
-      data {
-        supplierPartNumber
-        quantityAvailable
-        warehouseId
-        warehouseName
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-`;
+interface InventoryNode {
+  supplierPartNumber: string;
+  inventoryPosition: {
+    totalFulfillableQty: number;
+    castleGate: { onHandQty: number } | null;
+  };
+}
 
-const PAGINATED_QUERY = `
-  query GetInventoryPage($cursor: String) {
-    inventory(after: $cursor) {
-      data {
-        supplierPartNumber
-        quantityAvailable
-        warehouseId
-        warehouseName
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
-    }
-  }
-`;
-
-interface InventoryData {
-  data: {
-    supplierPartNumber: string;
-    quantityAvailable: number;
-    warehouseId: string;
-    warehouseName: string;
-  }[];
-  pageInfo: {
-    hasNextPage: boolean;
-    endCursor: string | null;
+interface InventoryResponse {
+  integrationsSupplierPartsInventory: {
+    edges: { node: InventoryNode }[];
+    pageInfo: { hasNextPage: boolean; endCursor: string | null };
   };
 }
 
@@ -77,52 +48,37 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Fetch all CastleGate inventory items with cursor pagination.
- * NOTE: The exact query and field names will be confirmed after sandbox testing.
- * Wayfair API rate limit: 10 req/sec — we throttle to ~2 req/sec for safety.
+ * Wayfair API rate limit: 10 req/sec — throttled to ~2 req/sec for safety.
  */
 export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
+  const supplierId = await getSupplierId();
   const all: WayfairInventoryItem[] = [];
   let cursor: string | null = null;
   let page = 0;
 
   while (true) {
-    let result: { inventory: InventoryData };
+    const result = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
+      supplierId,
+      first: 100,
+      cursor: cursor ?? undefined,
+    });
 
-    try {
-      if (cursor) {
-        result = await graphqlQuery<{ inventory: InventoryData }>(
-          PAGINATED_QUERY,
-          { cursor }
-        );
-      } else {
-        result = await graphqlQuery<{ inventory: InventoryData }>(
-          INVENTORY_ALL_QUERY
-        );
-      }
-    } catch (err: any) {
-      // If paginated query fails (schema mismatch), throw with helpful message
-      throw new Error(
-        `Wayfair inventory query failed (page ${page}): ${err.message}. ` +
-        'Check GraphQL schema in Wayfair Partner Portal sandbox.'
-      );
-    }
+    const conn = result.integrationsSupplierPartsInventory;
+    if (!conn?.edges?.length) break;
 
-    const inventory = result.inventory;
-    if (!inventory?.data?.length) break;
-
-    for (const row of inventory.data) {
+    for (const { node } of conn.edges) {
       all.push({
-        partNumber: row.supplierPartNumber,
-        warehouseId: row.warehouseId || 'CASTLEGATE',
-        warehouseName: row.warehouseName || 'CastleGate',
-        quantity: row.quantityAvailable ?? 0,
+        partNumber: node.supplierPartNumber,
+        warehouseId: 'CASTLEGATE',
+        warehouseName: 'CastleGate',
+        quantity: node.inventoryPosition?.totalFulfillableQty ?? 0,
       });
     }
 
-    logger.info(`[Wayfair] Page ${page}: ${inventory.data.length} items (total: ${all.length})`);
+    logger.info(`[Wayfair] Page ${page}: ${conn.edges.length} items (total: ${all.length})`);
 
-    if (!inventory.pageInfo?.hasNextPage) break;
-    cursor = inventory.pageInfo.endCursor;
+    if (!conn.pageInfo?.hasNextPage) break;
+    cursor = conn.pageInfo.endCursor;
     page++;
     await delay(500); // 2 req/sec — well within 10 req/sec limit
   }

@@ -6,6 +6,7 @@ interface WayfairCredentials {
   client_id: string;
   client_secret: string;
   use_sandbox: boolean;
+  supplier_id: number | null;
 }
 
 // In-memory token cache (12h lifetime)
@@ -19,7 +20,7 @@ export function clearWayfairTokenCache(): void {
 
 export async function getCredentials(): Promise<WayfairCredentials> {
   const result = await pool.query(
-    'SELECT client_id, client_secret, use_sandbox FROM wayfair_credentials WHERE id = 1'
+    'SELECT client_id, client_secret, use_sandbox, supplier_id FROM wayfair_credentials WHERE id = 1'
   );
   if (!result.rows.length) {
     throw new Error('Wayfair credentials not configured. Add them in Settings.');
@@ -27,20 +28,21 @@ export async function getCredentials(): Promise<WayfairCredentials> {
   return result.rows[0];
 }
 
+// Returns the full GraphQL endpoint URL for the given mode
 export function getApiBase(useSandbox: boolean): string {
   return useSandbox
-    ? 'https://sandbox.api.wayfair.com'
-    : 'https://api.wayfair.com';
+    ? 'https://api.wayfair.io/sandbox/v1/supplier-order-api/graphql'
+    : 'https://api.wayfair.io/v1/supplier-order-api/graphql';
 }
 
-async function getToken(): Promise<{ token: string; apiBase: string }> {
+async function getToken(): Promise<{ token: string; graphqlUrl: string }> {
   if (cachedToken && Date.now() < tokenExpiry - 60_000) {
     const creds = await getCredentials();
-    return { token: cachedToken, apiBase: getApiBase(creds.use_sandbox) };
+    return { token: cachedToken, graphqlUrl: getApiBase(creds.use_sandbox) };
   }
 
   const creds = await getCredentials();
-  const apiBase = getApiBase(creds.use_sandbox);
+  const graphqlUrl = getApiBase(creds.use_sandbox);
 
   let res;
   try {
@@ -72,17 +74,17 @@ async function getToken(): Promise<{ token: string; apiBase: string }> {
   cachedToken = token;
 
   logger.info(`[Wayfair] Token acquired, expires in ${expiresIn}s (sandbox=${creds.use_sandbox})`);
-  return { token, apiBase };
+  return { token, graphqlUrl };
 }
 
 export async function graphqlQuery<T = unknown>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  const { token, apiBase } = await getToken();
+  const { token, graphqlUrl } = await getToken();
 
   const res = await axios.post(
-    `${apiBase}/v1/graphql`,
+    graphqlUrl,
     { query, variables },
     {
       headers: {
@@ -99,4 +101,34 @@ export async function graphqlQuery<T = unknown>(
   }
 
   return res.data.data as T;
+}
+
+/**
+ * Get the Wayfair supplier ID.
+ * 1. Check DB (wayfair_credentials.supplier_id)
+ * 2. Try auto-discover via getApplicationByClientId API
+ * 3. Store discovered ID back to DB for future use
+ */
+export async function getSupplierId(): Promise<number> {
+  const creds = await getCredentials();
+
+  if (creds.supplier_id) return creds.supplier_id;
+
+  // Try auto-discover
+  const result = await graphqlQuery<{
+    getApplicationByClientId: { suppliers: { id: number; name: string }[] } | null
+  }>(`{ getApplicationByClientId(clientId: "${creds.client_id}") { suppliers { id name } } }`);
+
+  const supplierId = result.getApplicationByClientId?.suppliers?.[0]?.id;
+  if (!supplierId) {
+    throw new Error(
+      'Wayfair supplier ID could not be auto-discovered. ' +
+      'Enter it manually in Settings > Wayfair CastleGate API > Supplier ID.'
+    );
+  }
+
+  // Persist for future calls
+  await pool.query('UPDATE wayfair_credentials SET supplier_id = $1 WHERE id = 1', [supplierId]);
+  logger.info(`[Wayfair] Auto-discovered supplier ID: ${supplierId}`);
+  return supplierId;
 }
