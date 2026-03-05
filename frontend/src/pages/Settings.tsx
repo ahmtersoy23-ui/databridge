@@ -58,7 +58,7 @@ const btnStyle = (bg: string) => ({
 });
 
 const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
-const emptyWayfairForm = { client_id: '', client_secret: '', use_sandbox: true };
+const emptyWayfairForm = { client_id: '', client_secret: '', use_sandbox: true, supplier_id: '' };
 
 export default function Settings() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
@@ -105,7 +105,12 @@ export default function Settings() {
       const res = await axios.get('/api/v1/wayfair/settings');
       setWayfairConfig(res.data);
       if (res.data.configured) {
-        setWayfairForm(prev => ({ ...prev, client_id: res.data.client_id, use_sandbox: res.data.use_sandbox }));
+        setWayfairForm(prev => ({
+          ...prev,
+          client_id: res.data.client_id,
+          use_sandbox: res.data.use_sandbox,
+          supplier_id: res.data.supplier_id ? String(res.data.supplier_id) : '',
+        }));
       }
     } catch {
       // ignore
@@ -188,7 +193,13 @@ export default function Settings() {
     setWayfairSaving(true);
     setWayfairMessage('');
     try {
-      await axios.post('/api/v1/wayfair/settings', wayfairForm);
+      const payload: Record<string, unknown> = {
+        client_id: wayfairForm.client_id,
+        client_secret: wayfairForm.client_secret || undefined,
+        use_sandbox: wayfairForm.use_sandbox,
+      };
+      if (wayfairForm.supplier_id) payload.supplier_id = parseInt(wayfairForm.supplier_id, 10);
+      await axios.post('/api/v1/wayfair/settings', payload);
       setWayfairMessage('Saved successfully!');
       fetchWayfairConfig();
     } catch (err: any) {
@@ -368,6 +379,16 @@ export default function Settings() {
             onChange={e => setWayfairForm({ ...wayfairForm, client_secret: e.target.value })}
             style={inputStyle}
             required={!wayfairConfig?.configured}
+          />
+          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
+            Supplier ID <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8rem' }}>(optional — auto-discovered if blank)</span>
+          </label>
+          <input
+            type="number"
+            placeholder="e.g. 12345"
+            value={wayfairForm.supplier_id}
+            onChange={e => setWayfairForm({ ...wayfairForm, supplier_id: e.target.value })}
+            style={inputStyle}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
