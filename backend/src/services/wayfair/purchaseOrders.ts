@@ -51,7 +51,12 @@ export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder
   try {
     result = await graphqlQuery<POResponse>(PO_QUERY);
   } catch (err: any) {
-    if (err.message?.includes('wrongly returned a null value')) {
+    const msg: string = err.message || '';
+    if (
+      msg.includes('wrongly returned a null value') ||
+      msg.includes('Internal Server Error') ||
+      msg.includes('failed to retrieve CG PO')
+    ) {
       logger.info('[Wayfair PO] No orders available (sandbox limitation)');
       return [];
     }
