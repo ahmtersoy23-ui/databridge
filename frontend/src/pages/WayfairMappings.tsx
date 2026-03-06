@@ -45,6 +45,8 @@ function WayfairOrders() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [schemaFields, setSchemaFields] = useState<{ name: string; description: string }[] | null>(null);
   const [schemaLoading, setSchemaLoading] = useState(false);
+  const [typeFields, setTypeFields] = useState<{ name: string; type: { name: string | null; kind: string; ofType: { name: string | null } | null } }[] | null>(null);
+  const [typeLoading, setTypeLoading] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -71,6 +73,18 @@ function WayfairOrders() {
     }
   };
 
+  const fetchType = async () => {
+    setTypeLoading(true);
+    try {
+      const res = await axios.get('/api/v1/wayfair/settings/type/PurchaseOrderV2');
+      setTypeFields(res.data.fields);
+    } catch (err: any) {
+      setTypeFields([{ name: 'Error', type: { name: err.response?.data?.error || 'Failed', kind: '', ofType: null } }]);
+    } finally {
+      setTypeLoading(false);
+    }
+  };
+
   useEffect(() => { fetchOrders(); }, []);
 
   const statusColor = (status: string) => {
@@ -83,6 +97,10 @@ function WayfairOrders() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button onClick={fetchType} disabled={typeLoading}
+          style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {typeLoading ? 'Loading...' : 'Inspect PO Type'}
+        </button>
         <button onClick={fetchSchema} disabled={schemaLoading}
           style={{ padding: '0.4rem 1rem', background: '#64748b', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
           {schemaLoading ? 'Loading...' : 'View API Schema'}
@@ -92,6 +110,24 @@ function WayfairOrders() {
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
+
+      {typeFields && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>PurchaseOrderV2 Fields</strong>
+            <span onClick={() => setTypeFields(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          {typeFields.map(f => {
+            const typeName = f.type.ofType?.name || f.type.name || f.type.kind;
+            return (
+              <div key={f.name} style={{ padding: '0.2rem 0', borderBottom: '1px solid #334155' }}>
+                <span style={{ color: '#7dd3fc' }}>{f.name}</span>
+                <span style={{ color: '#64748b', marginLeft: '1rem' }}>{typeName}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {schemaFields && (
         <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
