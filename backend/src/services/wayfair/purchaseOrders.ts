@@ -4,30 +4,31 @@ import logger from '../../config/logger';
 export interface WayfairLineItem {
   partNumber: string;
   quantity: number;
-  unitPrice?: number;
+  price?: number;
 }
 
 export interface WayfairPurchaseOrder {
   poNumber: string;
-  status: string;
-  orderDate: string;
-  expectedShipDate?: string;
+  orderType: string;
+  poDate: string;
+  estimatedShipDate?: string;
   lineItems: WayfairLineItem[];
 }
 
 // getCastleGatePurchaseOrders returns PurchaseOrderV2[] directly (no connection/edges/pageInfo)
 // Supplier is inferred from auth token — no supplierId arg needed
+// PurchaseOrderV2 actual fields: poNumber, poDate, estimatedShipDate, orderType, products, ...
 const PO_QUERY = `
   query GetCastleGatePOs($hasResponse: Boolean) {
     getCastleGatePurchaseOrders(hasResponse: $hasResponse) {
       poNumber
-      status
-      orderDate
+      poDate
       estimatedShipDate
-      lineItems {
+      orderType
+      products {
         partNumber
         quantity
-        unitPrice
+        price
       }
     }
   }
@@ -35,10 +36,10 @@ const PO_QUERY = `
 
 interface PONode {
   poNumber: string;
-  status: string;
-  orderDate: string;
+  orderType: string;
+  poDate: string;
   estimatedShipDate?: string;
-  lineItems?: { partNumber: string; quantity: number; unitPrice?: number }[];
+  products?: { partNumber: string; quantity: number; price?: number }[];
 }
 
 interface POResponse {
@@ -62,13 +63,13 @@ export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder
 
   return orders.map(node => ({
     poNumber: node.poNumber,
-    status: node.status,
-    orderDate: node.orderDate,
-    expectedShipDate: node.estimatedShipDate,
-    lineItems: (node.lineItems || []).map(li => ({
-      partNumber: li.partNumber,
-      quantity: li.quantity,
-      unitPrice: li.unitPrice,
+    orderType: node.orderType,
+    poDate: node.poDate,
+    estimatedShipDate: node.estimatedShipDate,
+    lineItems: (node.products || []).map(p => ({
+      partNumber: p.partNumber,
+      quantity: p.quantity,
+      price: p.price,
     })),
   }));
 }

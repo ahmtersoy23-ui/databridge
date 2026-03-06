@@ -4,14 +4,14 @@ import axios from 'axios';
 interface WayfairLineItem {
   partNumber: string;
   quantity: number;
-  unitPrice?: number;
+  price?: number;
 }
 
 interface WayfairPurchaseOrder {
   poNumber: string;
-  status: string;
-  orderDate: string;
-  expectedShipDate?: string;
+  orderType: string;
+  poDate: string;
+  estimatedShipDate?: string;
   lineItems: WayfairLineItem[];
 }
 
@@ -87,10 +87,9 @@ function WayfairOrders() {
 
   useEffect(() => { fetchOrders(); }, []);
 
-  const statusColor = (status: string) => {
-    if (status === 'Unacknowledged') return { bg: '#fef3c7', color: '#92400e' };
-    if (status === 'Acknowledged') return { bg: '#dbeafe', color: '#1e40af' };
-    if (status === 'Shipped') return { bg: '#dcfce7', color: '#166534' };
+  const orderTypeColor = (type: string) => {
+    if (type === 'DROPSHIP') return { bg: '#dbeafe', color: '#1e40af' };
+    if (type === 'CASTLEGATE') return { bg: '#dcfce7', color: '#166534' };
     return { bg: '#f1f5f9', color: '#475569' };
   };
 
@@ -165,15 +164,15 @@ function WayfairOrders() {
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>PO Number</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Order Date</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Type</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>PO Date</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Ship By</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
               </tr>
             </thead>
             <tbody>
               {orders.map(order => {
-                const sc = statusColor(order.status);
+                const sc = orderTypeColor(order.orderType);
                 return (
                   <>
                     <tr
@@ -184,14 +183,14 @@ function WayfairOrders() {
                       <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>{order.poNumber}</td>
                       <td style={{ padding: '0.6rem 0.5rem' }}>
                         <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem', background: sc.bg, color: sc.color }}>
-                          {order.status}
+                          {order.orderType}
                         </span>
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
-                        {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '—'}
+                        {order.poDate ? new Date(order.poDate).toLocaleDateString() : '—'}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
-                        {order.expectedShipDate ? new Date(order.expectedShipDate).toLocaleDateString() : '—'}
+                        {order.estimatedShipDate ? new Date(order.estimatedShipDate).toLocaleDateString() : '—'}
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.lineItems.length} item{order.lineItems.length !== 1 ? 's' : ''}</td>
                     </tr>
@@ -203,7 +202,7 @@ function WayfairOrders() {
                               <tr style={{ color: '#64748b' }}>
                                 <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Part Number</th>
                                 <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Qty</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Unit Price</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Price</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -211,7 +210,7 @@ function WayfairOrders() {
                                 <tr key={i}>
                                   <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{li.partNumber}</td>
                                   <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantity}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.unitPrice != null ? `$${li.unitPrice.toFixed(2)}` : '—'}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.price != null ? `$${li.price.toFixed(2)}` : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
