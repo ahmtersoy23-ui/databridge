@@ -57,11 +57,21 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
   let page = 0;
 
   while (true) {
-    const result: InventoryResponse = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
-      supplierId,
-      first: 100,
-      cursor: cursor ?? undefined,
-    });
+    let result: InventoryResponse;
+    try {
+      result = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
+        supplierId,
+        first: 100,
+        cursor: cursor ?? undefined,
+      });
+    } catch (err: any) {
+      // Sandbox returns null for suppliers with no data — non-null type error bubbles up
+      if (err.message?.includes('wrongly returned a null value')) {
+        logger.info('[Wayfair] Inventory data unavailable (sandbox limitation or no CastleGate data)');
+        break;
+      }
+      throw err;
+    }
 
     const conn: InventoryResponse['integrationsSupplierPartsInventory'] = result.integrationsSupplierPartsInventory;
     if (!conn?.edges?.length) break;

@@ -15,11 +15,13 @@ export interface WayfairPurchaseOrder {
   lineItems: WayfairLineItem[];
 }
 
-// Cursor-based PO query — query name and shape to be confirmed via /api/v1/wayfair/settings/schema
+// getCastleGatePurchaseOrders — confirmed name from schema introspection
+// hasResponse=false → open (no response yet), omit → all orders
 const PO_QUERY = `
-  query GetPurchaseOrders($supplierId: Int!, $first: Int!, $cursor: String) {
-    purchaseOrders(
+  query GetCastleGatePOs($supplierId: Int!, $hasResponse: Boolean, $first: Int!, $cursor: String) {
+    getCastleGatePurchaseOrders(
       supplierId: $supplierId
+      hasResponse: $hasResponse
       page: { first: $first, after: $cursor }
     ) {
       edges {
@@ -27,7 +29,7 @@ const PO_QUERY = `
           poNumber
           status
           orderDate
-          expectedShipDate
+          estimatedShipDate
           lineItems {
             partNumber
             quantity
@@ -44,12 +46,12 @@ interface PONode {
   poNumber: string;
   status: string;
   orderDate: string;
-  expectedShipDate?: string;
+  estimatedShipDate?: string;
   lineItems?: { partNumber: string; quantity: number; unitPrice?: number }[];
 }
 
 interface POResponse {
-  purchaseOrders: {
+  getCastleGatePurchaseOrders: {
     edges: { node: PONode }[];
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
   };
@@ -62,13 +64,22 @@ export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder
   let page = 0;
 
   while (true) {
-    const result: POResponse = await graphqlQuery<POResponse>(PO_QUERY, {
-      supplierId,
-      first: 50,
-      cursor: cursor ?? undefined,
-    });
+    let result: POResponse;
+    try {
+      result = await graphqlQuery<POResponse>(PO_QUERY, {
+        supplierId,
+        first: 50,
+        cursor: cursor ?? undefined,
+      });
+    } catch (err: any) {
+      if (err.message?.includes('wrongly returned a null value')) {
+        logger.info('[Wayfair PO] No orders available (sandbox limitation)');
+        break;
+      }
+      throw err;
+    }
 
-    const conn: POResponse['purchaseOrders'] = result.purchaseOrders;
+    const conn: POResponse['getCastleGatePurchaseOrders'] = result.getCastleGatePurchaseOrders;
     if (!conn?.edges?.length) break;
 
     for (const { node } of conn.edges) {
@@ -76,7 +87,7 @@ export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder
         poNumber: node.poNumber,
         status: node.status,
         orderDate: node.orderDate,
-        expectedShipDate: node.expectedShipDate,
+        expectedShipDate: node.estimatedShipDate,
         lineItems: (node.lineItems || []).map(li => ({
           partNumber: li.partNumber,
           quantity: li.quantity,
