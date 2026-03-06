@@ -76,6 +76,23 @@ router.get('/schema', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/v1/wayfair/settings/type/:typeName — introspect fields of a GraphQL type
+router.get('/type/:typeName', async (req: Request, res: Response) => {
+  try {
+    const { typeName } = req.params;
+    const result = await graphqlQuery<{
+      __type: { fields: { name: string; type: { name: string | null; kind: string; ofType: { name: string | null } | null } }[] } | null
+    }>(`{ __type(name: "${typeName}") { fields { name type { name kind ofType { name } } } } }`);
+    if (!result.__type) {
+      res.status(404).json({ success: false, error: `Type '${typeName}' not found` });
+      return;
+    }
+    res.json({ type: typeName, fields: result.__type.fields });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // POST /api/v1/wayfair/settings/test — test token + discover supplier ID
 router.post('/test', async (_req: Request, res: Response) => {
   try {
