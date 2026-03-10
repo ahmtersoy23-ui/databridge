@@ -59,7 +59,7 @@ async function upsertInventory(
     });
 
     await pool.query(`
-      INSERT INTO wayfair_inventory (part_number, warehouse_id, warehouse_name, quantity, iwasku, last_synced_at)
+      INSERT INTO wayfair_inventory (part_number, warehouse_id, warehouse_name, quantity, iwasku)
       VALUES ${values.join(', ')}
       ON CONFLICT (part_number, warehouse_id) DO UPDATE SET
         warehouse_name = EXCLUDED.warehouse_name,
