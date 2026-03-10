@@ -8,37 +8,49 @@ export interface WayfairInventoryItem {
   quantity: number;
 }
 
+// New CastleGate On-hand API (inventorySummaryList) — required for Wayfair sandbox approval
 const INVENTORY_QUERY = `
-  query GetInventory($supplierId: Int!, $first: Int!, $cursor: String) {
-    integrationsSupplierPartsInventory(
+  query inventorySummaryList($supplierId: Int!, $first: Int!, $cursor: String) {
+    inventorySummaryList(
       supplierId: $supplierId
-      filter: {}
       page: { first: $first, after: $cursor }
     ) {
+      pageInfo { hasNextPage endCursor }
       edges {
         node {
           supplierPartNumber
           inventoryPosition {
-            totalFulfillableQty
-            castleGate { onHandQty }
+            castleGate {
+              onHandQty
+              warehouses {
+                warehouseId
+                onHandQty
+              }
+            }
           }
         }
       }
-      pageInfo { hasNextPage endCursor }
     }
   }
 `;
 
+interface InventoryWarehouse {
+  warehouseId: string;
+  onHandQty: number;
+}
+
 interface InventoryNode {
   supplierPartNumber: string;
   inventoryPosition: {
-    totalFulfillableQty: number;
-    castleGate: { onHandQty: number } | null;
+    castleGate: {
+      onHandQty: number;
+      warehouses?: InventoryWarehouse[];
+    } | null;
   };
 }
 
 interface InventoryResponse {
-  integrationsSupplierPartsInventory: {
+  inventorySummaryList: {
     edges: { node: InventoryNode }[];
     pageInfo: { hasNextPage: boolean; endCursor: string | null };
   };
@@ -47,7 +59,8 @@ interface InventoryResponse {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Fetch all CastleGate inventory items with cursor pagination.
+ * Fetch all CastleGate on-hand inventory items via inventorySummaryList.
+ * Returns one row per warehouse per part (or a single CASTLEGATE row if no breakdown).
  * Wayfair API rate limit: 10 req/sec — throttled to ~2 req/sec for safety.
  */
 export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
@@ -65,24 +78,44 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
         cursor: cursor ?? undefined,
       });
     } catch (err: any) {
-      // Sandbox returns null for suppliers with no data — non-null type error bubbles up
-      if (err.message?.includes('wrongly returned a null value')) {
-        logger.info('[Wayfair] Inventory data unavailable (sandbox limitation or no CastleGate data)');
+      const msg: string = err.message || '';
+      if (
+        msg.includes('wrongly returned a null value') ||
+        msg.includes('Internal Server Error')
+      ) {
+        logger.info('[Wayfair] Inventory data unavailable (sandbox has no data for this supplier)');
         break;
       }
       throw err;
     }
 
-    const conn: InventoryResponse['integrationsSupplierPartsInventory'] = result.integrationsSupplierPartsInventory;
+    const conn = result.inventorySummaryList;
     if (!conn?.edges?.length) break;
 
     for (const { node } of conn.edges) {
-      all.push({
-        partNumber: node.supplierPartNumber,
-        warehouseId: 'CASTLEGATE',
-        warehouseName: 'CastleGate',
-        quantity: node.inventoryPosition?.totalFulfillableQty ?? 0,
-      });
+      const cg = node.inventoryPosition?.castleGate;
+      if (!cg) continue;
+
+      const warehouses = cg.warehouses?.filter(w => w.onHandQty > 0);
+      if (warehouses && warehouses.length > 0) {
+        // Store per-warehouse breakdown
+        for (const wh of warehouses) {
+          all.push({
+            partNumber: node.supplierPartNumber,
+            warehouseId: String(wh.warehouseId),
+            warehouseName: `CastleGate WH ${wh.warehouseId}`,
+            quantity: wh.onHandQty,
+          });
+        }
+      } else {
+        // No warehouse breakdown — store total as single CASTLEGATE row
+        all.push({
+          partNumber: node.supplierPartNumber,
+          warehouseId: 'CASTLEGATE',
+          warehouseName: 'CastleGate',
+          quantity: cg.onHandQty ?? 0,
+        });
+      }
     }
 
     logger.info(`[Wayfair] Page ${page}: ${conn.edges.length} items (total: ${all.length})`);
@@ -90,7 +123,7 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
     if (!conn.pageInfo?.hasNextPage) break;
     cursor = conn.pageInfo.endCursor;
     page++;
-    await delay(500); // 2 req/sec — well within 10 req/sec limit
+    await delay(500); // ~2 req/sec — well within 10 req/sec limit
   }
 
   return all;
