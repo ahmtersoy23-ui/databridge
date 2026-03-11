@@ -61,8 +61,8 @@ export async function writeTransactionData(): Promise<void> {
       const params: any[] = [];
 
       batch.forEach((t: any, idx: number) => {
-        const offset = idx * 22;
-        const placeholders = Array.from({ length: 22 }, (_, j) => `$${offset + j + 1}`);
+        const offset = idx * 23;
+        const placeholders = Array.from({ length: 23 }, (_, j) => `$${offset + j + 1}`);
         values.push(`(${placeholders.join(', ')})`);
         params.push(
           t.transaction_id, 'sp-api-sync', t.transaction_date, t.date_only,
@@ -70,7 +70,8 @@ export async function writeTransactionData(): Promise<void> {
           t.marketplace, t.fulfillment, t.order_postal, t.quantity || 0,
           t.product_sales || 0, t.promotional_rebates || 0, t.selling_fees || 0,
           t.fba_fees || 0, t.other_transaction_fees || 0, t.other || 0,
-          t.vat || 0, t.liquidations || 0, t.total || 0
+          t.vat || 0, t.liquidations || 0, t.total || 0,
+          t.marketplace_code || null
         );
       });
 
@@ -80,7 +81,8 @@ export async function writeTransactionData(): Promise<void> {
           type, category_type, order_id, sku, description,
           marketplace, fulfillment, order_postal, quantity,
           product_sales, promotional_rebates, selling_fees, fba_fees,
-          other_transaction_fees, other, vat, liquidations, total
+          other_transaction_fees, other, vat, liquidations, total,
+          marketplace_code
         ) VALUES ${values.join(', ')}
         ON CONFLICT (transaction_id) DO UPDATE SET
           file_name = EXCLUDED.file_name,
@@ -103,7 +105,8 @@ export async function writeTransactionData(): Promise<void> {
           other = EXCLUDED.other,
           vat = EXCLUDED.vat,
           liquidations = EXCLUDED.liquidations,
-          total = EXCLUDED.total
+          total = EXCLUDED.total,
+          marketplace_code = EXCLUDED.marketplace_code
       `, params);
 
       written += batch.length;
