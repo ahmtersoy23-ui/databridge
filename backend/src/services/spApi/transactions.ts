@@ -107,7 +107,7 @@ export async function fetchSettlementTransactions(
       });
 
       const tsv = await downloadDocument(doc.url);
-      const transactions = parseSettlementTsv(tsv, marketplace.credential_id, startDate, marketplace.country_code.toLowerCase());
+      const transactions = parseSettlementTsv(tsv, marketplace.credential_id, startDate, marketplace.country_code.toUpperCase());
       allTransactions.push(...transactions);
 
       logger.info(`[SP-API] Settlement ${settlementId}: ${transactions.length} supplementary transactions`);
