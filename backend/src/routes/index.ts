@@ -11,6 +11,7 @@ import wisersellSettingsRouter from './wisersellSettings';
 import wayfairSettingsRouter from './wayfairSettings';
 import wayfairMappingsRouter from './wayfairMappings';
 import wayfairOrdersRouter from './wayfairOrders';
+import wayfairInventoryRouter from './wayfairInventory';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.use('/wisersell-settings', wisersellSettingsRouter);
 router.use('/wayfair/settings', wayfairSettingsRouter);
 router.use('/wayfair/mappings', wayfairMappingsRouter);
 router.use('/wayfair/orders', wayfairOrdersRouter);
+router.use('/wayfair/inventory', wayfairInventoryRouter);
 
 // Management endpoints (auth required)
 router.use('/sync', syncRouter);

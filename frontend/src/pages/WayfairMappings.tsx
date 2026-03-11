@@ -319,6 +319,55 @@ function WayfairCGOrders() {
   );
 }
 
+function WayfairInventoryTab() {
+  const [rawResponse, setRawResponse] = useState<unknown>(null);
+  const [rawLoading, setRawLoading] = useState(false);
+
+  const fetchRaw = async () => {
+    setRawLoading(true);
+    try {
+      const res = await axios.get('/api/v1/wayfair/inventory/raw');
+      setRawResponse(res.data);
+    } catch (err: any) {
+      setRawResponse({ error: err.response?.data?.error || err.message });
+    } finally {
+      setRawLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        <button onClick={fetchRaw} disabled={rawLoading}
+          style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {rawLoading ? 'Loading...' : 'Raw Inventory Response'}
+        </button>
+      </div>
+
+      {rawResponse !== null && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>Raw Inventory API Response (ilk 5 ürün)</strong>
+            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          <pre style={{ maxHeight: '600px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {rawResponse === null && (
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          API'den gelen ham stok verisini görmek için "Raw Inventory Response" butonuna tıkla.<br />
+          <span style={{ fontSize: '0.8rem', marginTop: '0.5rem', display: 'block' }}>
+            onHandQty · inStockQty · fulfillableQty (Available) · warehouse breakdown
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WayfairOrders() {
   const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
 
@@ -345,7 +394,7 @@ function WayfairOrders() {
 }
 
 export default function WayfairMappings() {
-  const [activeTab, setActiveTab] = useState<'mappings' | 'orders'>('mappings');
+  const [activeTab, setActiveTab] = useState<'mappings' | 'orders' | 'inventory'>('mappings');
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, pages: 1 });
   const [loading, setLoading] = useState(true);
@@ -471,7 +520,7 @@ export default function WayfairMappings() {
 
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0' }}>
-        {(['mappings', 'orders'] as const).map(tab => (
+        {(['mappings', 'orders', 'inventory'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             style={{
               padding: '0.5rem 1.25rem', border: 'none', background: 'none', cursor: 'pointer',
@@ -486,6 +535,7 @@ export default function WayfairMappings() {
       </div>
 
       {activeTab === 'orders' && <WayfairOrders />}
+      {activeTab === 'inventory' && <WayfairInventoryTab />}
       {activeTab === 'mappings' && <>
 
       {/* Toolbar */}
