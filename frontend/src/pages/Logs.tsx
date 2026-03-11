@@ -27,6 +27,13 @@ const statusColors: Record<string, string> = {
   pending: '#6b7280',
 };
 
+const jobTypeLabels: Record<string, string> = {
+  sales_sync: 'sales_sync (orders)',
+  sales_backfill: 'sales_backfill (orders)',
+  transaction_sync: 'finance_sync',
+  transaction_backfill: 'finance_backfill',
+};
+
 export default function Logs() {
   const [jobs, setJobs] = useState<SyncJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +97,7 @@ export default function Logs() {
               {jobs.map(job => (
                 <tr key={job.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                   <td style={{ padding: '0.5rem' }}>{job.id}</td>
-                  <td style={{ padding: '0.5rem' }}>{job.job_type}</td>
+                  <td style={{ padding: '0.5rem' }}>{jobTypeLabels[job.job_type] || job.job_type}</td>
                   <td style={{ padding: '0.5rem' }}>{job.marketplace}</td>
                   <td style={{ padding: '0.5rem' }}>
                     <span style={{ color: statusColors[job.status] || '#6b7280', fontWeight: 500 }}>
@@ -99,7 +106,7 @@ export default function Logs() {
                   </td>
                   <td style={{ padding: '0.5rem' }}>{job.records_processed}</td>
                   <td style={{ padding: '0.5rem' }}>{formatDuration(job.started_at, job.completed_at)}</td>
-                  <td style={{ padding: '0.5rem' }}>{new Date(job.created_at).toLocaleString()}</td>
+                  <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{new Date(job.created_at).toLocaleString()}</td>
                   <td style={{ padding: '0.5rem', fontSize: '0.85rem', maxWidth: '400px' }}>
                     {job.error_message ? (
                       <span
