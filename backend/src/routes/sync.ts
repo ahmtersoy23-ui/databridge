@@ -1,17 +1,17 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
-import { syncSalesForMarketplace } from '../services/sync/salesSync';
-import { backfillSales } from '../services/sync/salesSync';
+import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
+import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
 import { validateBody } from '../middleware/validate';
 import logger from '../config/logger';
 
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -63,6 +63,31 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     } else if (type === 'wayfair') {
       runWayfairSync().catch(err => logger.error('[Sync] Manual Wayfair sync error:', err));
       res.json({ success: true, message: 'Wayfair CastleGate sync started' });
+    } else if (type === 'transactions') {
+      if (marketplace) {
+        const mp = await getMarketplaceByCode(marketplace);
+        if (!mp) {
+          res.status(404).json({ success: false, error: `Marketplace not found: ${marketplace}` });
+          return;
+        }
+        const count = await syncTransactionsForMarketplace(mp);
+        res.json({ success: true, message: `Transactions synced for ${marketplace}`, records: count });
+      } else {
+        runTransactionSync().catch(err => logger.error('[Sync] Manual transaction sync error:', err));
+        res.json({ success: true, message: 'Transaction sync started for all marketplaces' });
+      }
+    } else if (type === 'transaction_backfill') {
+      if (!marketplace) {
+        res.status(400).json({ success: false, error: 'Marketplace required for transaction backfill' });
+        return;
+      }
+      const mp = await getMarketplaceByCode(marketplace);
+      if (!mp) {
+        res.status(404).json({ success: false, error: `Marketplace not found: ${marketplace}` });
+        return;
+      }
+      backfillTransactions(mp, months || 18).catch(err => logger.error('[Sync] Transaction backfill error:', err));
+      res.json({ success: true, message: `Transaction backfill started for ${marketplace} (${months || 18} months)` });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

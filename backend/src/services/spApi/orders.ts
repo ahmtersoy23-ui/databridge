@@ -1,5 +1,5 @@
-import { SellingPartner } from 'amazon-sp-api';
 import { getSpApiClient, getSpApiClientByRegion } from './client';
+import { waitForReport, toMarketplaceLocalDate } from './reportUtils';
 import logger from '../../config/logger';
 import { SALES_CHANNEL_TO_CHANNEL, MARKETPLACE_TIMEZONE_OFFSETS } from '../../config/constants';
 import type { MarketplaceConfig, RawOrder } from '../../types';
@@ -79,42 +79,4 @@ export async function fetchOrdersByDateRange(
 
   logger.info(`[SP-API] Parsed ${orders.length} order items for ${marketplace.country_code}`);
   return orders;
-}
-
-async function waitForReport(client: SellingPartner, reportId: string, maxAttempts = 30): Promise<any> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const report: any = await client.callAPI({
-      operation: 'getReport',
-      endpoint: 'reports',
-      path: { reportId },
-    });
-
-    const status = report?.processingStatus;
-
-    if (status === 'DONE') {
-      const docId = report.reportDocumentId;
-      return client.callAPI({
-        operation: 'getReportDocument',
-        endpoint: 'reports',
-        path: { reportDocumentId: docId },
-      });
-    }
-
-    if (status === 'CANCELLED' || status === 'FATAL') {
-      throw new Error(`Report ${reportId} failed with status: ${status}`);
-    }
-
-    // Wait before polling again (exponential backoff: 10s, 15s, 20s, ...)
-    const waitMs = Math.min(10_000 + attempt * 5_000, 60_000);
-    logger.debug(`[SP-API] Report ${reportId} status: ${status}, waiting ${waitMs}ms...`);
-    await new Promise(resolve => setTimeout(resolve, waitMs));
-  }
-
-  throw new Error(`Report ${reportId} timed out after ${maxAttempts} attempts`);
-}
-
-function toMarketplaceLocalDate(utcDate: Date, timezoneOffset: number): string {
-  const localMs = utcDate.getTime() + timezoneOffset * 60 * 60 * 1000;
-  const localDate = new Date(localMs);
-  return localDate.toISOString().split('T')[0]; // YYYY-MM-DD
 }

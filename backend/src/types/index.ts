@@ -68,6 +68,34 @@ export interface FbaInventoryItem {
   inbound_receiving_quantity: number;
 }
 
+// AmzSellMetrics-compatible financial transaction
+export interface FinancialTransaction {
+  transaction_id: string;
+  file_name: string;
+  transaction_date: Date;
+  date_only: string;
+  type: string;
+  category_type: string;
+  order_id: string;
+  sku: string;
+  description: string;
+  marketplace: string;
+  marketplace_code: string;
+  fulfillment: string;
+  order_postal: string;
+  quantity: number;
+  product_sales: number;
+  promotional_rebates: number;
+  selling_fees: number;
+  fba_fees: number;
+  other_transaction_fees: number;
+  other: number;
+  vat: number;
+  liquidations: number;
+  total: number;
+  credential_id: number | null;
+}
+
 // StockPulse-compatible sales response item
 export interface SalesResponseItem {
   iwasku: string;

@@ -2,21 +2,24 @@ import cron from 'node-cron';
 import { pool } from '../../config/database';
 import { syncInventoryForMarketplace } from './inventorySync';
 import { syncSalesForMarketplace } from './salesSync';
+import { syncTransactionsForMarketplace } from './transactionSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
 import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
 let salesTask: cron.ScheduledTask | null = null;
+let transactionTask: cron.ScheduledTask | null = null;
 let njWarehouseTask: cron.ScheduledTask | null = null;
 let wisersellTask: cron.ScheduledTask | null = null;
 let wayfairTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
+let isTransactionSyncing = false;
 let isNJSyncing = false;
 let isWisersellSyncing = false;
 let isWayfairSyncing = false;
@@ -160,6 +163,34 @@ async function runWisersellSync(): Promise<void> {
   }
 }
 
+async function runTransactionSync(): Promise<void> {
+  if (isTransactionSyncing) {
+    logger.warn('[Scheduler] Skipping transaction sync - another transaction sync is in progress');
+    return;
+  }
+
+  isTransactionSyncing = true;
+  try {
+    const eligibleMarketplaces = await getEligibleMarketplaces();
+
+    // Financial transaction reports are per marketplace_id (not per credential like orders)
+    logger.info(`[Scheduler] Transaction sync: ${eligibleMarketplaces.length} marketplaces`);
+
+    for (const mp of eligibleMarketplaces) {
+      try {
+        logger.info(`[Scheduler] Transaction sync for ${mp.country_code}`);
+        await syncTransactionsForMarketplace(mp);
+      } catch (err: any) {
+        logger.error(`[Scheduler] Transaction sync failed for ${mp.country_code}:`, err.message);
+      }
+      // Wait between marketplaces to respect rate limits
+      await new Promise(resolve => setTimeout(resolve, 10_000));
+    }
+  } finally {
+    isTransactionSyncing = false;
+  }
+}
+
 async function runWayfairSync(): Promise<void> {
   if (isWayfairSyncing) {
     logger.warn('[Scheduler] Skipping Wayfair sync - another sync is in progress');
@@ -192,6 +223,11 @@ export function startScheduler(): void {
     runNJWarehouseSync().catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
   });
 
+  transactionTask = cron.schedule(SYNC_TRANSACTIONS_CRON, () => {
+    logger.info('[Scheduler] Starting scheduled transaction sync');
+    runTransactionSync().catch(err => logger.error('[Scheduler] Transaction sync error:', err));
+  });
+
   wisersellTask = cron.schedule(SYNC_WISERSELL_CRON, () => {
     logger.info('[Scheduler] Starting scheduled Wisersell catalog sync');
     runWisersellSync().catch(err => logger.error('[Scheduler] Wisersell sync error:', err));
@@ -204,6 +240,7 @@ export function startScheduler(): void {
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
+  logger.info(`[Scheduler] Transaction sync: ${SYNC_TRANSACTIONS_CRON}`);
   logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
   logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
   logger.info(`[Scheduler] Wayfair CastleGate sync: ${SYNC_WAYFAIR_CRON}`);
@@ -214,10 +251,11 @@ export function startScheduler(): void {
 export function stopScheduler(): void {
   inventoryTask?.stop();
   salesTask?.stop();
+  transactionTask?.stop();
   njWarehouseTask?.stop();
   wisersellTask?.stop();
   wayfairTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
