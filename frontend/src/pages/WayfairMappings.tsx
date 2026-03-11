@@ -156,8 +156,7 @@ function WayfairOrders() {
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading orders...</div>
         ) : orders.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            No orders found.{' '}
-            <span style={{ fontSize: '0.85rem' }}>Sandbox mode may not return real purchase orders.</span>
+            No CastleGate purchase orders found.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>

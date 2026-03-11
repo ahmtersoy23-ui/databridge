@@ -54,12 +54,13 @@ export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder
     const msg: string = err.message || '';
     if (
       msg.includes('wrongly returned a null value') ||
-      msg.includes('Internal Server Error') ||
       msg.includes('failed to retrieve CG PO')
     ) {
-      logger.info('[Wayfair PO] No orders available (sandbox limitation)');
+      logger.info('[Wayfair PO] No CastleGate POs available');
       return [];
     }
+    // Log but rethrow all other errors (including production Internal Server Errors)
+    logger.error(`[Wayfair PO] Error fetching orders: ${msg}`);
     throw err;
   }
 
