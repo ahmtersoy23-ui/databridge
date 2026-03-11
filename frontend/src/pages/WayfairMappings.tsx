@@ -2,32 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 
-interface WayfairLineItem {
-  supplierPartNumber: string;
-  partNumber: string;
-  productName?: string;
-  quantityOrdered: number;
-  quantityShipped: number;
-  unitPrice?: number;
-  status: string;
-  trackingNumbers?: string[];
-}
-
+interface WayfairCGProduct { partNumber: string; quantity: number; price: number; totalCost?: number; }
 interface WayfairPurchaseOrder {
-  requestId: string;
-  status: string;
-  statusLabel: string;
-  orderDate: string;
-  customerOrderNumber?: string;
-  retailerName?: string;
-  shippingAddress?: {
-    name?: string;
-    city?: string;
-    stateShortName?: string;
-    postalCode?: string;
-    countryShortName?: string;
-  };
-  lineItems: WayfairLineItem[];
+  id: string;
+  poNumber: string;
+  poDate: string;
+  supplierId: number;
+  products: WayfairCGProduct[];
 }
 
 interface MappingRow {
@@ -195,53 +176,28 @@ function WayfairDropshipOrders() {
   );
 }
 
-function WayfairOrders() {
-  const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('dropship');
+function WayfairCGOrders() {
   const [orders, setOrders] = useState<WayfairPurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [schemaFields, setSchemaFields] = useState<{ name: string; description: string }[] | null>(null);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-  const [typeFields, setTypeFields] = useState<{ name: string; type: { name: string | null; kind: string; ofType: { name: string | null } | null } }[] | null>(null);
-  const [typeLoading, setTypeLoading] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'new' | 'responded'>('all');
   const [rawResponse, setRawResponse] = useState<unknown>(null);
   const [rawLoading, setRawLoading] = useState(false);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (f = filter) => {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get('/api/v1/wayfair/orders');
+      const params: Record<string, string> = {};
+      if (f === 'new') params.hasResponse = 'false';
+      if (f === 'responded') params.hasResponse = 'true';
+      const res = await axios.get('/api/v1/wayfair/orders', { params });
       setOrders(res.data.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to fetch orders');
+      setError(err.response?.data?.error || 'Failed to fetch CastleGate orders');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchSchema = async () => {
-    setSchemaLoading(true);
-    try {
-      const res = await axios.get('/api/v1/wayfair/settings/schema');
-      setSchemaFields(res.data.fields);
-    } catch (err: any) {
-      setSchemaFields([{ name: 'Error', description: err.response?.data?.error || 'Failed to fetch schema' }]);
-    } finally {
-      setSchemaLoading(false);
-    }
-  };
-
-  const fetchType = async () => {
-    setTypeLoading(true);
-    try {
-      const res = await axios.get('/api/v1/wayfair/settings/type/PurchaseOrderV2');
-      setTypeFields(res.data.fields);
-    } catch (err: any) {
-      setTypeFields([{ name: 'Error', type: { name: err.response?.data?.error || 'Failed', kind: '', ofType: null } }]);
-    } finally {
-      setTypeLoading(false);
     }
   };
 
@@ -259,18 +215,115 @@ function WayfairOrders() {
 
   useEffect(() => { fetchOrders(); }, []);
 
-  const statusColor = (status: string) => {
-    if (status === 'NEW') return { bg: '#fef3c7', color: '#92400e' };
-    if (status === 'ALLOCATED') return { bg: '#dbeafe', color: '#1e40af' };
-    if (status === 'SHIPPED' || status === 'PARTIALLY_SHIPPED') return { bg: '#dcfce7', color: '#166534' };
-    if (status === 'CANCELLED' || status === 'REJECTED') return { bg: '#fef2f2', color: '#dc2626' };
-    if (status === 'DELIVERED') return { bg: '#f0fdf4', color: '#166534' };
-    return { bg: '#f1f5f9', color: '#475569' };
+  const handleFilter = (f: 'all' | 'new' | 'responded') => {
+    setFilter(f);
+    fetchOrders(f);
   };
 
   return (
     <div>
-      {/* Sub-tab bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['all', 'new', 'responded'] as const).map(f => (
+            <button key={f} onClick={() => handleFilter(f)}
+              style={{ padding: '0.35rem 0.9rem', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', background: filter === f ? '#0891b2' : '#fff', color: filter === f ? '#fff' : '#374151' }}>
+              {f === 'all' ? 'All' : f === 'new' ? 'New (no response)' : 'Responded'}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={fetchRaw} disabled={rawLoading}
+            style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+            {rawLoading ? 'Loading...' : 'Raw Response'}
+          </button>
+          <button onClick={() => fetchOrders()} disabled={loading}
+            style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+            {loading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+
+      {rawResponse !== null && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>Raw CastleGate API Response (limit: 5)</strong>
+            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          <pre style={{ maxHeight: '500px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {error && <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>{error}</div>}
+
+      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
+        ) : orders.length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>No CastleGate orders found.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>PO Number</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>PO Date</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Supplier ID</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(order => (
+                <>
+                  <tr key={order.id}
+                    style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.id ? '#f8fafc' : undefined }}
+                    onClick={() => setExpanded(expanded === order.id ? null : order.id)}>
+                    <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>{order.poNumber}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>{order.poDate ? new Date(order.poDate).toLocaleDateString() : '—'}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.supplierId}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.products?.length ?? 0}</td>
+                  </tr>
+                  {expanded === order.id && (
+                    <tr key={`${order.id}-d`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                      <td colSpan={4} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ color: '#64748b' }}>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Part Number</th>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Qty</th>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Price</th>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(order.products || []).map((p, i) => (
+                              <tr key={i}>
+                                <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{p.partNumber}</td>
+                                <td style={{ padding: '0.2rem 0.5rem' }}>{p.quantity}</td>
+                                <td style={{ padding: '0.2rem 0.5rem' }}>{p.price != null ? `$${p.price.toFixed(2)}` : '—'}</td>
+                                <td style={{ padding: '0.2rem 0.5rem' }}>{p.totalCost != null ? `$${p.totalCost.toFixed(2)}` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WayfairOrders() {
+  const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
+
+  return (
+    <div>
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
         {(['castlegate', 'dropship'] as const).map(t => (
           <button key={t} onClick={() => setOrderSubTab(t)}
@@ -285,168 +338,8 @@ function WayfairOrders() {
           </button>
         ))}
       </div>
-
+      {orderSubTab === 'castlegate' && <WayfairCGOrders />}
       {orderSubTab === 'dropship' && <WayfairDropshipOrders />}
-
-      {orderSubTab === 'castlegate' && <div>
-      <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontSize: '0.875rem' }}>
-        <strong>CastleGate Multi-Channel</strong> — Bu hesap Dropship modeliyle çalışmaktadır. CastleGate siparişleri bu hesap için yetkili değil.
-        Dropship siparişleri için üstteki <em>Dropship</em> sekmesini kullan.
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
-        <button onClick={fetchRaw} disabled={rawLoading}
-          style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          {rawLoading ? 'Loading...' : 'Raw Response'}
-        </button>
-        <button onClick={fetchType} disabled={typeLoading}
-          style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          {typeLoading ? 'Loading...' : 'Inspect PO Type'}
-        </button>
-        <button onClick={fetchSchema} disabled={schemaLoading}
-          style={{ padding: '0.4rem 1rem', background: '#64748b', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          {schemaLoading ? 'Loading...' : 'View API Schema'}
-        </button>
-        <button onClick={fetchOrders} disabled={loading}
-          style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-          {loading ? 'Loading...' : 'Refresh'}
-        </button>
-      </div>
-
-      {rawResponse !== null && (
-        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#94a3b8' }}>Raw API Response</strong>
-            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
-          </div>
-          <pre style={{ maxHeight: '400px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
-            {JSON.stringify(rawResponse, null, 2)}
-          </pre>
-        </div>
-      )}
-
-      {typeFields && (
-        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#94a3b8' }}>PurchaseOrderV2 Fields</strong>
-            <span onClick={() => setTypeFields(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
-          </div>
-          {typeFields.map(f => {
-            const typeName = f.type.ofType?.name || f.type.name || f.type.kind;
-            return (
-              <div key={f.name} style={{ padding: '0.2rem 0', borderBottom: '1px solid #334155' }}>
-                <span style={{ color: '#7dd3fc' }}>{f.name}</span>
-                <span style={{ color: '#64748b', marginLeft: '1rem' }}>{typeName}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {schemaFields && (
-        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#94a3b8' }}>Available GraphQL Queries ({schemaFields.length})</strong>
-            <span onClick={() => setSchemaFields(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
-          </div>
-          <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-            {schemaFields.map(f => (
-              <div key={f.name} style={{ padding: '0.2rem 0', borderBottom: '1px solid #334155' }}>
-                <span style={{ color: '#7dd3fc' }}>{f.name}</span>
-                {f.description && <span style={{ color: '#64748b', marginLeft: '1rem' }}>{f.description}</span>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading orders...</div>
-        ) : orders.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            No CastleGate purchase orders found.
-          </div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>Request ID</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Order Date</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Retailer</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Ship To</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map(order => {
-                const sc = statusColor(order.status);
-                return (
-                  <>
-                    <tr
-                      key={order.requestId}
-                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.requestId ? '#f8fafc' : undefined }}
-                      onClick={() => setExpanded(expanded === order.requestId ? null : order.requestId)}
-                    >
-                      <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.8rem' }}>{order.requestId}</td>
-                      <td style={{ padding: '0.6rem 0.5rem' }}>
-                        <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem', background: sc.bg, color: sc.color }}>
-                          {order.statusLabel || order.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
-                        {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '—'}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569', fontSize: '0.82rem' }}>{order.retailerName || '—'}</td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.8rem' }}>
-                        {order.shippingAddress ? `${order.shippingAddress.city || ''}, ${order.shippingAddress.stateShortName || ''}` : '—'}
-                      </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.lineItems.length}</td>
-                    </tr>
-                    {expanded === order.requestId && (
-                      <tr key={`${order.requestId}-detail`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <td colSpan={6} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
-                            <thead>
-                              <tr style={{ color: '#64748b' }}>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Supplier Part#</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Product</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Ordered</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Shipped</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Unit Price</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Status</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {order.lineItems.map((li, i) => (
-                                <tr key={i}>
-                                  <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{li.supplierPartNumber || li.partNumber}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem', color: '#64748b' }}>{li.productName || '—'}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantityOrdered}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantityShipped}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.unitPrice != null ? `$${li.unitPrice.toFixed(2)}` : '—'}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem', color: '#64748b' }}>{li.status}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-      </div>}
     </div>
   );
 }
