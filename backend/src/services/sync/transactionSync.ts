@@ -1,5 +1,5 @@
 import { pool } from '../../config/database';
-import { fetchTransactionsByDateRange } from '../spApi/transactions';
+import { fetchTransactionsByDateRange, fetchSettlementTransactions } from '../spApi/transactions';
 import logger from '../../config/logger';
 import { TRANSACTION_OVERLAP_DAYS } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
@@ -18,17 +18,28 @@ export async function syncTransactionsForMarketplace(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    const transactions = await fetchTransactionsByDateRange(marketplace, startDate, endDate);
-    if (transactions.length === 0) {
+    // Fetch from Finances API (Orders, Refunds, Adjustments, Service Fees, etc.)
+    const financesTransactions = await fetchTransactionsByDateRange(marketplace, startDate, endDate);
+
+    // Fetch from Settlement Reports (FBA Inventory Fee, Shipping Services, etc.)
+    let settlementTransactions: FinancialTransaction[] = [];
+    try {
+      settlementTransactions = await fetchSettlementTransactions(marketplace, startDate);
+    } catch (err: any) {
+      logger.warn(`[Sync] Settlement report fetch failed for ${marketplace.country_code}: ${err.message}`);
+    }
+
+    const allTransactions = [...financesTransactions, ...settlementTransactions];
+    if (allTransactions.length === 0) {
       await updateSyncJob(jobId, 'completed', 0);
       return 0;
     }
 
-    await upsertTransactions(transactions);
+    await upsertTransactions(allTransactions);
 
-    await updateSyncJob(jobId, 'completed', transactions.length);
-    logger.info(`[Sync] Transaction sync completed for ${marketplace.country_code}: ${transactions.length} transactions`);
-    return transactions.length;
+    await updateSyncJob(jobId, 'completed', allTransactions.length);
+    logger.info(`[Sync] Transaction sync completed for ${marketplace.country_code}: ${financesTransactions.length} finances + ${settlementTransactions.length} settlement = ${allTransactions.length} total`);
+    return allTransactions.length;
   } catch (err: any) {
     logger.error(`[Sync] Transaction sync failed for ${marketplace.country_code}:`, err.message);
     await updateSyncJob(jobId, 'failed', 0, err.message);
