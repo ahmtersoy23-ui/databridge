@@ -61,6 +61,7 @@ const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wis
 const emptyWayfairForm = { client_id: '', client_secret: '', use_sandbox: true, supplier_id: '' };
 
 export default function Settings() {
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'wisersell'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -237,12 +238,32 @@ export default function Settings() {
     }
   };
 
+  const tabBtn = (tab: typeof activeTab, label: string) => (
+    <button key={tab} onClick={() => setActiveTab(tab)}
+      style={{
+        padding: '0.5rem 1.25rem', border: 'none', background: 'none', cursor: 'pointer',
+        fontSize: '0.9rem', fontWeight: 500,
+        color: activeTab === tab ? '#0891b2' : '#64748b',
+        borderBottom: activeTab === tab ? '2px solid #0891b2' : '2px solid transparent',
+        marginBottom: '-2px',
+      }}>
+      {label}
+    </button>
+  );
+
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Settings</h1>
+      <h1 style={{ marginBottom: '1rem' }}>Settings</h1>
 
-      {/* Existing credentials */}
-      <div style={cardStyle}>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0' }}>
+        {tabBtn('amazon', 'Amazon SP-API')}
+        {tabBtn('wayfair', 'Wayfair')}
+        {tabBtn('wisersell', 'Wisersell')}
+      </div>
+
+      {/* Amazon SP-API tab — credentials table */}
+      {activeTab === 'amazon' && <div style={cardStyle}>
         <h2 style={{ marginBottom: '1rem' }}>Current Credentials</h2>
         {credentials.length === 0 ? (
           <p style={{ color: '#64748b' }}>No credentials configured yet.</p>
@@ -290,10 +311,10 @@ export default function Settings() {
             </tbody>
           </table>
         )}
-      </div>
+      </div>}
 
       {/* Wisersell credentials */}
-      <div style={cardStyle}>
+      {activeTab === 'wisersell' && <div style={cardStyle}>
         <h2 style={{ marginBottom: '0.5rem' }}>Wisersell API</h2>
         {wisersellConfig?.configured && (
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
@@ -349,10 +370,10 @@ export default function Settings() {
             {wisersellSaving ? 'Saving...' : wisersellConfig?.configured ? 'Update' : 'Save'}
           </button>
         </form>
-      </div>
+      </div>}
 
       {/* Wayfair credentials */}
-      <div style={cardStyle}>
+      {activeTab === 'wayfair' && <div style={cardStyle}>
         <h2 style={{ marginBottom: '0.5rem' }}>Wayfair CastleGate API</h2>
         {wayfairConfig?.configured && (
           <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
@@ -421,10 +442,10 @@ export default function Settings() {
             )}
           </div>
         </form>
-      </div>
+      </div>}
 
       {/* Add/Edit credentials form */}
-      <div style={cardStyle}>
+      {activeTab === 'amazon' && <div style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <h2>{editingId ? 'Edit Credentials' : 'Add SP-API Credentials'}</h2>
           {editingId && (
@@ -508,7 +529,7 @@ export default function Settings() {
             {saving ? 'Saving...' : editingId ? 'Update Credentials' : 'Save Credentials'}
           </button>
         </form>
-      </div>
+      </div>}
     </div>
   );
 }
