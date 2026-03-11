@@ -129,6 +129,13 @@ export default function Dashboard() {
           >
             {syncing === 'wisersell' ? 'Syncing...' : 'Sync Catalog'}
           </button>
+          <button
+            onClick={() => triggerSync('transactions')}
+            disabled={!!syncing}
+            style={{ padding: '0.5rem 1.5rem', background: '#d97706', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            {syncing === 'transactions' ? 'Syncing...' : 'Sync Transactions'}
+          </button>
         </div>
       </div>
 
