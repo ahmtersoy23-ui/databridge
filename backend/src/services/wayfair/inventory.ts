@@ -6,6 +6,7 @@ export interface WayfairInventoryItem {
   warehouseId: string;
   warehouseName: string;
   quantity: number;
+  availableQty: number;
 }
 
 // New CastleGate On-hand API (inventorySummaryList) — required for Wayfair sandbox approval
@@ -22,6 +23,9 @@ const INVENTORY_QUERY = `
           inventoryPosition {
             castleGate {
               onHandQty
+              onHand {
+                inStock { fulfillableQty }
+              }
               warehouses {
                 warehouseId
                 onHandQty
@@ -44,6 +48,7 @@ interface InventoryNode {
   inventoryPosition: {
     castleGate: {
       onHandQty: number;
+      onHand?: { inStock?: { fulfillableQty?: number } };
       warehouses?: InventoryWarehouse[];
     } | null;
   };
@@ -96,15 +101,18 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
       const cg = node.inventoryPosition?.castleGate;
       if (!cg) continue;
 
+      const availableQty = cg.onHand?.inStock?.fulfillableQty ?? 0;
+
       const warehouses = cg.warehouses?.filter(w => w.onHandQty > 0);
       if (warehouses && warehouses.length > 0) {
-        // Store per-warehouse breakdown
+        // Store per-warehouse breakdown; availableQty is part-level total (same on all rows)
         for (const wh of warehouses) {
           all.push({
             partNumber: node.supplierPartNumber,
             warehouseId: String(wh.warehouseId),
             warehouseName: `CastleGate WH ${wh.warehouseId}`,
             quantity: wh.onHandQty,
+            availableQty,
           });
         }
       } else {
@@ -114,6 +122,7 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
           warehouseId: 'CASTLEGATE',
           warehouseName: 'CastleGate',
           quantity: cg.onHandQty ?? 0,
+          availableQty,
         });
       }
     }

@@ -45,7 +45,7 @@ async function loadMappings(): Promise<Map<string, string>> {
 }
 
 async function upsertInventory(
-  items: Array<{ partNumber: string; warehouseId: string; warehouseName: string; quantity: number; iwasku: string | null }>
+  items: Array<{ partNumber: string; warehouseId: string; warehouseName: string; quantity: number; availableQty: number; iwasku: string | null }>
 ): Promise<void> {
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
@@ -53,17 +53,18 @@ async function upsertInventory(
     const params: unknown[] = [];
 
     batch.forEach((item, idx) => {
-      const offset = idx * 5;
-      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
-      params.push(item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.iwasku);
+      const offset = idx * 6;
+      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
+      params.push(item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.availableQty, item.iwasku);
     });
 
     await pool.query(`
-      INSERT INTO wayfair_inventory (part_number, warehouse_id, warehouse_name, quantity, iwasku)
+      INSERT INTO wayfair_inventory (part_number, warehouse_id, warehouse_name, quantity, available_qty, iwasku)
       VALUES ${values.join(', ')}
       ON CONFLICT (part_number, warehouse_id) DO UPDATE SET
         warehouse_name = EXCLUDED.warehouse_name,
         quantity = EXCLUDED.quantity,
+        available_qty = EXCLUDED.available_qty,
         iwasku = EXCLUDED.iwasku,
         last_synced_at = NOW()
     `, params);
