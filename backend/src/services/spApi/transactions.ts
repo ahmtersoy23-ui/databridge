@@ -107,7 +107,7 @@ export async function fetchSettlementTransactions(
       });
 
       const tsv = await downloadDocument(doc.url);
-      const transactions = parseSettlementTsv(tsv, marketplace.credential_id, startDate);
+      const transactions = parseSettlementTsv(tsv, marketplace.credential_id, startDate, marketplace.country_code.toLowerCase());
       allTransactions.push(...transactions);
 
       logger.info(`[SP-API] Settlement ${settlementId}: ${transactions.length} supplementary transactions`);
@@ -139,7 +139,7 @@ function downloadDocument(url: string): Promise<string> {
  * Covers: other-transaction (FBA fees, shipping services, storage, etc.)
  * Skips: Order, Refund, ServiceFee, etc. (already from Finances API)
  */
-function parseSettlementTsv(tsv: string, credentialId: number | null, startDate: Date): FinancialTransaction[] {
+function parseSettlementTsv(tsv: string, credentialId: number | null, startDate: Date, defaultMarketplaceCode: string): FinancialTransaction[] {
   const lines = tsv.split('\n').filter(l => l.trim());
   if (lines.length < 2) return [];
 
@@ -160,6 +160,9 @@ function parseSettlementTsv(tsv: string, credentialId: number | null, startDate:
 
   // Only process types NOT covered by Finances API
   const financesApiTypes = new Set(['Order', 'Refund', 'ServiceFee', 'Grade and Resell Fees', 'SAFE-T Reimbursement', 'Order_Retrocharge']);
+
+  // Reserve entries are Disbursement-equivalent (not profitability-relevant)
+  const skipDescriptions = ['previous reserve amount balance', 'current reserve amount'];
 
   // Group by order-id + posted-date to aggregate amount rows into single transactions
   const txnMap = new Map<string, {
@@ -185,6 +188,9 @@ function parseSettlementTsv(tsv: string, credentialId: number | null, startDate:
     const amtType = c[amtTypeIdx] || '';
     const amtDesc = c[amtDescIdx] || '';
 
+    // Skip Reserve entries (Disbursement-equivalent, not for profitability)
+    if (skipDescriptions.some(s => amtDesc.toLowerCase().includes(s))) continue;
+
     // Group key: txnType + orderId + postedDate (to aggregate multi-row entries)
     const key = `${txnType}|${orderId}|${postedStr}|${c[skuIdx] || ''}`;
 
@@ -209,7 +215,7 @@ function parseSettlementTsv(tsv: string, credentialId: number | null, startDate:
   for (const [, entry] of txnMap) {
     const total = entry.amounts.reduce((s, a) => s + a.amount, 0);
     const categoryType = categorizeSettlementType(entry.txnType, entry.amtType, entry.amtDesc);
-    const marketplaceCode = detectMarketplaceCode(entry.marketplace);
+    const marketplaceCode = detectMarketplaceCode(entry.marketplace) || defaultMarketplaceCode;
     const dateOnly = computeDateOnly(entry.postedDate, marketplaceCode);
     const description = entry.amounts.map(a => a.desc).filter(Boolean).join('; ') || entry.txnType;
 
@@ -236,9 +242,9 @@ function parseSettlementTsv(tsv: string, credentialId: number | null, startDate:
       product_sales: 0,
       promotional_rebates: 0,
       selling_fees: 0,
-      fba_fees: categoryType === 'FBA Inventory Fee' ? total : 0,
-      other_transaction_fees: categoryType === 'Service Fee' ? total : 0,
-      other: !['FBA Inventory Fee', 'Service Fee'].includes(categoryType) ? total : 0,
+      fba_fees: 0,
+      other_transaction_fees: 0,
+      other: total,
       vat: 0,
       liquidations: 0,
       total,
