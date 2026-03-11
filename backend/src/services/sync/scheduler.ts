@@ -173,17 +173,25 @@ async function runTransactionSync(): Promise<void> {
   try {
     const eligibleMarketplaces = await getEligibleMarketplaces();
 
-    // Financial transaction reports are per marketplace_id (not per credential like orders)
-    logger.info(`[Scheduler] Transaction sync: ${eligibleMarketplaces.length} marketplaces`);
-
+    // Group by credential_id — Finances API returns all marketplaces for a credential in one call
+    const byCredential = new Map<number, MarketplaceConfig[]>();
     for (const mp of eligibleMarketplaces) {
+      const credId = mp.credential_id!;
+      if (!byCredential.has(credId)) byCredential.set(credId, []);
+      byCredential.get(credId)!.push(mp);
+    }
+
+    logger.info(`[Scheduler] Transaction sync: ${byCredential.size} credentials (${eligibleMarketplaces.length} marketplaces)`);
+
+    for (const [credId, group] of byCredential) {
+      const representative = group[0];
+      const channels = group.map(m => m.country_code).join(',');
       try {
-        logger.info(`[Scheduler] Transaction sync for ${mp.country_code}`);
-        await syncTransactionsForMarketplace(mp);
+        logger.info(`[Scheduler] Transaction sync credential ${credId}: ${channels} (via ${representative.country_code})`);
+        await syncTransactionsForMarketplace(representative);
       } catch (err: any) {
-        logger.error(`[Scheduler] Transaction sync failed for ${mp.country_code}:`, err.message);
+        logger.error(`[Scheduler] Transaction sync failed for credential ${credId} (${representative.country_code}):`, err.message);
       }
-      // Wait between marketplaces to respect rate limits
       await new Promise(resolve => setTimeout(resolve, 10_000));
     }
   } finally {
