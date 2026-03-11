@@ -10,7 +10,7 @@ import NJWarehouse from './pages/NJWarehouse';
 import Catalog from './pages/Catalog';
 import WayfairMappings from './pages/WayfairMappings';
 
-const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis', '/nj-warehouse', '/catalog'];
+const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis'];
 
 function Nav() {
   const location = useLocation();
@@ -54,6 +54,14 @@ function Nav() {
           Wayfair
         </NavLink>
 
+        <NavLink to="/nj-warehouse" style={({ isActive }) => topLink(isActive)}>
+          NJ Warehouse
+        </NavLink>
+
+        <NavLink to="/catalog" style={({ isActive }) => topLink(isActive)}>
+          Catalog
+        </NavLink>
+
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
           <NavLink to="/settings" style={({ isActive }) => topLink(isActive)}>
             Settings
@@ -71,8 +79,6 @@ function Nav() {
           <NavLink to="/inventory" style={subLink}>Inventory</NavLink>
           <NavLink to="/sales-analysis" style={subLink}>Sales Analysis</NavLink>
           <NavLink to="/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
-          <NavLink to="/nj-warehouse" style={subLink}>NJ Warehouse</NavLink>
-          <NavLink to="/catalog" style={subLink}>Catalog</NavLink>
         </nav>
       )}
     </>
