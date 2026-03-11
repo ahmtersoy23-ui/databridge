@@ -28,11 +28,18 @@ export async function getCredentials(): Promise<WayfairCredentials> {
   return result.rows[0];
 }
 
-// Returns the full GraphQL endpoint URL for the given mode
+// Returns the CastleGate GraphQL endpoint URL
 export function getApiBase(useSandbox: boolean): string {
   return useSandbox
     ? 'https://api.wayfair.io/sandbox/v1/supplier-order-api/graphql'
     : 'https://api.wayfair.io/v1/supplier-order-api/graphql';
+}
+
+// Returns the Dropship GraphQL endpoint URL (different host from CastleGate)
+export function getDropshipApiBase(useSandbox: boolean): string {
+  return useSandbox
+    ? 'https://sandbox.api.wayfair.com/v1/graphql'
+    : 'https://api.wayfair.com/v1/graphql';
 }
 
 async function getToken(): Promise<{ token: string; graphqlUrl: string }> {
@@ -79,12 +86,13 @@ async function getToken(): Promise<{ token: string; graphqlUrl: string }> {
 
 export async function graphqlQuery<T = unknown>(
   query: string,
-  variables?: Record<string, unknown>
+  variables?: Record<string, unknown>,
+  endpointOverride?: string
 ): Promise<T> {
   const { token, graphqlUrl } = await getToken();
 
   const res = await axios.post(
-    graphqlUrl,
+    endpointOverride ?? graphqlUrl,
     { query, variables },
     {
       headers: {

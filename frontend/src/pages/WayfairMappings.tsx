@@ -53,7 +53,120 @@ const cardStyle = {
   marginBottom: '1rem',
 } as const;
 
+interface DropshipProduct { partNumber: string; quantity: number; price: number; }
+interface DropshipOrder { poNumber: string; poDate: string; supplierId: number; products: DropshipProduct[]; }
+
+function WayfairDropshipOrders() {
+  const [orders, setOrders] = useState<DropshipOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'new' | 'responded'>('all');
+
+  const fetchOrders = async (f = filter) => {
+    setLoading(true);
+    setError('');
+    try {
+      const params: Record<string, string> = {};
+      if (f === 'new') params.hasResponse = 'false';
+      if (f === 'responded') params.hasResponse = 'true';
+      const res = await axios.get('/api/v1/wayfair/orders/dropship', { params });
+      setOrders(res.data.data);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to fetch dropship orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchOrders(); }, []);
+
+  const handleFilter = (f: 'all' | 'new' | 'responded') => {
+    setFilter(f);
+    fetchOrders(f);
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {(['all', 'new', 'responded'] as const).map(f => (
+            <button key={f} onClick={() => handleFilter(f)}
+              style={{ padding: '0.35rem 0.9rem', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', background: filter === f ? '#0891b2' : '#fff', color: filter === f ? '#fff' : '#374151' }}>
+              {f === 'all' ? 'All' : f === 'new' ? 'New (no response)' : 'Responded'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => fetchOrders()} disabled={loading}
+          style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </div>
+
+      {error && <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>{error}</div>}
+
+      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
+        ) : orders.length === 0 ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>No dropship orders found.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>PO Number</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>PO Date</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Supplier ID</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(order => (
+                <>
+                  <tr key={order.poNumber}
+                    style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.poNumber ? '#f8fafc' : undefined }}
+                    onClick={() => setExpanded(expanded === order.poNumber ? null : order.poNumber)}>
+                    <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>{order.poNumber}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>{order.poDate ? new Date(order.poDate).toLocaleDateString() : '—'}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.supplierId}</td>
+                    <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.products?.length ?? 0}</td>
+                  </tr>
+                  {expanded === order.poNumber && (
+                    <tr key={`${order.poNumber}-d`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                      <td colSpan={4} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+                          <thead>
+                            <tr style={{ color: '#64748b' }}>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Part Number</th>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Qty</th>
+                              <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Price</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(order.products || []).map((p, i) => (
+                              <tr key={i}>
+                                <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{p.partNumber}</td>
+                                <td style={{ padding: '0.2rem 0.5rem' }}>{p.quantity}</td>
+                                <td style={{ padding: '0.2rem 0.5rem' }}>{p.price != null ? `$${p.price.toFixed(2)}` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WayfairOrders() {
+  const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
   const [orders, setOrders] = useState<WayfairPurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -127,6 +240,25 @@ function WayfairOrders() {
 
   return (
     <div>
+      {/* Sub-tab bar */}
+      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
+        {(['castlegate', 'dropship'] as const).map(t => (
+          <button key={t} onClick={() => setOrderSubTab(t)}
+            style={{
+              padding: '0.4rem 1.1rem', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: '0.875rem', fontWeight: 500,
+              color: orderSubTab === t ? '#0891b2' : '#64748b',
+              borderBottom: orderSubTab === t ? '2px solid #0891b2' : '2px solid transparent',
+              marginBottom: '-2px',
+            }}>
+            {t === 'castlegate' ? 'CastleGate' : 'Dropship'}
+          </button>
+        ))}
+      </div>
+
+      {orderSubTab === 'dropship' && <WayfairDropshipOrders />}
+
+      {orderSubTab === 'castlegate' && <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
         <button onClick={fetchRaw} disabled={rawLoading}
           style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -280,6 +412,7 @@ function WayfairOrders() {
           </table>
         )}
       </div>
+      </div>}
     </div>
   );
 }
