@@ -54,7 +54,7 @@ export async function fetchDropshipOrders(hasResponse?: boolean): Promise<Wayfai
       {
         limit: 25,
         hasResponse: hasResponse ?? null,
-        sortOrder: 'ASC',
+        sortOrder: 'DESC',
       },
       endpoint
     );

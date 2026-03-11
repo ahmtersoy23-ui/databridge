@@ -44,7 +44,7 @@ router.get('/dropship/raw', async (_req: Request, res: Response) => {
           products { partNumber quantity price }
         }
       }
-    `, { limit: 5, hasResponse: null, sortOrder: 'ASC' }, endpoint);
+    `, { limit: 5, hasResponse: null, sortOrder: 'DESC' }, endpoint);
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });

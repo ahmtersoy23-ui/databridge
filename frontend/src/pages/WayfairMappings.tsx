@@ -196,7 +196,7 @@ function WayfairDropshipOrders() {
 }
 
 function WayfairOrders() {
-  const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
+  const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('dropship');
   const [orders, setOrders] = useState<WayfairPurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -289,6 +289,10 @@ function WayfairOrders() {
       {orderSubTab === 'dropship' && <WayfairDropshipOrders />}
 
       {orderSubTab === 'castlegate' && <div>
+      <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fffbeb', color: '#92400e', border: '1px solid #fde68a', fontSize: '0.875rem' }}>
+        <strong>CastleGate Multi-Channel</strong> — Bu hesap Dropship modeliyle çalışmaktadır. CastleGate siparişleri bu hesap için yetkili değil.
+        Dropship siparişleri için üstteki <em>Dropship</em> sekmesini kullan.
+      </div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
         <button onClick={fetchRaw} disabled={rawLoading}
           style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
