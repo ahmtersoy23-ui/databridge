@@ -144,26 +144,36 @@ function flattenShipmentEvent(event: any, categoryType: string, credentialId: nu
   const marketplaceValue = event.MarketplaceName || '';
   const marketplaceCode = detectMarketplaceCode(marketplaceValue);
 
-  for (const item of (event.ShipmentItemList || [])) {
+  // Orders use ShipmentItemList; Refunds use ShipmentItemAdjustmentList
+  const itemList = event.ShipmentItemList?.length > 0
+    ? event.ShipmentItemList
+    : event.ShipmentItemAdjustmentList || [];
+
+  for (const item of itemList) {
     const sku = item.SellerSKU || '';
     const quantity = item.QuantityShipped || 0;
 
-    const productSales = getChargeAmount(item.ItemChargeList, 'Principal');
-    const tax = getChargeAmount(item.ItemChargeList, 'Tax');
-    const shippingCharge = getChargeAmount(item.ItemChargeList, 'ShippingCharge');
-    const shippingTax = getChargeAmount(item.ItemChargeList, 'ShippingTax');
+    // Orders use ItemChargeList/ItemFeeList; Refunds use *AdjustmentList variants
+    const charges = item.ItemChargeList || item.ItemChargeAdjustmentList || [];
+    const fees = item.ItemFeeList || item.ItemFeeAdjustmentList || [];
+    const promos = item.PromotionList || item.PromotionAdjustmentList || [];
 
-    const commission = getFeeAmount(item.ItemFeeList, 'Commission');
-    const fbaPerUnit = getFeeAmount(item.ItemFeeList, 'FBAPerUnitFulfillmentFee');
-    const fbaPerOrder = getFeeAmount(item.ItemFeeList, 'FBAPerOrderFulfillmentFee');
-    const fbaWeightBased = getFeeAmount(item.ItemFeeList, 'FBAWeightBasedFee');
+    const productSales = getChargeAmount(charges, 'Principal');
+    const tax = getChargeAmount(charges, 'Tax');
+    const shippingCharge = getChargeAmount(charges, 'ShippingCharge');
+    const shippingTax = getChargeAmount(charges, 'ShippingTax');
+
+    const commission = getFeeAmount(fees, 'Commission');
+    const fbaPerUnit = getFeeAmount(fees, 'FBAPerUnitFulfillmentFee');
+    const fbaPerOrder = getFeeAmount(fees, 'FBAPerOrderFulfillmentFee');
+    const fbaWeightBased = getFeeAmount(fees, 'FBAWeightBasedFee');
     const fbaFees = fbaPerUnit + fbaPerOrder + fbaWeightBased;
     const sellingFees = commission;
-    const otherFees = sumFees(item.ItemFeeList, [
+    const otherFees = sumFees(fees, [
       'Commission', 'FBAPerUnitFulfillmentFee', 'FBAPerOrderFulfillmentFee', 'FBAWeightBasedFee',
     ]);
 
-    const promotionalRebates = sumPromotions(item.PromotionList);
+    const promotionalRebates = sumPromotions(promos);
     const vat = sumTaxWithheld(item.ItemTaxWithheldList);
     const fulfillment = fbaFees !== 0 ? 'FBA' : 'FBM';
 
