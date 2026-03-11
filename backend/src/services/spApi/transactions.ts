@@ -90,6 +90,28 @@ function flattenFinancialEvents(events: any, credentialId: number | null): Finan
   if (Array.isArray(events.ChargeRefundEventList)) {
     for (const e of events.ChargeRefundEventList) transactions.push(...flattenShipmentEvent(e, 'Chargeback Refund', credentialId));
   }
+  // ChargebackEventList and GuaranteeClaimEventList share Refund structure (ShipmentItemAdjustmentList)
+  if (Array.isArray(events.ChargebackEventList)) {
+    for (const e of events.ChargebackEventList) transactions.push(...flattenShipmentEvent(e, 'Chargeback', credentialId));
+  }
+  if (Array.isArray(events.GuaranteeClaimEventList)) {
+    for (const e of events.GuaranteeClaimEventList) transactions.push(...flattenShipmentEvent(e, 'Guarantee Claim', credentialId));
+  }
+  if (Array.isArray(events.ProductAdsPaymentEventList)) {
+    for (const e of events.ProductAdsPaymentEventList) transactions.push(flattenProductAdsEvent(e, credentialId));
+  }
+  if (Array.isArray(events.RetrochargeEventList)) {
+    for (const e of events.RetrochargeEventList) transactions.push(flattenRetrochargeEvent(e, credentialId));
+  }
+  if (Array.isArray(events.DebtRecoveryEventList)) {
+    for (const e of events.DebtRecoveryEventList) transactions.push(flattenDebtRecoveryEvent(e, credentialId));
+  }
+  if (Array.isArray(events.RemovalShipmentEventList)) {
+    for (const e of events.RemovalShipmentEventList) transactions.push(...flattenRemovalShipmentEvent(e, credentialId));
+  }
+  if (Array.isArray(events.RemovalShipmentAdjustmentEventList)) {
+    for (const e of events.RemovalShipmentAdjustmentEventList) transactions.push(...flattenRemovalShipmentAdjustmentEvent(e, credentialId));
+  }
 
   return transactions;
 }
@@ -347,4 +369,146 @@ function flattenCouponEvent(event: any, credentialId: number | null): FinancialT
     vat: 0, liquidations: 0, total,
     credential_id: credentialId,
   }];
+}
+
+function flattenProductAdsEvent(event: any, credentialId: number | null): FinancialTransaction {
+  const postedDate = event.postedDate ? new Date(event.postedDate) : new Date();
+  const total = event.transactionValue?.CurrencyAmount || 0;
+
+  const transactionId = generateTransactionId('', postedDate, 'ProductAds', event.invoiceId || '', event.transactionType || '', total);
+  const dateOnly = computeDateOnly(postedDate, '');
+
+  return {
+    transaction_id: transactionId, file_name: 'sp-api-sync',
+    transaction_date: postedDate, date_only: dateOnly,
+    type: `Product Ads - ${event.transactionType || 'Charge'}`, category_type: 'Service Fee',
+    order_id: event.invoiceId || '', sku: '',
+    description: `Product Advertising ${event.transactionType || ''}`,
+    marketplace: '', marketplace_code: '', fulfillment: 'Unknown', order_postal: '',
+    quantity: 0,
+    product_sales: 0, promotional_rebates: 0, selling_fees: 0,
+    fba_fees: 0, other_transaction_fees: total, other: 0,
+    vat: 0, liquidations: 0, total,
+    credential_id: credentialId,
+  };
+}
+
+function flattenRetrochargeEvent(event: any, credentialId: number | null): FinancialTransaction {
+  const postedDate = event.PostedDate ? new Date(event.PostedDate) : new Date();
+  const baseTax = event.BaseTax?.CurrencyAmount || 0;
+  const shippingTax = event.ShippingTax?.CurrencyAmount || 0;
+  const total = baseTax + shippingTax;
+  const marketplaceValue = event.MarketplaceName || '';
+  const marketplaceCode = detectMarketplaceCode(marketplaceValue);
+
+  const transactionId = generateTransactionId(marketplaceCode, postedDate, 'Retrocharge', event.AmazonOrderId || '', '', total);
+  const dateOnly = computeDateOnly(postedDate, marketplaceCode);
+
+  return {
+    transaction_id: transactionId, file_name: 'sp-api-sync',
+    transaction_date: postedDate, date_only: dateOnly,
+    type: 'Retrocharge', category_type: 'Others',
+    order_id: event.AmazonOrderId || '', sku: '', description: 'Retrocharge tax adjustment',
+    marketplace: marketplaceValue, marketplace_code: marketplaceCode,
+    fulfillment: 'Unknown', order_postal: '',
+    quantity: 0,
+    product_sales: 0, promotional_rebates: 0, selling_fees: 0,
+    fba_fees: 0, other_transaction_fees: 0, other: total,
+    vat: 0, liquidations: 0, total,
+    credential_id: credentialId,
+  };
+}
+
+function flattenDebtRecoveryEvent(event: any, credentialId: number | null): FinancialTransaction {
+  const recoveryAmount = event.RecoveryAmount?.CurrencyAmount || 0;
+  const debtType = event.DebtRecoveryType || 'DebtRecovery';
+
+  // Use group begin date if available, otherwise current date
+  const items = event.DebtRecoveryItemList || [];
+  const postedDate = items.length > 0 && items[0].GroupBeginDate
+    ? new Date(items[0].GroupBeginDate)
+    : new Date();
+
+  const transactionId = generateTransactionId('', postedDate, debtType, '', '', recoveryAmount);
+  const dateOnly = computeDateOnly(postedDate, '');
+
+  return {
+    transaction_id: transactionId, file_name: 'sp-api-sync',
+    transaction_date: postedDate, date_only: dateOnly,
+    type: debtType, category_type: 'Others',
+    order_id: '', sku: '', description: `Debt recovery: ${debtType}`,
+    marketplace: '', marketplace_code: '', fulfillment: 'Unknown', order_postal: '',
+    quantity: 0,
+    product_sales: 0, promotional_rebates: 0, selling_fees: 0,
+    fba_fees: 0, other_transaction_fees: 0, other: recoveryAmount,
+    vat: 0, liquidations: 0, total: recoveryAmount,
+    credential_id: credentialId,
+  };
+}
+
+function flattenRemovalShipmentEvent(event: any, credentialId: number | null): FinancialTransaction[] {
+  const transactions: FinancialTransaction[] = [];
+  const postedDate = event.PostedDate ? new Date(event.PostedDate) : null;
+  if (!postedDate || isNaN(postedDate.getTime())) return transactions;
+
+  const orderId = event.OrderId || '';
+  const txnType = event.TransactionType || 'Removal';
+
+  for (const item of (event.RemovalShipmentItemList || [])) {
+    const fee = item.FeeAmount?.CurrencyAmount || 0;
+    const revenue = item.Revenue?.CurrencyAmount || 0;
+    const total = fee + revenue;
+
+    const transactionId = generateTransactionId('', postedDate, txnType, orderId, item.FulfillmentNetworkSKU || '', total);
+    const dateOnly = computeDateOnly(postedDate, '');
+
+    transactions.push({
+      transaction_id: transactionId, file_name: 'sp-api-sync',
+      transaction_date: postedDate, date_only: dateOnly,
+      type: txnType, category_type: 'Delivery Services',
+      order_id: orderId, sku: item.FulfillmentNetworkSKU || '',
+      description: `Removal shipment: ${txnType}`,
+      marketplace: '', marketplace_code: '', fulfillment: 'FBA', order_postal: '',
+      quantity: item.Quantity || 0,
+      product_sales: 0, promotional_rebates: 0, selling_fees: 0,
+      fba_fees: fee, other_transaction_fees: 0, other: revenue,
+      vat: 0, liquidations: 0, total,
+      credential_id: credentialId,
+    });
+  }
+
+  return transactions;
+}
+
+function flattenRemovalShipmentAdjustmentEvent(event: any, credentialId: number | null): FinancialTransaction[] {
+  const transactions: FinancialTransaction[] = [];
+  const postedDate = event.PostedDate ? new Date(event.PostedDate) : null;
+  if (!postedDate || isNaN(postedDate.getTime())) return transactions;
+
+  const orderId = event.OrderId || '';
+  const txnType = event.TransactionType || 'Removal Adjustment';
+
+  for (const item of (event.RemovalShipmentItemAdjustmentList || [])) {
+    const revenue = item.RevenueAdjustment?.CurrencyAmount || 0;
+    const total = revenue;
+
+    const transactionId = generateTransactionId('', postedDate, `${txnType}-Adj`, orderId, item.FulfillmentNetworkSKU || '', total);
+    const dateOnly = computeDateOnly(postedDate, '');
+
+    transactions.push({
+      transaction_id: transactionId, file_name: 'sp-api-sync',
+      transaction_date: postedDate, date_only: dateOnly,
+      type: `${txnType} Adjustment`, category_type: 'Delivery Services',
+      order_id: orderId, sku: item.FulfillmentNetworkSKU || '',
+      description: `Removal shipment adjustment: ${txnType}`,
+      marketplace: '', marketplace_code: '', fulfillment: 'FBA', order_postal: '',
+      quantity: item.AdjustedQuantity || 0,
+      product_sales: 0, promotional_rebates: 0, selling_fees: 0,
+      fba_fees: 0, other_transaction_fees: 0, other: revenue,
+      vat: 0, liquidations: 0, total,
+      credential_id: credentialId,
+    });
+  }
+
+  return transactions;
 }
