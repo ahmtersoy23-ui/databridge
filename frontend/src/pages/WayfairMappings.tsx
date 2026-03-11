@@ -5,9 +5,6 @@ import * as XLSX from 'xlsx';
 interface MappingRow {
   part_number: string;
   iwasku: string | null;
-  total_quantity: number;
-  warehouses: string;
-  mapped_at: string | null;
 }
 
 interface Pagination {
@@ -34,7 +31,6 @@ export default function WayfairMappings() {
   const [editingPn, setEditingPn] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState('');
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,10 +38,10 @@ export default function WayfairMappings() {
   const fetchData = async (page = 1) => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/v1/wayfair/mappings', {
-        params: { filter, page, limit: pagination.limit, search },
+      const res = await axios.get('/api/v1/wayfair/parts', {
+        params: { filter, page, limit: pagination.limit, search, includeOrders: 'true' },
       });
-      setRows(res.data.data);
+      setRows(res.data.data.map((r: any) => ({ part_number: r.part_number, iwasku: r.iwasku })));
       setPagination(res.data.pagination);
     } catch {
       // ignore
@@ -132,19 +128,6 @@ export default function WayfairMappings() {
     }
   };
 
-  const handleSync = async () => {
-    setSyncing(true);
-    setMessage('');
-    try {
-      await axios.post('/api/v1/sync/trigger', { type: 'wayfair' });
-      setMessage('Wayfair sync started in background.');
-    } catch (err: any) {
-      setMessage(err.response?.data?.error || 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   return (
     <div>
       <h1 style={{ marginBottom: '1rem' }}>Wayfair Mappings</h1>
@@ -183,10 +166,6 @@ export default function WayfairMappings() {
             {importing ? 'Importing...' : 'Import Excel'}
             <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
           </label>
-          <button onClick={handleSync} disabled={syncing}
-            style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {syncing ? 'Starting...' : 'Sync Now'}
-          </button>
         </div>
       </div>
 
@@ -212,17 +191,19 @@ export default function WayfairMappings() {
           <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
             {loading ? 'Loading...' : `${pagination.total} items`}
           </span>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
-              style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
-              ‹
-            </button>
-            <span style={{ fontSize: '0.85rem' }}>{pagination.page} / {pagination.pages}</span>
-            <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
-              style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
-              ›
-            </button>
-          </div>
+          {pagination.pages > 1 && (
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
+                style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
+                ‹
+              </button>
+              <span style={{ fontSize: '0.85rem' }}>{pagination.page} / {pagination.pages}</span>
+              <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
+                style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
+                ›
+              </button>
+            </div>
+          )}
         </div>
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
@@ -230,10 +211,7 @@ export default function WayfairMappings() {
             <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Part Number</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Qty</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Warehouses</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}></th>
+              <th style={{ textAlign: 'left', padding: '0.5rem', width: '80px' }}></th>
             </tr>
           </thead>
           <tbody>
@@ -249,7 +227,7 @@ export default function WayfairMappings() {
                         value={editValue}
                         onChange={e => setEditValue(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') saveEdit(row.part_number); if (e.key === 'Escape') cancelEdit(); }}
-                        style={{ padding: '0.25rem 0.5rem', border: '1px solid #2563eb', borderRadius: '4px', width: '120px', fontFamily: 'monospace', fontSize: '0.82rem' }}
+                        style={{ padding: '0.25rem 0.5rem', border: '1px solid #2563eb', borderRadius: '4px', width: '140px', fontFamily: 'monospace', fontSize: '0.82rem' }}
                       />
                       <button disabled={saving} onClick={() => saveEdit(row.part_number)}
                         style={{ padding: '0.25rem 0.5rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
@@ -270,17 +248,6 @@ export default function WayfairMappings() {
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '0.5rem' }}>{row.total_quantity?.toLocaleString()}</td>
-                <td style={{ padding: '0.5rem', color: '#64748b', fontSize: '0.8rem' }}>{row.warehouses}</td>
-                <td style={{ padding: '0.5rem' }}>
-                  <span style={{
-                    padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem',
-                    background: row.iwasku ? '#dcfce7' : '#fef3c7',
-                    color: row.iwasku ? '#166534' : '#92400e',
-                  }}>
-                    {row.iwasku ? 'Matched' : 'Unmatched'}
-                  </span>
-                </td>
                 <td style={{ padding: '0.5rem' }}>
                   {row.iwasku && (
                     <button onClick={() => deleteMapping(row.part_number)}
@@ -293,7 +260,7 @@ export default function WayfairMappings() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={3} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                   No items found. Run a Wayfair sync first to populate part numbers.
                 </td>
               </tr>

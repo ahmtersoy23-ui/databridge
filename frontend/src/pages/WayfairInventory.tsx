@@ -14,8 +14,6 @@ export default function WayfairInventory() {
   const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 50, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [rawResponse, setRawResponse] = useState<unknown>(null);
-  const [rawLoading, setRawLoading] = useState(false);
 
   const fetchData = async (page = 1) => {
     setLoading(true);
@@ -27,18 +25,6 @@ export default function WayfairInventory() {
       // ignore
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchRaw = async () => {
-    setRawLoading(true);
-    try {
-      const res = await axios.get('/api/v1/wayfair/inventory/raw');
-      setRawResponse(res.data);
-    } catch (err: any) {
-      setRawResponse({ error: err.response?.data?.error || err.message });
-    } finally {
-      setRawLoading(false);
     }
   };
 
@@ -54,44 +40,12 @@ export default function WayfairInventory() {
           value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '240px' }}
         />
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
-          <button onClick={fetchRaw} disabled={rawLoading}
-            style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {rawLoading ? 'Loading...' : 'Raw Response'}
-          </button>
-          <button onClick={() => fetchData(1)} disabled={loading}
-            style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
-        </div>
+        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+          {loading ? 'Loading...' : `${pagination.total} items`}
+        </span>
       </div>
 
-      {rawResponse !== null && (
-        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <strong style={{ color: '#94a3b8' }}>Raw Inventory API Response (ilk 5 ürün)</strong>
-            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
-          </div>
-          <pre style={{ maxHeight: '500px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
-            {JSON.stringify(rawResponse, null, 2)}
-          </pre>
-        </div>
-      )}
-
       <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem 1rem', borderBottom: '1px solid #e2e8f0', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
-            {loading ? 'Loading...' : `${pagination.total} items`}
-          </span>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
-              style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>‹</button>
-            <span style={{ fontSize: '0.85rem' }}>{pagination.page} / {pagination.pages}</span>
-            <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
-              style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>›</button>
-          </div>
-        </div>
-
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
@@ -124,12 +78,22 @@ export default function WayfairInventory() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-                  Veri yok. Wayfair sync çalıştırın.
+                  No inventory data. Run a Wayfair sync first.
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+
+        {pagination.pages > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+            <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
+              style={{ padding: '0.35rem 0.9rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', fontSize: '0.85rem' }}>‹ Prev</button>
+            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{pagination.page} / {pagination.pages}</span>
+            <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
+              style={{ padding: '0.35rem 0.9rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', fontSize: '0.85rem' }}>Next ›</button>
+          </div>
+        )}
       </div>
     </div>
   );

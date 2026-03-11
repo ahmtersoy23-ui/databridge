@@ -11,9 +11,11 @@ import Catalog from './pages/Catalog';
 import WayfairMappings from './pages/WayfairMappings';
 import WayfairOrders from './pages/WayfairOrders';
 import WayfairInventory from './pages/WayfairInventory';
+import WayfairOrdersAnalysis from './pages/WayfairOrdersAnalysis';
+import WayfairInventoryAnalysis from './pages/WayfairInventoryAnalysis';
 
 const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis'];
-const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/mappings'];
+const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders-analysis', '/wayfair/inventory-analysis', '/wayfair/mappings'];
 
 function Nav() {
   const location = useLocation();
@@ -91,6 +93,8 @@ function Nav() {
         <nav style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 2rem', background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
           <NavLink to="/wayfair/orders" style={subLink}>Orders</NavLink>
           <NavLink to="/wayfair/inventory" style={subLink}>Inventory</NavLink>
+          <NavLink to="/wayfair/orders-analysis" style={subLink}>Orders Analysis</NavLink>
+          <NavLink to="/wayfair/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
           <NavLink to="/wayfair/mappings" style={subLink}>Mappings</NavLink>
         </nav>
       )}
@@ -114,6 +118,8 @@ export default function App() {
           <Route path="/catalog" element={<Catalog />} />
           <Route path="/wayfair/orders" element={<WayfairOrders />} />
           <Route path="/wayfair/inventory" element={<WayfairInventory />} />
+          <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
+          <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
           <Route path="/wayfair/mappings" element={<WayfairMappings />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
