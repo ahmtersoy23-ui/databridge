@@ -1,5 +1,7 @@
 import { pool, sharedPool } from '../../config/database';
 import { fetchWayfairInventory } from '../wayfair/inventory';
+import { fetchWayfairPurchaseOrders } from '../wayfair/purchaseOrders';
+import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
 import logger from '../../config/logger';
 
 const BATCH_SIZE = 500;
@@ -69,6 +71,81 @@ async function upsertInventory(
         last_synced_at = NOW()
     `, params);
   }
+}
+
+async function syncOrders(mappings: Map<string, string>): Promise<number> {
+  let totalUpserted = 0;
+
+  try {
+    const [cgOrders, dsOrders] = await Promise.all([
+      fetchWayfairPurchaseOrders(),
+      fetchDropshipOrders(),
+    ]);
+
+    // Flatten CG orders into product rows
+    const rows: Array<{
+      po_number: string; po_date: string | null; supplier_id: number | null;
+      order_type: string; part_number: string; iwasku: string | null;
+      quantity: number; price: number; total_cost: number | null;
+    }> = [];
+
+    for (const o of cgOrders) {
+      for (const p of o.products || []) {
+        rows.push({
+          po_number: o.poNumber, po_date: o.poDate, supplier_id: o.supplierId,
+          order_type: 'castlegate', part_number: p.partNumber,
+          iwasku: mappings.get(p.partNumber) || null,
+          quantity: Number(p.quantity) || 0, price: Number(p.price) || 0,
+          total_cost: p.totalCost != null ? Number(p.totalCost) : null,
+        });
+      }
+    }
+    for (const o of dsOrders) {
+      for (const p of o.products || []) {
+        rows.push({
+          po_number: o.poNumber, po_date: o.poDate, supplier_id: o.supplierId,
+          order_type: 'dropship', part_number: p.partNumber,
+          iwasku: mappings.get(p.partNumber) || null,
+          quantity: Number(p.quantity) || 0, price: Number(p.price) || 0,
+          total_cost: null,
+        });
+      }
+    }
+
+    // Upsert in batches
+    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+      const batch = rows.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: unknown[] = [];
+
+      batch.forEach((r, idx) => {
+        const o = idx * 9;
+        values.push(`($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9})`);
+        params.push(r.po_number, r.po_date, r.supplier_id, r.order_type, r.part_number, r.iwasku, r.quantity, r.price, r.total_cost);
+      });
+
+      await pool.query(`
+        INSERT INTO wayfair_orders (po_number, po_date, supplier_id, order_type, part_number, iwasku, quantity, price, total_cost)
+        VALUES ${values.join(', ')}
+        ON CONFLICT (po_number, part_number, order_type) DO UPDATE SET
+          po_date = EXCLUDED.po_date,
+          supplier_id = EXCLUDED.supplier_id,
+          iwasku = EXCLUDED.iwasku,
+          quantity = EXCLUDED.quantity,
+          price = EXCLUDED.price,
+          total_cost = EXCLUDED.total_cost,
+          fetched_at = NOW()
+      `, params);
+
+      totalUpserted += batch.length;
+    }
+
+    logger.info(`[WayfairSync] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS orders)`);
+  } catch (err: any) {
+    logger.warn(`[WayfairSync] Order sync failed (non-fatal): ${err.message}`);
+  }
+
+  return totalUpserted;
 }
 
 async function aggregateToFbaInventory(): Promise<number> {
@@ -142,11 +219,14 @@ export async function syncWayfair(): Promise<number> {
     // 4. Upsert into wayfair_inventory (DataBridge internal)
     await upsertInventory(enriched);
 
-    // 5. Aggregate to pricelab_db.fba_inventory (warehouse='WF')
+    // 5. Sync orders (CG + Dropship) → wayfair_orders
+    const orderLines = await syncOrders(mappings);
+
+    // 6. Aggregate to pricelab_db.fba_inventory (warehouse='WF')
     const aggregated = await aggregateToFbaInventory();
     logger.info(`[WayfairSync] Aggregated ${aggregated} iwasku rows to fba_inventory (WF)`);
 
-    await updateSyncJob(jobId, 'completed', rawItems.length);
+    await updateSyncJob(jobId, 'completed', rawItems.length + orderLines);
     logger.info(`[WayfairSync] Completed: ${rawItems.length} items, ${aggregated} mapped to StockPulse`);
     return rawItems.length;
   } catch (err: any) {

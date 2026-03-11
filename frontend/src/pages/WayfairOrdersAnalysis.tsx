@@ -55,18 +55,21 @@ export default function WayfairOrdersAnalysis() {
     for (const order of orders) {
       const poNum = (order as any).poNumber || (order as any).id || '';
       for (const p of order.products || []) {
+        const qty = Number(p.quantity) || 0;
+        const price = Number(p.price) || 0;
+        const cost = Number((p as any).totalCost) || price * qty;
         const existing = map.get(p.partNumber);
         if (existing) {
-          existing.totalQty += p.quantity;
-          existing.totalCost += (p as any).totalCost ?? p.price * p.quantity;
+          existing.totalQty += qty;
+          existing.totalCost += cost;
           existing.poNumbers.add(poNum);
-          existing.prices.push(p.price);
+          existing.prices.push(price);
         } else {
           map.set(p.partNumber, {
-            totalQty: p.quantity,
-            totalCost: (p as any).totalCost ?? p.price * p.quantity,
+            totalQty: qty,
+            totalCost: cost,
             poNumbers: new Set([poNum]),
-            prices: [p.price],
+            prices: [price],
           });
         }
       }

@@ -2,10 +2,56 @@ import { Router, Request, Response } from 'express';
 import { getCredentials, graphqlQuery, getDropshipApiBase } from '../services/wayfair/client';
 import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
+import { pool } from '../config/database';
 
 const router = Router();
 
-// GET /api/v1/wayfair/orders?hasResponse=false|true
+// GET /api/v1/wayfair/orders/browse?type=castlegate|dropship&page=1&limit=50&search=
+router.get('/browse', async (req: Request, res: Response) => {
+  try {
+    const orderType = (req.query.type as string) || 'castlegate';
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const search = ((req.query.search as string) || '').trim();
+    const offset = (page - 1) * limit;
+
+    const conditions = ['order_type = $1'];
+    const params: unknown[] = [orderType];
+    let idx = 2;
+
+    if (search) {
+      conditions.push(`(part_number ILIKE $${idx} OR po_number ILIKE $${idx} OR iwasku ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const where = conditions.join(' AND ');
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*) FROM wayfair_orders WHERE ${where}`, params
+    );
+    const total = parseInt(countRes.rows[0].count);
+
+    const dataParams = [...params, limit, offset];
+    const rows = await pool.query(`
+      SELECT po_number, po_date, part_number, iwasku, quantity, price, total_cost
+      FROM wayfair_orders
+      WHERE ${where}
+      ORDER BY po_date DESC, po_number, part_number
+      LIMIT $${idx} OFFSET $${idx + 1}
+    `, dataParams);
+
+    res.json({
+      success: true,
+      data: rows.rows,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/v1/wayfair/orders?hasResponse=false|true (live API - kept for analysis pages)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const hasResponse = req.query.hasResponse === 'true'
