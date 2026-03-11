@@ -48,6 +48,8 @@ function WayfairOrders() {
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [typeFields, setTypeFields] = useState<{ name: string; type: { name: string | null; kind: string; ofType: { name: string | null } | null } }[] | null>(null);
   const [typeLoading, setTypeLoading] = useState(false);
+  const [rawResponse, setRawResponse] = useState<unknown>(null);
+  const [rawLoading, setRawLoading] = useState(false);
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -86,6 +88,18 @@ function WayfairOrders() {
     }
   };
 
+  const fetchRaw = async () => {
+    setRawLoading(true);
+    try {
+      const res = await axios.get('/api/v1/wayfair/orders/raw');
+      setRawResponse(res.data);
+    } catch (err: any) {
+      setRawResponse({ error: err.response?.data?.error || err.message });
+    } finally {
+      setRawLoading(false);
+    }
+  };
+
   useEffect(() => { fetchOrders(); }, []);
 
   const orderTypeColor = (type: string) => {
@@ -97,6 +111,10 @@ function WayfairOrders() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+        <button onClick={fetchRaw} disabled={rawLoading}
+          style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {rawLoading ? 'Loading...' : 'Raw Response'}
+        </button>
         <button onClick={fetchType} disabled={typeLoading}
           style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
           {typeLoading ? 'Loading...' : 'Inspect PO Type'}
@@ -110,6 +128,18 @@ function WayfairOrders() {
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
+
+      {rawResponse !== null && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>Raw API Response</strong>
+            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          <pre style={{ maxHeight: '400px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {typeFields && (
         <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.8rem', fontFamily: 'monospace' }}>
