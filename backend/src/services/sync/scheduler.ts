@@ -5,6 +5,7 @@ import { syncSalesForMarketplace } from './salesSync';
 import { syncTransactionsForMarketplace } from './transactionSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
+import { writeTransactionData, cleanupOldTransactions } from './transactionDataWriter';
 import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
@@ -171,6 +172,13 @@ async function runTransactionSync(): Promise<void> {
 
   isTransactionSyncing = true;
   try {
+    // Clean up old transactions (older than 35 days)
+    try {
+      await cleanupOldTransactions();
+    } catch (err: any) {
+      logger.error('[Scheduler] cleanupOldTransactions error:', err.message);
+    }
+
     const eligibleMarketplaces = await getEligibleMarketplaces();
 
     // Group by credential_id — Finances API returns all marketplaces for a credential in one call
@@ -193,6 +201,13 @@ async function runTransactionSync(): Promise<void> {
         logger.error(`[Scheduler] Transaction sync failed for credential ${credId} (${representative.country_code}):`, err.message);
       }
       await new Promise(resolve => setTimeout(resolve, 10_000));
+    }
+
+    // Write current month Order/Refund to amz_transactions (pricelab_db)
+    try {
+      await writeTransactionData();
+    } catch (err: any) {
+      logger.error('[Scheduler] writeTransactionData error:', err.message);
     }
   } finally {
     isTransactionSyncing = false;
@@ -266,4 +281,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
