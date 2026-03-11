@@ -74,6 +74,24 @@ router.get('/', async (_req: Request, res: Response) => {
       LIMIT 20
     `);
 
+    // Wayfair inventory match quality (by distinct part_number)
+    const wfInvMatch = await pool.query(`
+      SELECT
+        COUNT(DISTINCT part_number) as total,
+        COUNT(DISTINCT CASE WHEN iwasku IS NOT NULL THEN part_number END) as matched,
+        COUNT(DISTINCT CASE WHEN iwasku IS NULL THEN part_number END) as unmatched
+      FROM wayfair_inventory
+    `);
+
+    const wfUnmatchedInv = await pool.query(`
+      SELECT part_number, SUM(quantity) as total_qty
+      FROM wayfair_inventory
+      WHERE iwasku IS NULL
+      GROUP BY part_number
+      ORDER BY total_qty DESC
+      LIMIT 20
+    `);
+
     res.json({
       success: true,
       data: {
@@ -86,6 +104,10 @@ router.get('/', async (_req: Request, res: Response) => {
           unmatchedOrders: unmatchedSkus.rows,
           inventory: invMatch.rows[0],
           unmatchedInventory: unmatchedInv.rows,
+        },
+        wayfairSkuQuality: {
+          inventory: wfInvMatch.rows[0],
+          unmatchedInventory: wfUnmatchedInv.rows,
         },
       },
     });

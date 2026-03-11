@@ -9,12 +9,16 @@ import InventoryAnalysis from './pages/InventoryAnalysis';
 import NJWarehouse from './pages/NJWarehouse';
 import Catalog from './pages/Catalog';
 import WayfairMappings from './pages/WayfairMappings';
+import WayfairOrders from './pages/WayfairOrders';
+import WayfairInventory from './pages/WayfairInventory';
 
 const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis'];
+const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/mappings'];
 
 function Nav() {
   const location = useLocation();
   const isAmazon = AMAZON_PATHS.some(p => location.pathname.startsWith(p));
+  const isWayfair = WAYFAIR_PATHS.some(p => location.pathname.startsWith(p));
 
   const topLink = (active: boolean) => ({
     color: active ? '#fff' : '#94a3b8',
@@ -50,7 +54,7 @@ function Nav() {
           Amazon
         </NavLink>
 
-        <NavLink to="/wayfair" style={({ isActive }) => topLink(isActive)}>
+        <NavLink to="/wayfair/orders" style={topLink(isWayfair)}>
           Wayfair
         </NavLink>
 
@@ -81,6 +85,15 @@ function Nav() {
           <NavLink to="/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
         </nav>
       )}
+
+      {/* Wayfair sub-nav */}
+      {isWayfair && (
+        <nav style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 2rem', background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
+          <NavLink to="/wayfair/orders" style={subLink}>Orders</NavLink>
+          <NavLink to="/wayfair/inventory" style={subLink}>Inventory</NavLink>
+          <NavLink to="/wayfair/mappings" style={subLink}>Mappings</NavLink>
+        </nav>
+      )}
     </>
   );
 }
@@ -99,7 +112,9 @@ export default function App() {
           <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
           <Route path="/nj-warehouse" element={<NJWarehouse />} />
           <Route path="/catalog" element={<Catalog />} />
-          <Route path="/wayfair" element={<WayfairMappings />} />
+          <Route path="/wayfair/orders" element={<WayfairOrders />} />
+          <Route path="/wayfair/inventory" element={<WayfairInventory />} />
+          <Route path="/wayfair/mappings" element={<WayfairMappings />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>
       </main>

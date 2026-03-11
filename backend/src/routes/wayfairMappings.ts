@@ -4,6 +4,8 @@ import * as XLSX from 'xlsx';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { refreshWayfairAggregation } from '../services/sync/wayfairSync';
+import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
+import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
 
 const router = Router();
 
@@ -149,6 +151,18 @@ router.post('/bulk', validateBody(bulkSchema), async (req: Request, res: Respons
   }
 });
 
+// GET /api/v1/wayfair/mappings/all — all mappings as key-value (for inline IWASKU display)
+router.get('/all', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT part_number, iwasku FROM wayfair_sku_mapping WHERE iwasku IS NOT NULL');
+    const map: Record<string, string> = {};
+    for (const r of result.rows) map[r.part_number] = r.iwasku;
+    res.json({ success: true, data: map });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // DELETE /api/v1/wayfair/mappings/:partNumber
 router.delete('/:partNumber', async (req: Request, res: Response) => {
   const { partNumber } = req.params;
@@ -168,18 +182,19 @@ router.delete('/:partNumber', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/v1/wayfair/mappings/export — Excel download
+// GET /api/v1/wayfair/mappings/export — Excel download (inventory + orders part_numbers)
 router.get('/export', async (_req: Request, res: Response) => {
   try {
+    // Get all part_numbers from inventory + mapping table
     const result = await pool.query(`
       SELECT
-        wi.part_number,
+        COALESCE(wi.part_number, m.part_number) as part_number,
         COALESCE(m.iwasku, '') as iwasku,
-        SUM(wi.quantity) as total_quantity
-      FROM wayfair_inventory wi
-      LEFT JOIN wayfair_sku_mapping m ON wi.part_number = m.part_number
-      GROUP BY wi.part_number, m.iwasku
-      ORDER BY wi.part_number
+        COALESCE(SUM(wi.quantity), 0) as total_quantity
+      FROM wayfair_sku_mapping m
+      FULL OUTER JOIN wayfair_inventory wi ON wi.part_number = m.part_number
+      GROUP BY COALESCE(wi.part_number, m.part_number), m.iwasku
+      ORDER BY part_number
     `);
 
     const rows = result.rows.map((r: { part_number: string; iwasku: string; total_quantity: number }) => ({
@@ -188,9 +203,31 @@ router.get('/export', async (_req: Request, res: Response) => {
       total_quantity: Number(r.total_quantity),
     }));
 
+    // Also include part_numbers from live orders (CG + Dropship)
+    const knownPns = new Set(rows.map(r => r.part_number));
+    try {
+      const [cgOrders, dsOrders] = await Promise.all([
+        fetchWayfairPurchaseOrders(),
+        fetchDropshipOrders(),
+      ]);
+      for (const o of cgOrders) for (const p of o.products) {
+        if (!knownPns.has(p.partNumber)) {
+          rows.push({ part_number: p.partNumber, iwasku: '', total_quantity: 0 });
+          knownPns.add(p.partNumber);
+        }
+      }
+      for (const o of dsOrders) for (const p of o.products) {
+        if (!knownPns.has(p.partNumber)) {
+          rows.push({ part_number: p.partNumber, iwasku: '', total_quantity: 0 });
+          knownPns.add(p.partNumber);
+        }
+      }
+    } catch {
+      // If order fetch fails (no credentials, API error), continue with DB-only data
+    }
+
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows, { header: ['part_number', 'iwasku', 'total_quantity'] });
-    // Column widths
     ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 15 }];
     XLSX.utils.book_append_sheet(wb, ws, 'Mappings');
 
