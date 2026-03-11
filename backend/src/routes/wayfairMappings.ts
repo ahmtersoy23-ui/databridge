@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
+import * as XLSX from 'xlsx';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { refreshWayfairAggregation } from '../services/sync/wayfairSync';
@@ -167,7 +168,7 @@ router.delete('/:partNumber', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/v1/wayfair/mappings/export — CSV download
+// GET /api/v1/wayfair/mappings/export — Excel download
 router.get('/export', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(`
@@ -181,15 +182,22 @@ router.get('/export', async (_req: Request, res: Response) => {
       ORDER BY wi.part_number
     `);
 
-    const header = 'part_number,iwasku,total_quantity';
-    const rows = result.rows.map((r: { part_number: string; iwasku: string; total_quantity: number }) =>
-      `${r.part_number},${r.iwasku},${r.total_quantity}`
-    );
-    const csv = [header, ...rows].join('\n');
+    const rows = result.rows.map((r: { part_number: string; iwasku: string; total_quantity: number }) => ({
+      part_number: r.part_number,
+      iwasku: r.iwasku,
+      total_quantity: Number(r.total_quantity),
+    }));
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="wayfair_mappings.csv"');
-    res.send(csv);
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows, { header: ['part_number', 'iwasku', 'total_quantity'] });
+    // Column widths
+    ws['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 15 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Mappings');
+
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="wayfair_mappings.xlsx"');
+    res.send(buf);
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

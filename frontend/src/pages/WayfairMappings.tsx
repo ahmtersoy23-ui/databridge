@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 
 interface WayfairLineItem {
   partNumber: string;
@@ -308,21 +309,20 @@ export default function WayfairMappings() {
     setMessage('');
 
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
-      const mappings: Array<{ part_number: string; iwasku: string }> = [];
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
 
-      // Skip header row if present
-      const startIdx = lines[0].toLowerCase().includes('part_number') ? 1 : 0;
-      for (let i = startIdx; i < lines.length; i++) {
-        const cols = lines[i].split(',');
-        const pn = cols[0]?.trim();
-        const iwasku = cols[1]?.trim();
+      const mappings: Array<{ part_number: string; iwasku: string }> = [];
+      for (const row of rawRows) {
+        const pn = String(row['part_number'] ?? '').trim();
+        const iwasku = String(row['iwasku'] ?? '').trim();
         if (pn && iwasku) mappings.push({ part_number: pn, iwasku });
       }
 
       if (mappings.length === 0) {
-        setMessage('No valid rows found. Format: part_number,iwasku');
+        setMessage('No valid rows found. Excel must have "part_number" and "iwasku" columns.');
         return;
       }
 
@@ -402,11 +402,11 @@ export default function WayfairMappings() {
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
           <button onClick={handleExport}
             style={{ padding: '0.4rem 1rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-            Export CSV
+            Export Excel
           </button>
           <label style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
-            {importing ? 'Importing...' : 'Import CSV'}
-            <input ref={fileInputRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
+            {importing ? 'Importing...' : 'Import Excel'}
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
           </label>
           <button onClick={handleSync} disabled={syncing}
             style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
@@ -427,11 +427,9 @@ export default function WayfairMappings() {
         </div>
       )}
 
-      {/* CSV format hint */}
+      {/* Excel format hint */}
       <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
-        Import format: <code>part_number,iwasku</code> (CSV, one per line, header optional)
-        &nbsp;&nbsp;·&nbsp;&nbsp;
-        Export CSV → fill iwasku column → Import
+        Export Excel → <code>iwasku</code> kolonunu doldur → Import Excel
       </div>
 
       {/* Table */}
