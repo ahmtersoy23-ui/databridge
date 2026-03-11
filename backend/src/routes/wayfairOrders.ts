@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getCredentials, graphqlQuery } from '../services/wayfair/client';
+import { getCredentials, graphqlQuery, getDropshipApiBase } from '../services/wayfair/client';
 import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
 
@@ -32,7 +32,26 @@ router.get('/dropship', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/v1/wayfair/orders/raw — ham GraphQL response (debug)
+// GET /api/v1/wayfair/orders/dropship/raw — ham Dropship GraphQL response (debug)
+router.get('/dropship/raw', async (_req: Request, res: Response) => {
+  try {
+    const creds = await getCredentials();
+    const endpoint = getDropshipApiBase(creds.use_sandbox);
+    const result = await graphqlQuery<unknown>(`
+      query getDropshipPurchaseOrders($limit: Int32, $hasResponse: Boolean, $sortOrder: SortOrder) {
+        getDropshipPurchaseOrders(limit: $limit, hasResponse: $hasResponse, sortOrder: $sortOrder) {
+          poNumber poDate supplierId
+          products { partNumber quantity price }
+        }
+      }
+    `, { limit: 5, hasResponse: null, sortOrder: 'ASC' }, endpoint);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/v1/wayfair/orders/raw — ham CastleGate GraphQL response (debug)
 router.get('/raw', async (_req: Request, res: Response) => {
   try {
     await getCredentials();

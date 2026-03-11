@@ -62,6 +62,8 @@ function WayfairDropshipOrders() {
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'new' | 'responded'>('all');
+  const [rawResponse, setRawResponse] = useState<unknown>(null);
+  const [rawLoading, setRawLoading] = useState(false);
 
   const fetchOrders = async (f = filter) => {
     setLoading(true);
@@ -76,6 +78,18 @@ function WayfairDropshipOrders() {
       setError(err.response?.data?.error || 'Failed to fetch dropship orders');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRaw = async () => {
+    setRawLoading(true);
+    try {
+      const res = await axios.get('/api/v1/wayfair/orders/dropship/raw');
+      setRawResponse(res.data);
+    } catch (err: any) {
+      setRawResponse({ error: err.response?.data?.error || err.message });
+    } finally {
+      setRawLoading(false);
     }
   };
 
@@ -97,11 +111,27 @@ function WayfairDropshipOrders() {
             </button>
           ))}
         </div>
+        <button onClick={fetchRaw} disabled={rawLoading}
+          style={{ padding: '0.4rem 1rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          {rawLoading ? 'Loading...' : 'Raw Response'}
+        </button>
         <button onClick={() => fetchOrders()} disabled={loading}
           style={{ padding: '0.4rem 1rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
+
+      {rawResponse !== null && (
+        <div style={{ background: '#1e293b', color: '#e2e8f0', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <strong style={{ color: '#94a3b8' }}>Raw Dropship API Response (limit: 5)</strong>
+            <span onClick={() => setRawResponse(null)} style={{ cursor: 'pointer', color: '#94a3b8' }}>✕</span>
+          </div>
+          <pre style={{ maxHeight: '500px', overflowY: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+            {JSON.stringify(rawResponse, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {error && <div style={{ padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>{error}</div>}
 
