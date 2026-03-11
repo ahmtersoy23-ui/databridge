@@ -1,81 +1,159 @@
-import { graphqlQuery } from './client';
+import { graphqlQuery, getSupplierId } from './client';
 import logger from '../../config/logger';
 
 export interface WayfairLineItem {
+  supplierPartNumber: string;
   partNumber: string;
-  quantity: number;
-  price?: number;
+  productName?: string;
+  quantityOrdered: number;
+  quantityShipped: number;
+  unitPrice?: number;
+  status: string;
+  trackingNumbers?: string[];
 }
 
 export interface WayfairPurchaseOrder {
-  poNumber: string;
-  orderType: string;
-  poDate: string;
-  estimatedShipDate?: string;
+  requestId: string;
+  status: string;
+  statusLabel: string;
+  orderDate: string;
+  customerOrderNumber?: string;
+  retailerName?: string;
+  shippingAddress?: {
+    name?: string;
+    city?: string;
+    stateShortName?: string;
+    postalCode?: string;
+    countryShortName?: string;
+  };
   lineItems: WayfairLineItem[];
 }
 
-// getCastleGatePurchaseOrders returns PurchaseOrderV2[] directly (no connection/edges/pageInfo)
-// Supplier is inferred from auth token — no supplierId arg needed
-// PurchaseOrderV2 actual fields: poNumber, poDate, estimatedShipDate, orderType, products, ...
-const PO_QUERY = `
-  query GetCastleGatePOs($hasResponse: Boolean) {
-    getCastleGatePurchaseOrders(hasResponse: $hasResponse) {
-      poNumber
-      poDate
-      estimatedShipDate
-      orderType
-      products {
-        partNumber
-        quantity
-        price
+// fulfillmentOrderDetailsList — CastleGate Multi-Channel Order API
+// Page-based pagination (page + pageSize, max 100)
+const ORDERS_QUERY = `
+  query FulfillmentOrderDetailsList($orderDetailsListInput: FulfillmentOrderDetailsListInput!) {
+    fulfillmentOrderDetailsList(orderDetailsListInput: $orderDetailsListInput) {
+      pageInfo {
+        hasNextPage
+        totalPages
+        totalItems
+      }
+      nodes {
+        fulfillmentOrder {
+          requestId
+          status
+          statusLabel
+          orderDate
+          customerOrderNumber
+          retailer {
+            name
+          }
+          shippingAddress {
+            name
+            city
+            stateShortName
+            postalCode
+            countryShortName
+          }
+          fulfillmentOrderItems {
+            supplierPartNumber
+            partNumber
+            supplierProductName
+            quantityOrdered
+            quantityShipped
+            unitPrice
+            status
+            trackingNumbers
+          }
+        }
       }
     }
   }
 `;
 
-interface PONode {
-  poNumber: string;
-  orderType: string;
-  poDate: string;
-  estimatedShipDate?: string;
-  products?: { partNumber: string; quantity: number; price?: number }[];
+interface FulfillmentOrderItem {
+  supplierPartNumber?: string;
+  partNumber?: string;
+  supplierProductName?: string;
+  quantityOrdered?: number;
+  quantityShipped?: number;
+  unitPrice?: number;
+  status?: string;
+  trackingNumbers?: string[];
 }
 
-interface POResponse {
-  getCastleGatePurchaseOrders: PONode[];
+interface FulfillmentOrder {
+  requestId: string;
+  status: string;
+  statusLabel: string;
+  orderDate?: string;
+  customerOrderNumber?: string;
+  retailer?: { name?: string };
+  shippingAddress?: {
+    name?: string;
+    city?: string;
+    stateShortName?: string;
+    postalCode?: string;
+    countryShortName?: string;
+  };
+  fulfillmentOrderItems?: FulfillmentOrderItem[];
+}
+
+interface FulfillmentOrdersResponse {
+  fulfillmentOrderDetailsList: {
+    pageInfo: { hasNextPage: boolean; totalPages: number; totalItems: number };
+    nodes: { fulfillmentOrder: FulfillmentOrder }[];
+  };
 }
 
 export async function fetchWayfairPurchaseOrders(): Promise<WayfairPurchaseOrder[]> {
-  let result: POResponse;
-  try {
-    result = await graphqlQuery<POResponse>(PO_QUERY);
-  } catch (err: any) {
-    const msg: string = err.message || '';
-    if (
-      msg.includes('wrongly returned a null value') ||
-      msg.includes('failed to retrieve CG PO') ||
-      msg.includes('Internal Server Error') ||
-      msg.includes('something went wrong')
-    ) {
-      logger.info(`[Wayfair PO] No CastleGate POs available: ${msg}`);
-      return [];
+  const supplierId = await getSupplierId();
+  const all: WayfairPurchaseOrder[] = [];
+  let page = 1;
+
+  while (true) {
+    let result: FulfillmentOrdersResponse;
+    try {
+      result = await graphqlQuery<FulfillmentOrdersResponse>(ORDERS_QUERY, {
+        orderDetailsListInput: { supplierId, page, pageSize: 100 },
+      });
+    } catch (err: any) {
+      const msg: string = err.message || '';
+      logger.info(`[Wayfair Orders] ${msg}`);
+      return all;
     }
-    throw err;
+
+    const conn = result.fulfillmentOrderDetailsList;
+    if (!conn?.nodes?.length) break;
+
+    for (const { fulfillmentOrder: o } of conn.nodes) {
+      all.push({
+        requestId: o.requestId,
+        status: o.status,
+        statusLabel: o.statusLabel,
+        orderDate: o.orderDate || '',
+        customerOrderNumber: o.customerOrderNumber,
+        retailerName: o.retailer?.name,
+        shippingAddress: o.shippingAddress,
+        lineItems: (o.fulfillmentOrderItems || []).map(item => ({
+          supplierPartNumber: item.supplierPartNumber || '',
+          partNumber: item.partNumber || '',
+          productName: item.supplierProductName,
+          quantityOrdered: item.quantityOrdered ?? 0,
+          quantityShipped: item.quantityShipped ?? 0,
+          unitPrice: item.unitPrice,
+          status: item.status || '',
+          trackingNumbers: item.trackingNumbers || [],
+        })),
+      });
+    }
+
+    logger.info(`[Wayfair Orders] Page ${page}/${conn.pageInfo.totalPages}: ${conn.nodes.length} orders (total: ${all.length}/${conn.pageInfo.totalItems})`);
+
+    if (!conn.pageInfo.hasNextPage) break;
+    page++;
   }
 
-  const orders = result.getCastleGatePurchaseOrders || [];
-  logger.info(`[Wayfair PO] ${orders.length} orders fetched`);
-
-  return orders.map(node => ({
-    poNumber: node.poNumber,
-    orderType: node.orderType,
-    poDate: node.poDate,
-    estimatedShipDate: node.estimatedShipDate,
-    lineItems: (node.products || []).map(p => ({
-      partNumber: p.partNumber,
-      quantity: p.quantity,
-      price: p.price,
-    })),
-  }));
+  return all;
 }

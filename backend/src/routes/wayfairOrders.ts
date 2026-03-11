@@ -19,21 +19,26 @@ router.get('/', async (_req: Request, res: Response) => {
 router.get('/raw', async (_req: Request, res: Response) => {
   try {
     await getCredentials();
+    const { getSupplierId } = await import('../services/wayfair/client');
+    const supplierId = await getSupplierId();
     const result = await graphqlQuery<unknown>(`
-      query {
-        getCastleGatePurchaseOrders {
-          poNumber
-          poDate
-          estimatedShipDate
-          orderType
-          products {
-            partNumber
-            quantity
-            price
+      query FulfillmentOrderDetailsList($orderDetailsListInput: FulfillmentOrderDetailsListInput!) {
+        fulfillmentOrderDetailsList(orderDetailsListInput: $orderDetailsListInput) {
+          pageInfo { hasNextPage totalPages totalItems }
+          nodes {
+            fulfillmentOrder {
+              requestId status statusLabel orderDate customerOrderNumber
+              retailer { name }
+              shippingAddress { name city stateShortName postalCode countryShortName }
+              fulfillmentOrderItems {
+                supplierPartNumber partNumber supplierProductName
+                quantityOrdered quantityShipped unitPrice status trackingNumbers
+              }
+            }
           }
         }
       }
-    `);
+    `, { orderDetailsListInput: { supplierId, page: 1, pageSize: 10 } });
     res.json(result);
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });

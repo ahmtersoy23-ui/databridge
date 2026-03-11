@@ -3,16 +3,30 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 
 interface WayfairLineItem {
+  supplierPartNumber: string;
   partNumber: string;
-  quantity: number;
-  price?: number;
+  productName?: string;
+  quantityOrdered: number;
+  quantityShipped: number;
+  unitPrice?: number;
+  status: string;
+  trackingNumbers?: string[];
 }
 
 interface WayfairPurchaseOrder {
-  poNumber: string;
-  orderType: string;
-  poDate: string;
-  estimatedShipDate?: string;
+  requestId: string;
+  status: string;
+  statusLabel: string;
+  orderDate: string;
+  customerOrderNumber?: string;
+  retailerName?: string;
+  shippingAddress?: {
+    name?: string;
+    city?: string;
+    stateShortName?: string;
+    postalCode?: string;
+    countryShortName?: string;
+  };
   lineItems: WayfairLineItem[];
 }
 
@@ -102,9 +116,12 @@ function WayfairOrders() {
 
   useEffect(() => { fetchOrders(); }, []);
 
-  const orderTypeColor = (type: string) => {
-    if (type === 'DROPSHIP') return { bg: '#dbeafe', color: '#1e40af' };
-    if (type === 'CASTLEGATE') return { bg: '#dcfce7', color: '#166534' };
+  const statusColor = (status: string) => {
+    if (status === 'NEW') return { bg: '#fef3c7', color: '#92400e' };
+    if (status === 'ALLOCATED') return { bg: '#dbeafe', color: '#1e40af' };
+    if (status === 'SHIPPED' || status === 'PARTIALLY_SHIPPED') return { bg: '#dcfce7', color: '#166534' };
+    if (status === 'CANCELLED' || status === 'REJECTED') return { bg: '#fef2f2', color: '#dc2626' };
+    if (status === 'DELIVERED') return { bg: '#f0fdf4', color: '#166534' };
     return { bg: '#f1f5f9', color: '#475569' };
   };
 
@@ -193,54 +210,62 @@ function WayfairOrders() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>PO Number</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Type</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>PO Date</th>
-                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Ship By</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>Request ID</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Order Date</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Retailer</th>
+                <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Ship To</th>
                 <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Items</th>
               </tr>
             </thead>
             <tbody>
               {orders.map(order => {
-                const sc = orderTypeColor(order.orderType);
+                const sc = statusColor(order.status);
                 return (
                   <>
                     <tr
-                      key={order.poNumber}
-                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.poNumber ? '#f8fafc' : undefined }}
-                      onClick={() => setExpanded(expanded === order.poNumber ? null : order.poNumber)}
+                      key={order.requestId}
+                      style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: expanded === order.requestId ? '#f8fafc' : undefined }}
+                      onClick={() => setExpanded(expanded === order.requestId ? null : order.requestId)}
                     >
-                      <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600 }}>{order.poNumber}</td>
+                      <td style={{ padding: '0.6rem 1rem', fontFamily: 'monospace', fontWeight: 600, fontSize: '0.8rem' }}>{order.requestId}</td>
                       <td style={{ padding: '0.6rem 0.5rem' }}>
                         <span style={{ padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem', background: sc.bg, color: sc.color }}>
-                          {order.orderType}
+                          {order.statusLabel || order.status}
                         </span>
                       </td>
                       <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
-                        {order.poDate ? new Date(order.poDate).toLocaleDateString() : '—'}
+                        {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : '—'}
                       </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569' }}>
-                        {order.estimatedShipDate ? new Date(order.estimatedShipDate).toLocaleDateString() : '—'}
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#475569', fontSize: '0.82rem' }}>{order.retailerName || '—'}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b', fontSize: '0.8rem' }}>
+                        {order.shippingAddress ? `${order.shippingAddress.city || ''}, ${order.shippingAddress.stateShortName || ''}` : '—'}
                       </td>
-                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.lineItems.length} item{order.lineItems.length !== 1 ? 's' : ''}</td>
+                      <td style={{ padding: '0.6rem 0.5rem', color: '#64748b' }}>{order.lineItems.length}</td>
                     </tr>
-                    {expanded === order.poNumber && (
-                      <tr key={`${order.poNumber}-detail`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                        <td colSpan={5} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
+                    {expanded === order.requestId && (
+                      <tr key={`${order.requestId}-detail`} style={{ borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                        <td colSpan={6} style={{ padding: '0.5rem 1rem 1rem 2rem' }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
                             <thead>
                               <tr style={{ color: '#64748b' }}>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Part Number</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Qty</th>
-                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Price</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Supplier Part#</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Product</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Ordered</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Shipped</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Unit Price</th>
+                                <th style={{ textAlign: 'left', padding: '0.25rem 0.5rem' }}>Status</th>
                               </tr>
                             </thead>
                             <tbody>
                               {order.lineItems.map((li, i) => (
                                 <tr key={i}>
-                                  <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{li.partNumber}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantity}</td>
-                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.price != null ? `$${li.price.toFixed(2)}` : '—'}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem', fontFamily: 'monospace' }}>{li.supplierPartNumber || li.partNumber}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem', color: '#64748b' }}>{li.productName || '—'}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantityOrdered}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.quantityShipped}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem' }}>{li.unitPrice != null ? `$${li.unitPrice.toFixed(2)}` : '—'}</td>
+                                  <td style={{ padding: '0.2rem 0.5rem', color: '#64748b' }}>{li.status}</td>
                                 </tr>
                               ))}
                             </tbody>
