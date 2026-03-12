@@ -32,7 +32,7 @@ const COL_ZERO = '#d1d5db';
 type SortKey = keyof AggRow;
 
 export default function WayfairOrdersAnalysis() {
-  const [tab, setTab] = useState<'castlegate' | 'dropship'>('castlegate');
+  const [tab, setTab] = useState<'total' | 'castlegate' | 'dropship'>('total');
   const [cgOrders, setCgOrders] = useState<CGOrder[]>([]);
   const [dsOrders, setDsOrders] = useState<DSOrder[]>([]);
   const [mappings, setMappings] = useState<MappingMap>({});
@@ -90,7 +90,28 @@ export default function WayfairOrdersAnalysis() {
 
   const cgAgg = useMemo(() => aggregate(cgOrders), [cgOrders, mappings]);
   const dsAgg = useMemo(() => aggregate(dsOrders), [dsOrders, mappings]);
-  const rows = tab === 'castlegate' ? cgAgg : dsAgg;
+  const totalAgg = useMemo(() => {
+    const map = new Map<string, AggRow>();
+    for (const r of cgAgg) {
+      map.set(r.partNumber, { ...r });
+    }
+    for (const r of dsAgg) {
+      const existing = map.get(r.partNumber);
+      if (existing) {
+        const totalQty = existing.totalQty + r.totalQty;
+        const totalCost = existing.totalCost + r.totalCost;
+        const totalPOs = existing.poCount + r.poCount;
+        existing.totalQty = totalQty;
+        existing.totalCost = totalCost;
+        existing.poCount = totalPOs;
+        existing.avgPrice = totalQty > 0 ? totalCost / totalQty : 0;
+      } else {
+        map.set(r.partNumber, { ...r });
+      }
+    }
+    return Array.from(map.values());
+  }, [cgAgg, dsAgg]);
+  const rows = tab === 'total' ? totalAgg : tab === 'castlegate' ? cgAgg : dsAgg;
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -145,7 +166,7 @@ export default function WayfairOrdersAnalysis() {
 
       {/* CG / DS subtab */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
-        {(['castlegate', 'dropship'] as const).map(t => (
+        {(['total', 'castlegate', 'dropship'] as const).map(t => (
           <button key={t} onClick={() => { setTab(t); setSearch(''); }}
             style={{
               padding: '0.4rem 1.1rem', border: 'none', background: 'none', cursor: 'pointer',
@@ -154,7 +175,7 @@ export default function WayfairOrdersAnalysis() {
               borderBottom: tab === t ? '2px solid #0891b2' : '2px solid transparent',
               marginBottom: '-2px',
             }}>
-            {t === 'castlegate' ? 'CastleGate' : 'Dropship'}
+            {t === 'total' ? 'Total' : t === 'castlegate' ? 'CastleGate' : 'Dropship'}
           </button>
         ))}
       </div>
