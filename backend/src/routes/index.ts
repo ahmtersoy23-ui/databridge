@@ -13,6 +13,7 @@ import wayfairMappingsRouter from './wayfairMappings';
 import wayfairOrdersRouter from './wayfairOrders';
 import wayfairInventoryRouter from './wayfairInventory';
 import wayfairPartsRouter from './wayfairParts';
+import reviewsRouter from './reviews';
 
 const router = Router();
 
@@ -32,6 +33,9 @@ router.use('/wayfair/mappings', wayfairMappingsRouter);
 router.use('/wayfair/orders', wayfairOrdersRouter);
 router.use('/wayfair/inventory', wayfairInventoryRouter);
 router.use('/wayfair/parts', wayfairPartsRouter);
+
+// Review tracking
+router.use('/reviews', reviewsRouter);
 
 // Management endpoints (auth required)
 router.use('/sync', syncRouter);

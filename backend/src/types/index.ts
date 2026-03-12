@@ -116,6 +116,40 @@ export interface SalesResponseItem {
   preYearNext180: number;
 }
 
+// Review tracking types
+export interface TrackedAsin {
+  id: number;
+  asin: string;
+  country_code: string;
+  label: string | null;
+  is_active: boolean;
+}
+
+export interface ProductReview {
+  id: number;
+  asin: string;
+  country_code: string;
+  rating: number | null;
+  review_count: number;
+  last_review_text: string | null;
+  last_review_title: string | null;
+  last_review_rating: number | null;
+  last_review_date: string | null;
+  last_review_author: string | null;
+  is_blocked: boolean;
+  block_count: number;
+  checked_at: Date | null;
+}
+
+export interface ReviewHistory {
+  id: number;
+  asin: string;
+  country_code: string;
+  rating: number | null;
+  review_count: number;
+  recorded_at: Date;
+}
+
 // StockPulse-compatible inventory response item
 export interface InventoryResponseItem {
   iwasku: string;

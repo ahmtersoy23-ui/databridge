@@ -9,6 +9,7 @@ import { writeTransactionData, cleanupOldTransactions } from './transactionDataW
 import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
+import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
 import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON } from '../../config/constants';
 import { withRetry } from '../../utils/retry';
@@ -25,6 +26,7 @@ let isTransactionSyncing = false;
 let isNJSyncing = false;
 let isWisersellSyncing = false;
 let isWayfairSyncing = false;
+let isReviewSyncing = false; // kept for manual trigger via /sync/trigger
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -231,6 +233,22 @@ async function runWayfairSync(): Promise<void> {
   }
 }
 
+async function runReviewSync(): Promise<void> {
+  if (isReviewSyncing) {
+    logger.warn('[Scheduler] Skipping review sync - another review sync is in progress');
+    return;
+  }
+
+  isReviewSyncing = true;
+  try {
+    await runReviewTracking();
+  } catch (err: any) {
+    logger.error('[Scheduler] Review sync failed:', err.message);
+  } finally {
+    isReviewSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     logger.info('[Scheduler] Starting scheduled inventory sync');
@@ -262,13 +280,14 @@ export function startScheduler(): void {
     runWayfairSync().catch(err => logger.error('[Scheduler] Wayfair sync error:', err));
   });
 
+  // Review tracking runs locally (Mac residential IP) via launchd — no server cron
+
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
   logger.info(`[Scheduler] Transaction sync: ${SYNC_TRANSACTIONS_CRON}`);
   logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
   logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
   logger.info(`[Scheduler] Wayfair CastleGate sync: ${SYNC_WAYFAIR_CRON}`);
-
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -282,4 +301,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
