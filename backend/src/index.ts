@@ -8,7 +8,19 @@ import logger from './config/logger';
 
 const PORT = parseInt(process.env.PORT || '3008');
 
+// Validate required environment variables before starting
+function validateEnv(): void {
+  const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+  const missing = required.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    logger.error(`Missing required environment variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
+}
+
 async function startServer(): Promise<void> {
+  validateEnv();
+
   // Verify database connections
   await checkConnections();
 

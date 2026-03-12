@@ -82,7 +82,10 @@ router.get('/type/:typeName', async (req: Request, res: Response) => {
     const { typeName } = req.params;
     const result = await graphqlQuery<{
       __type: { fields: { name: string; type: { name: string | null; kind: string; ofType: { name: string | null } | null } }[] } | null
-    }>(`{ __type(name: "${typeName}") { fields { name type { name kind ofType { name } } } } }`);
+    }>(
+      `query IntrospectType($typeName: String!) { __type(name: $typeName) { fields { name type { name kind ofType { name } } } } }`,
+      { typeName }
+    );
     if (!result.__type) {
       res.status(404).json({ success: false, error: `Type '${typeName}' not found` });
       return;

@@ -69,12 +69,13 @@ router.put('/:id', authMiddleware, validateBody(updateSchema), async (req: Reque
   const { id } = req.params;
   const fields = req.body;
 
+  const ALLOWED_FIELDS = ['region', 'seller_id', 'refresh_token', 'client_id', 'client_secret', 'account_name'];
   const setClauses: string[] = [];
   const values: any[] = [];
   let idx = 1;
 
   for (const [key, val] of Object.entries(fields)) {
-    if (val !== undefined && val !== '') {
+    if (val !== undefined && val !== '' && ALLOWED_FIELDS.includes(key)) {
       setClauses.push(`${key} = $${idx}`);
       values.push(val);
       idx++;

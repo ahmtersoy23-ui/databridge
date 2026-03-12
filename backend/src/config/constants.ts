@@ -2,7 +2,7 @@ export const DB_MAX_CONNECTIONS = 15;
 export const DB_IDLE_TIMEOUT_MS = 30_000;
 export const DB_CONNECTION_TIMEOUT_MS = 5_000;
 
-export const SHARED_DB_MAX_CONNECTIONS = 5;
+export const SHARED_DB_MAX_CONNECTIONS = 10;
 
 export const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 min
 export const RATE_LIMIT_MAX_REQUESTS = 200;

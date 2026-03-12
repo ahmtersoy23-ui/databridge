@@ -122,10 +122,13 @@ export async function getSupplierId(): Promise<number> {
 
   if (creds.supplier_id) return creds.supplier_id;
 
-  // Try auto-discover
+  // Try auto-discover (use variables to prevent GraphQL injection)
   const result = await graphqlQuery<{
     getApplicationByClientId: { suppliers: { id: number; name: string }[] } | null
-  }>(`{ getApplicationByClientId(clientId: "${creds.client_id}") { suppliers { id name } } }`);
+  }>(
+    `query GetApp($clientId: String!) { getApplicationByClientId(clientId: $clientId) { suppliers { id name } } }`,
+    { clientId: creds.client_id }
+  );
 
   const supplierId = result.getApplicationByClientId?.suppliers?.[0]?.id;
   if (!supplierId) {

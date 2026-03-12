@@ -21,8 +21,8 @@ const getSSOVerifyUrl = () => process.env.SSO_VERIFY_URL || 'https://apps.iwa.we
 const getSSOAppCode = () => process.env.SSO_APP_CODE || 'databridge';
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction): Promise<void> {
-  // Skip auth in development
-  if (process.env.NODE_ENV === 'development') {
+  // Skip auth only in local development (localhost requests only)
+  if (process.env.NODE_ENV === 'development' && (req.hostname === 'localhost' || req.hostname === '127.0.0.1')) {
     req.user = { id: 0, email: 'dev@local', name: 'Developer', role: 'admin' };
     next();
     return;

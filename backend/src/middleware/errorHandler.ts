@@ -19,9 +19,9 @@ export function errorHandler(err: Error, _req: Request, res: Response, _next: Ne
     return;
   }
 
-  // PG constraint errors
+  // PG constraint errors — generic message to avoid leaking schema details
   if ((err as any).code?.startsWith?.('23')) {
-    res.status(400).json({ success: false, error: 'Database constraint violation' });
+    res.status(400).json({ success: false, error: 'Operation failed due to data conflict' });
     return;
   }
 

@@ -150,9 +150,6 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
 }
 
 async function aggregateToFbaInventory(): Promise<number> {
-  // Remove stale WF rows before re-inserting fresh data
-  await sharedPool.query(`DELETE FROM fba_inventory WHERE warehouse = 'WFS'`);
-
   // Aggregate wayfair_inventory → fba_inventory (only mapped iwasku rows)
   // Pick the part_number with highest quantity per iwasku as the "asin" identifier
   const result = await pool.query(`
@@ -166,32 +163,50 @@ async function aggregateToFbaInventory(): Promise<number> {
 
   if (result.rows.length === 0) return 0;
 
-  const values: string[] = [];
-  const params: unknown[] = [];
+  const BATCH_SIZE = 500;
+  const client = await sharedPool.connect();
+  try {
+    await client.query('BEGIN');
 
-  result.rows.forEach((row: { iwasku: string; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
-    const offset = idx * 5;
-    values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
-    params.push(
-      row.iwasku,
-      'WFS',
-      row.fulfillable_quantity,
-      row.fulfillable_quantity, // total_quantity = fulfillable for Wayfair
-      row.part_number || null   // asin = part_number for Wayfair
-    );
-  });
+    // Delete stale rows inside transaction — readers won't see empty state until COMMIT
+    await client.query(`DELETE FROM fba_inventory WHERE warehouse = 'WFS'`);
 
-  await sharedPool.query(`
-    INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity, asin)
-    VALUES ${values.join(', ')}
-    ON CONFLICT (iwasku, warehouse) DO UPDATE SET
-      fulfillable_quantity = EXCLUDED.fulfillable_quantity,
-      total_quantity = EXCLUDED.total_quantity,
-      asin = EXCLUDED.asin,
-      updated_at = NOW()
-  `, params);
+    for (let i = 0; i < result.rows.length; i += BATCH_SIZE) {
+      const batch = result.rows.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: unknown[] = [];
 
-  return result.rows.length;
+      batch.forEach((row: { iwasku: string; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
+        const offset = idx * 5;
+        values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
+        params.push(
+          row.iwasku,
+          'WFS',
+          row.fulfillable_quantity,
+          row.fulfillable_quantity, // total_quantity = fulfillable for Wayfair
+          row.part_number || null   // asin = part_number for Wayfair
+        );
+      });
+
+      await client.query(`
+        INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity, asin)
+        VALUES ${values.join(', ')}
+        ON CONFLICT (iwasku, warehouse) DO UPDATE SET
+          fulfillable_quantity = EXCLUDED.fulfillable_quantity,
+          total_quantity = EXCLUDED.total_quantity,
+          asin = EXCLUDED.asin,
+          updated_at = NOW()
+      `, params);
+    }
+
+    await client.query('COMMIT');
+    return result.rows.length;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function syncWayfair(): Promise<number> {
