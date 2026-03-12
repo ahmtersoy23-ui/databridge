@@ -91,7 +91,7 @@ const EU_AGGREGATE_SQL = `
   ORDER BY iwasku
 `;
 
-interface SalesRow {
+export interface SalesRow {
   iwasku: string;
   asin: string;
   last7: number;
@@ -112,7 +112,7 @@ interface SalesRow {
 
 const BATCH_SIZE = 500;
 
-async function upsertSalesData(channel: string, rows: SalesRow[]): Promise<number> {
+export async function upsertSalesData(channel: string, rows: SalesRow[]): Promise<number> {
   if (rows.length === 0) return 0;
 
   const client = await sharedPool.connect();

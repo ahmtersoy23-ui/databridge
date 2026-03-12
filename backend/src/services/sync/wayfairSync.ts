@@ -2,6 +2,7 @@ import { pool, sharedPool } from '../../config/database';
 import { fetchWayfairInventory } from '../wayfair/inventory';
 import { fetchWayfairPurchaseOrders } from '../wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
+import { writeWayfairSalesData } from './wayfairSalesDataWriter';
 import logger from '../../config/logger';
 
 const BATCH_SIZE = 500;
@@ -150,7 +151,7 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
 
 async function aggregateToFbaInventory(): Promise<number> {
   // Remove stale WF rows before re-inserting fresh data
-  await sharedPool.query(`DELETE FROM fba_inventory WHERE warehouse = 'WF'`);
+  await sharedPool.query(`DELETE FROM fba_inventory WHERE warehouse = 'WFS'`);
 
   // Aggregate wayfair_inventory → fba_inventory (only mapped iwasku rows)
   const result = await pool.query(`
@@ -170,7 +171,7 @@ async function aggregateToFbaInventory(): Promise<number> {
     values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
     params.push(
       row.iwasku,
-      'WF',
+      'WFS',
       row.fulfillable_quantity,
       row.fulfillable_quantity // total_quantity = fulfillable for Wayfair
     );
@@ -222,9 +223,13 @@ export async function syncWayfair(): Promise<number> {
     // 5. Sync orders (CG + Dropship) → wayfair_orders
     const orderLines = await syncOrders(mappings);
 
-    // 6. Aggregate to pricelab_db.fba_inventory (warehouse='WF')
+    // 6. Aggregate to pricelab_db.fba_inventory (warehouse='WFS')
     const aggregated = await aggregateToFbaInventory();
-    logger.info(`[WayfairSync] Aggregated ${aggregated} iwasku rows to fba_inventory (WF)`);
+    logger.info(`[WayfairSync] Aggregated ${aggregated} iwasku rows to fba_inventory (WFS)`);
+
+    // 7. Aggregate orders to pricelab_db.sales_data (channel='wfs')
+    const salesRows = await writeWayfairSalesData();
+    logger.info(`[WayfairSync] Wrote ${salesRows} sales_data rows (channel=wfs)`);
 
     await updateSyncJob(jobId, 'completed', rawItems.length + orderLines);
     logger.info(`[WayfairSync] Completed: ${rawItems.length} items, ${aggregated} mapped to StockPulse`);
@@ -242,6 +247,6 @@ export async function syncWayfair(): Promise<number> {
  */
 export async function refreshWayfairAggregation(): Promise<number> {
   const count = await aggregateToFbaInventory();
-  logger.info(`[WayfairSync] Aggregation refresh: ${count} iwasku rows written to fba_inventory (WF)`);
+  logger.info(`[WayfairSync] Aggregation refresh: ${count} iwasku rows written to fba_inventory (WFS)`);
   return count;
 }
