@@ -11,14 +11,16 @@ export function createApp(): Application {
   const app = express();
 
   app.set('trust proxy', 1);
-  app.use(helmet());
-  app.use(compression());
-  app.use(cors({
-    origin: process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
-      : ['http://localhost:5173', 'http://localhost:3008'],
-    credentials: true,
+  app.use(helmet({
+    contentSecurityPolicy: false,         // API-only, no HTML served
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
+  app.use(compression());
+  const corsOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+    : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173', 'http://localhost:3008']);
+  app.use(cors({ origin: corsOrigins, credentials: true }));
   app.use(express.json({ limit: '10mb' }));
 
   // Rate limiting

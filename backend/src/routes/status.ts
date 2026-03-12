@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/database';
+import { authMiddleware } from '../middleware/auth';
 
 const router = Router();
 
-// GET /api/v1/status - Sync status overview (public)
-router.get('/', async (_req: Request, res: Response) => {
+// GET /api/v1/status - Sync status overview (auth required)
+router.get('/', authMiddleware, async (_req: Request, res: Response) => {
   try {
     // Last sync per job type + marketplace
     const lastSyncs = await pool.query(`
