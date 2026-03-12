@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { clearWisersellTokenCache } from '../services/sync/wisersellSync';
+import { encryptCredential } from '../utils/crypto';
 
 const router = Router();
 
@@ -33,7 +34,8 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
   const { email, password, api_url } = req.body;
   try {
     if (password) {
-      // Full upsert including password
+      // Full upsert including password (encrypted at rest)
+      const encryptedPassword = encryptCredential(password);
       await pool.query(`
         INSERT INTO wisersell_credentials (id, email, password, api_url)
         VALUES (1, $1, $2, $3)
@@ -42,7 +44,7 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
           password = EXCLUDED.password,
           api_url = EXCLUDED.api_url,
           updated_at = NOW()
-      `, [email, password, api_url]);
+      `, [email, encryptedPassword, api_url]);
     } else {
       // Update email + api_url only, keep existing password
       await pool.query(`

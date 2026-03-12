@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
+import { decryptCredential } from '../../utils/crypto';
 
 interface WayfairCredentials {
   client_id: string;
@@ -25,7 +26,8 @@ export async function getCredentials(): Promise<WayfairCredentials> {
   if (!result.rows.length) {
     throw new Error('Wayfair credentials not configured. Add them in Settings.');
   }
-  return result.rows[0];
+  const row = result.rows[0];
+  return { ...row, client_secret: decryptCredential(row.client_secret) };
 }
 
 // Returns the CastleGate GraphQL endpoint URL

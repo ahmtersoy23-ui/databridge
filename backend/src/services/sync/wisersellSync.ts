@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
+import { decryptCredential } from '../../utils/crypto';
 
 interface WisersellProduct {
   id: number;
@@ -39,7 +40,8 @@ async function getCredentials(): Promise<{ email: string; password: string; api_
   if (!result.rows.length) {
     throw new Error('Wisersell credentials not configured. Add them in Settings.');
   }
-  return result.rows[0];
+  const row = result.rows[0];
+  return { ...row, password: decryptCredential(row.password) };
 }
 
 async function getToken(): Promise<string> {

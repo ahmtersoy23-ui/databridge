@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { clearWayfairTokenCache, getCredentials, getApiBase, graphqlQuery, getSupplierId } from '../services/wayfair/client';
+import { encryptCredential } from '../utils/crypto';
 
 const router = Router();
 
@@ -34,6 +35,7 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
   const { client_id, client_secret, use_sandbox, supplier_id } = req.body;
   try {
     if (client_secret) {
+      const encryptedSecret = encryptCredential(client_secret);
       await pool.query(`
         INSERT INTO wayfair_credentials (id, client_id, client_secret, use_sandbox, supplier_id)
         VALUES (1, $1, $2, $3, $4)
@@ -43,7 +45,7 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
           use_sandbox = EXCLUDED.use_sandbox,
           supplier_id = COALESCE(EXCLUDED.supplier_id, wayfair_credentials.supplier_id),
           updated_at = NOW()
-      `, [client_id, client_secret, use_sandbox, supplier_id ?? null]);
+      `, [client_id, encryptedSecret, use_sandbox, supplier_id ?? null]);
     } else {
       await pool.query(`
         INSERT INTO wayfair_credentials (id, client_id, client_secret, use_sandbox, supplier_id)

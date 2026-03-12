@@ -16,6 +16,10 @@ function validateEnv(): void {
     logger.error(`Missing required environment variables: ${missing.join(', ')}`);
     process.exit(1);
   }
+
+  if (!process.env.CREDENTIAL_ENCRYPTION_KEY) {
+    logger.warn('CREDENTIAL_ENCRYPTION_KEY not set — credentials will be stored in plaintext');
+  }
 }
 
 async function startServer(): Promise<void> {
