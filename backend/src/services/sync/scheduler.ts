@@ -11,6 +11,7 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import logger from '../../config/logger';
 import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON } from '../../config/constants';
+import { withRetry } from '../../utils/retry';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
@@ -70,7 +71,7 @@ async function runInventorySync(): Promise<void> {
       const channels = group.map(m => m.country_code).join(',');
       try {
         logger.info(`[Scheduler] Inventory sync ${key}: ${channels} (via ${representative.country_code})`);
-        await syncInventoryForMarketplace(representative);
+        await withRetry(() => syncInventoryForMarketplace(representative), { label: `inventory:${key}` });
       } catch (err: any) {
         logger.error(`[Scheduler] Inventory sync failed for ${key} (${representative.country_code}):`, err.message);
       }
@@ -114,7 +115,7 @@ async function runSalesSync(): Promise<void> {
       const channels = group.map(m => m.channel).join(',');
       try {
         logger.info(`[Scheduler] Syncing credential ${credId}: ${channels} (via ${representative.country_code})`);
-        await syncSalesForMarketplace(representative);
+        await withRetry(() => syncSalesForMarketplace(representative), { label: `sales:cred${credId}` });
       } catch (err: any) {
         logger.error(`[Scheduler] Sales sync failed for credential ${credId} (${representative.country_code}):`, err.message);
       }
@@ -140,7 +141,7 @@ async function runNJWarehouseSync(): Promise<void> {
 
   isNJSyncing = true;
   try {
-    await syncNJWarehouse();
+    await withRetry(() => syncNJWarehouse(), { label: 'nj-warehouse' });
   } catch (err: any) {
     logger.error('[Scheduler] NJ warehouse sync failed:', err.message);
   } finally {
@@ -156,7 +157,7 @@ async function runWisersellSync(): Promise<void> {
 
   isWisersellSyncing = true;
   try {
-    await syncWisersell();
+    await withRetry(() => syncWisersell(), { label: 'wisersell' });
   } catch (err: any) {
     logger.error('[Scheduler] Wisersell sync failed:', err.message);
   } finally {
@@ -196,7 +197,7 @@ async function runTransactionSync(): Promise<void> {
       const channels = group.map(m => m.country_code).join(',');
       try {
         logger.info(`[Scheduler] Transaction sync credential ${credId}: ${channels} (via ${representative.country_code})`);
-        await syncTransactionsForMarketplace(representative);
+        await withRetry(() => syncTransactionsForMarketplace(representative), { label: `transactions:cred${credId}` });
       } catch (err: any) {
         logger.error(`[Scheduler] Transaction sync failed for credential ${credId} (${representative.country_code}):`, err.message);
       }
@@ -222,7 +223,7 @@ async function runWayfairSync(): Promise<void> {
 
   isWayfairSyncing = true;
   try {
-    await syncWayfair();
+    await withRetry(() => syncWayfair(), { label: 'wayfair' });
   } catch (err: any) {
     logger.error('[Scheduler] Wayfair sync failed:', err.message);
   } finally {

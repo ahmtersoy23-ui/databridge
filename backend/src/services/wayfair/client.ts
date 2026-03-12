@@ -14,6 +14,35 @@ interface WayfairCredentials {
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
 
+// Simple circuit breaker — prevents hammering Wayfair API during outages
+const CB_THRESHOLD = 3;             // open after 3 consecutive failures
+const CB_COOLDOWN_MS = 5 * 60_000;  // 5min cooldown before half-open retry
+let cbFailures = 0;
+let cbOpenUntil = 0;
+
+function checkCircuitBreaker(): void {
+  if (cbFailures >= CB_THRESHOLD && Date.now() < cbOpenUntil) {
+    const secsLeft = Math.ceil((cbOpenUntil - Date.now()) / 1000);
+    throw new Error(`Wayfair circuit breaker OPEN — ${secsLeft}s until retry (${cbFailures} consecutive failures)`);
+  }
+}
+
+function recordSuccess(): void {
+  if (cbFailures > 0) {
+    logger.info(`[Wayfair] Circuit breaker reset after recovery (was ${cbFailures} failures)`);
+  }
+  cbFailures = 0;
+  cbOpenUntil = 0;
+}
+
+function recordFailure(): void {
+  cbFailures++;
+  if (cbFailures >= CB_THRESHOLD) {
+    cbOpenUntil = Date.now() + CB_COOLDOWN_MS;
+    logger.warn(`[Wayfair] Circuit breaker OPEN after ${cbFailures} failures — cooldown ${CB_COOLDOWN_MS / 1000}s`);
+  }
+}
+
 export function clearWayfairTokenCache(): void {
   cachedToken = null;
   tokenExpiry = 0;
@@ -91,26 +120,34 @@ export async function graphqlQuery<T = unknown>(
   variables?: Record<string, unknown>,
   endpointOverride?: string
 ): Promise<T> {
-  const { token, graphqlUrl } = await getToken();
+  checkCircuitBreaker();
 
-  const res = await axios.post(
-    endpointOverride ?? graphqlUrl,
-    { query, variables },
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 60_000,
+  try {
+    const { token, graphqlUrl } = await getToken();
+
+    const res = await axios.post(
+      endpointOverride ?? graphqlUrl,
+      { query, variables },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 60_000,
+      }
+    );
+
+    if (res.data.errors?.length) {
+      const msg = res.data.errors.map((e: any) => e.message).join('; ');
+      throw new Error(`Wayfair GraphQL error: ${msg}`);
     }
-  );
 
-  if (res.data.errors?.length) {
-    const msg = res.data.errors.map((e: any) => e.message).join('; ');
-    throw new Error(`Wayfair GraphQL error: ${msg}`);
+    recordSuccess();
+    return res.data.data as T;
+  } catch (err) {
+    recordFailure();
+    throw err;
   }
-
-  return res.data.data as T;
 }
 
 /**

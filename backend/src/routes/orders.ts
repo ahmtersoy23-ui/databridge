@@ -22,10 +22,18 @@ router.get('/', async (req: Request, res: Response) => {
       params.push(channel.toLowerCase());
     }
     if (dateFrom && typeof dateFrom === 'string') {
+      if (isNaN(Date.parse(dateFrom))) {
+        res.status(400).json({ success: false, error: 'Invalid dateFrom format' });
+        return;
+      }
       conditions.push(`purchase_date_local >= $${pi++}`);
       params.push(dateFrom);
     }
     if (dateTo && typeof dateTo === 'string') {
+      if (isNaN(Date.parse(dateTo))) {
+        res.status(400).json({ success: false, error: 'Invalid dateTo format' });
+        return;
+      }
       conditions.push(`purchase_date_local <= $${pi++}`);
       params.push(dateTo);
     }
