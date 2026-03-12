@@ -47,15 +47,20 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
           updated_at = NOW()
       `, [client_id, encryptedSecret, use_sandbox, supplier_id ?? null]);
     } else {
-      await pool.query(`
-        INSERT INTO wayfair_credentials (id, client_id, client_secret, use_sandbox, supplier_id)
-        VALUES (1, $1, '', $2, $3)
-        ON CONFLICT (id) DO UPDATE SET
-          client_id = EXCLUDED.client_id,
-          use_sandbox = EXCLUDED.use_sandbox,
-          supplier_id = COALESCE(EXCLUDED.supplier_id, wayfair_credentials.supplier_id),
-          updated_at = NOW()
-      `, [client_id, use_sandbox, supplier_id ?? null]);
+      // Update fields except client_secret — keep existing secret
+      const existing = await pool.query('SELECT id FROM wayfair_credentials WHERE id = 1');
+      if (existing.rows.length > 0) {
+        await pool.query(`
+          UPDATE wayfair_credentials SET
+            client_id = $1, use_sandbox = $2,
+            supplier_id = COALESCE($3, supplier_id),
+            updated_at = NOW()
+          WHERE id = 1
+        `, [client_id, use_sandbox, supplier_id ?? null]);
+      } else {
+        res.status(400).json({ success: false, error: 'Client secret is required for initial setup' });
+        return;
+      }
     }
 
     clearWayfairTokenCache();

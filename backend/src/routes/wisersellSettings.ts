@@ -47,14 +47,16 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
       `, [email, encryptedPassword, api_url]);
     } else {
       // Update email + api_url only, keep existing password
-      await pool.query(`
-        INSERT INTO wisersell_credentials (id, email, password, api_url)
-        VALUES (1, $1, '', $2)
-        ON CONFLICT (id) DO UPDATE SET
-          email = EXCLUDED.email,
-          api_url = EXCLUDED.api_url,
-          updated_at = NOW()
-      `, [email, api_url]);
+      const existing = await pool.query('SELECT id FROM wisersell_credentials WHERE id = 1');
+      if (existing.rows.length > 0) {
+        await pool.query(
+          'UPDATE wisersell_credentials SET email = $1, api_url = $2, updated_at = NOW() WHERE id = 1',
+          [email, api_url]
+        );
+      } else {
+        res.status(400).json({ success: false, error: 'Password is required for initial setup' });
+        return;
+      }
     }
 
     clearWisersellTokenCache();
