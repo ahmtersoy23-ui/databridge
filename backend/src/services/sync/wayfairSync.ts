@@ -154,8 +154,11 @@ async function aggregateToFbaInventory(): Promise<number> {
   await sharedPool.query(`DELETE FROM fba_inventory WHERE warehouse = 'WFS'`);
 
   // Aggregate wayfair_inventory → fba_inventory (only mapped iwasku rows)
+  // Pick the part_number with highest quantity per iwasku as the "asin" identifier
   const result = await pool.query(`
-    SELECT iwasku, SUM(quantity)::int AS fulfillable_quantity
+    SELECT iwasku,
+           SUM(quantity)::int AS fulfillable_quantity,
+           (array_agg(part_number ORDER BY quantity DESC))[1] AS part_number
     FROM wayfair_inventory
     WHERE iwasku IS NOT NULL
     GROUP BY iwasku
@@ -166,23 +169,25 @@ async function aggregateToFbaInventory(): Promise<number> {
   const values: string[] = [];
   const params: unknown[] = [];
 
-  result.rows.forEach((row: { iwasku: string; fulfillable_quantity: number }, idx: number) => {
-    const offset = idx * 4;
-    values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`);
+  result.rows.forEach((row: { iwasku: string; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
+    const offset = idx * 5;
+    values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
     params.push(
       row.iwasku,
       'WFS',
       row.fulfillable_quantity,
-      row.fulfillable_quantity // total_quantity = fulfillable for Wayfair
+      row.fulfillable_quantity, // total_quantity = fulfillable for Wayfair
+      row.part_number || null   // asin = part_number for Wayfair
     );
   });
 
   await sharedPool.query(`
-    INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity)
+    INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity, asin)
     VALUES ${values.join(', ')}
     ON CONFLICT (iwasku, warehouse) DO UPDATE SET
       fulfillable_quantity = EXCLUDED.fulfillable_quantity,
       total_quantity = EXCLUDED.total_quantity,
+      asin = EXCLUDED.asin,
       updated_at = NOW()
   `, params);
 
