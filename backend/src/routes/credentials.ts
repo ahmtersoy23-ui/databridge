@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { authMiddleware } from '../middleware/auth';
+
 import { validateBody } from '../middleware/validate';
 import { clearClientCache } from '../services/spApi/client';
 import logger from '../config/logger';
@@ -34,7 +34,7 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // POST /api/v1/credentials - Add credentials
-router.post('/', authMiddleware, validateBody(credentialSchema), async (req: Request, res: Response) => {
+router.post('/', validateBody(credentialSchema), async (req: Request, res: Response) => {
   const { region, seller_id, refresh_token, client_id, client_secret, account_name } = req.body;
 
   try {
@@ -65,7 +65,7 @@ const updateSchema = z.object({
   account_name: z.string().optional(),
 });
 
-router.put('/:id', authMiddleware, validateBody(updateSchema), async (req: Request, res: Response) => {
+router.put('/:id', validateBody(updateSchema), async (req: Request, res: Response) => {
   const { id } = req.params;
   const fields = req.body;
 
@@ -111,7 +111,7 @@ router.put('/:id', authMiddleware, validateBody(updateSchema), async (req: Reque
 });
 
 // PATCH /api/v1/credentials/:id/toggle - Toggle active status
-router.patch('/:id/toggle', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id/toggle', async (req: Request, res: Response) => {
   try {
     const result = await pool.query(
       'UPDATE sp_api_credentials SET is_active = NOT is_active, updated_at = NOW() WHERE id = $1 RETURNING id, region, seller_id, account_name, is_active',
@@ -131,7 +131,7 @@ router.patch('/:id/toggle', authMiddleware, async (req: Request, res: Response) 
 });
 
 // DELETE /api/v1/credentials/:id - Deactivate credentials
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', async (req: Request, res: Response) => {
   try {
     await pool.query(
       'UPDATE sp_api_credentials SET is_active = false, updated_at = NOW() WHERE id = $1',

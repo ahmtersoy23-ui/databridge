@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import authRouter from './auth';
 import salesRouter from './sales';
 import inventoryRouter from './inventory';
 import syncRouter from './sync';
@@ -14,18 +15,21 @@ import wayfairOrdersRouter from './wayfairOrders';
 import wayfairInventoryRouter from './wayfairInventory';
 import wayfairPartsRouter from './wayfairParts';
 import reviewsRouter from './reviews';
+import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
 
-// StockPulse-compatible endpoints (public - StockPulse authenticates internally)
-router.use('/amazonsales', salesRouter);
-router.use('/amazonfba', inventoryRouter);
+// Public endpoints (no auth)
+router.use('/auth', authRouter);
+router.use('/amazonsales', salesRouter);   // StockPulse reads these
+router.use('/amazonfba', inventoryRouter); // StockPulse reads these
 
-// Browse endpoints (management UI)
+// Auth gate — everything below requires SSO session
+router.use(ssoAuthMiddleware);
+
+// Browse endpoints
 router.use('/orders', ordersRouter);
 router.use('/inventory-detail', inventoryDetailRouter);
-
-// Catalog endpoint
 router.use('/catalog', catalogRouter);
 router.use('/wisersell-settings', wisersellSettingsRouter);
 router.use('/wayfair/settings', wayfairSettingsRouter);
@@ -33,11 +37,7 @@ router.use('/wayfair/mappings', wayfairMappingsRouter);
 router.use('/wayfair/orders', wayfairOrdersRouter);
 router.use('/wayfair/inventory', wayfairInventoryRouter);
 router.use('/wayfair/parts', wayfairPartsRouter);
-
-// Review tracking
 router.use('/reviews', reviewsRouter);
-
-// Management endpoints (auth required)
 router.use('/sync', syncRouter);
 router.use('/status', statusRouter);
 router.use('/credentials', credentialsRouter);

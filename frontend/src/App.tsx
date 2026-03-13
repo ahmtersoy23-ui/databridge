@@ -1,4 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import type { ReactNode } from 'react';
+import axios from 'axios';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
@@ -15,8 +18,65 @@ import WayfairOrdersAnalysis from './pages/WayfairOrdersAnalysis';
 import WayfairInventoryAnalysis from './pages/WayfairInventoryAnalysis';
 import Reviews from './pages/Reviews';
 
+// Axios global config — tüm isteklerde cookie gönder
+axios.defaults.withCredentials = true;
+
+// 401 interceptor — session expired ise SSO'ya yönlendir
+const SSO_PORTAL_URL = import.meta.env.VITE_SSO_PORTAL_URL || 'https://apps.iwa.web.tr';
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      const redirectUrl = encodeURIComponent(window.location.href);
+      window.location.href = `${SSO_PORTAL_URL}?redirect=${redirectUrl}`;
+    }
+    return Promise.reject(err);
+  }
+);
+
 const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis', '/reviews'];
 const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders-analysis', '/wayfair/inventory-analysis', '/wayfair/mappings'];
+
+function UserMenu() {
+  const { user, logout } = useAuth();
+  if (!user) return null;
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{user.name}</span>
+      <button
+        onClick={logout}
+        style={{
+          color: '#94a3b8', background: 'none', border: '1px solid #334155',
+          padding: '0.3rem 0.7rem', borderRadius: '4px', fontSize: '0.8rem',
+          cursor: 'pointer',
+        }}
+      >
+        Logout
+      </button>
+    </div>
+  );
+}
+
+function AuthGate({ children }: { children: ReactNode }) {
+  const { isLoading, isAuthenticated } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#94a3b8' }}>
+        Loading...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    const redirectUrl = encodeURIComponent(window.location.href);
+    window.location.href = `${SSO_PORTAL_URL}?redirect=${redirectUrl}`;
+    return null;
+  }
+
+  return <>{children}</>;
+}
 
 function Nav() {
   const location = useLocation();
@@ -69,13 +129,14 @@ function Nav() {
           Catalog
         </NavLink>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <NavLink to="/settings" style={({ isActive }) => topLink(isActive)}>
             Settings
           </NavLink>
           <NavLink to="/logs" style={({ isActive }) => topLink(isActive)}>
             Logs
           </NavLink>
+          <UserMenu />
         </div>
       </nav>
 
@@ -106,27 +167,31 @@ function Nav() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Nav />
-      <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/sales-analysis" element={<SalesAnalysis />} />
-          <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
-          <Route path="/nj-warehouse" element={<NJWarehouse />} />
-          <Route path="/catalog" element={<Catalog />} />
-          <Route path="/wayfair/orders" element={<WayfairOrders />} />
-          <Route path="/wayfair/inventory" element={<WayfairInventory />} />
-          <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
-          <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
-          <Route path="/wayfair/mappings" element={<WayfairMappings />} />
-          <Route path="/reviews" element={<Reviews />} />
-          <Route path="/logs" element={<Logs />} />
-        </Routes>
-      </main>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <AuthGate>
+          <Nav />
+          <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/sales-analysis" element={<SalesAnalysis />} />
+              <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
+              <Route path="/nj-warehouse" element={<NJWarehouse />} />
+              <Route path="/catalog" element={<Catalog />} />
+              <Route path="/wayfair/orders" element={<WayfairOrders />} />
+              <Route path="/wayfair/inventory" element={<WayfairInventory />} />
+              <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
+              <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
+              <Route path="/wayfair/mappings" element={<WayfairMappings />} />
+              <Route path="/reviews" element={<Reviews />} />
+              <Route path="/logs" element={<Logs />} />
+            </Routes>
+          </main>
+        </AuthGate>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

@@ -30,6 +30,8 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_SSO_PORTAL_URL: https://apps.iwa.web.tr
 
       - name: Clean old frontend assets
         uses: appleboy/ssh-action@v1.0.3

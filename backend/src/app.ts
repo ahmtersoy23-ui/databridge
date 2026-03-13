@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
@@ -17,6 +18,7 @@ export function createApp(): Application {
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }));
   app.use(compression());
+  app.use(cookieParser());
   const corsOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
     : (process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173', 'http://localhost:3008']);
