@@ -25,12 +25,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initialize = async () => {
-      // Check for SSO token in URL hash (SSO portal redirect)
+      // Check for SSO token — hash first, then query param fallback
       let ssoToken: string | null = null;
       const hash = window.location.hash;
       if (hash) {
         const hashParams = new URLSearchParams(hash.substring(1));
         ssoToken = hashParams.get('token');
+      }
+      if (!ssoToken) {
+        const urlParams = new URLSearchParams(window.location.search);
+        ssoToken = urlParams.get('token');
       }
 
       if (ssoToken) {
