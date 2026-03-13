@@ -15,7 +15,7 @@ import WayfairOrdersAnalysis from './pages/WayfairOrdersAnalysis';
 import WayfairInventoryAnalysis from './pages/WayfairInventoryAnalysis';
 import Reviews from './pages/Reviews';
 
-const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis'];
+const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis', '/reviews'];
 const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders-analysis', '/wayfair/inventory-analysis', '/wayfair/mappings'];
 
 function Nav() {
@@ -69,10 +69,6 @@ function Nav() {
           Catalog
         </NavLink>
 
-        <NavLink to="/reviews" style={({ isActive }) => topLink(isActive)}>
-          Reviews
-        </NavLink>
-
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
           <NavLink to="/settings" style={({ isActive }) => topLink(isActive)}>
             Settings
@@ -90,6 +86,7 @@ function Nav() {
           <NavLink to="/inventory" style={subLink}>Inventory</NavLink>
           <NavLink to="/sales-analysis" style={subLink}>Sales Analysis</NavLink>
           <NavLink to="/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
+          <NavLink to="/reviews" style={subLink}>Reviews</NavLink>
         </nav>
       )}
 
