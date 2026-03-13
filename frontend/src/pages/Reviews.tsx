@@ -16,6 +16,8 @@ interface ReviewRow {
   checked_at: string | null;
   updated_at: string | null;
   label: string | null;
+  prev_rating: string | null;
+  prev_review_count: number | null;
 }
 
 interface TrackedRow {
@@ -284,6 +286,33 @@ export default function Reviews() {
     return '#dc2626';
   };
 
+  const getStatus = (r: ReviewRow): { label: string; color: string; bg: string } | null => {
+    if (r.prev_review_count == null) return null; // no previous data
+    if (r.review_count === r.prev_review_count && r.rating === r.prev_rating) return null; // no change
+
+    const countChanged = r.review_count !== r.prev_review_count;
+    const currRating = r.rating ? parseFloat(r.rating) : null;
+    const prevRating = r.prev_rating ? parseFloat(r.prev_rating) : null;
+
+    if (countChanged && currRating != null && prevRating != null && currRating < prevRating) {
+      return { label: 'Rating Down', color: '#dc2626', bg: '#fef2f2' };
+    }
+    if (countChanged && currRating != null && prevRating != null && currRating > prevRating) {
+      return { label: 'Rating Up', color: '#059669', bg: '#f0fdf4' };
+    }
+    if (countChanged) {
+      return { label: 'Count Changed', color: '#d97706', bg: '#fffbeb' };
+    }
+    // only rating changed (without count change)
+    if (currRating != null && prevRating != null && currRating < prevRating) {
+      return { label: 'Rating Down', color: '#dc2626', bg: '#fef2f2' };
+    }
+    if (currRating != null && prevRating != null && currRating > prevRating) {
+      return { label: 'Rating Up', color: '#059669', bg: '#f0fdf4' };
+    }
+    return null;
+  };
+
   return (
     <div>
       <h1 style={{ marginBottom: '1rem' }}>Reviews</h1>
@@ -361,6 +390,7 @@ export default function Reviews() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '90px' }}>Status</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>ASIN</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
                   <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
@@ -376,6 +406,21 @@ export default function Reviews() {
                     borderBottom: '1px solid #f1f5f9',
                     opacity: r.is_blocked ? 0.5 : 1,
                   }}>
+                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                      {(() => {
+                        const status = getStatus(r);
+                        if (!status) return <span style={{ color: '#d1d5db', fontSize: '0.75rem' }}>—</span>;
+                        return (
+                          <span style={{
+                            fontSize: '0.72rem', fontWeight: 600, padding: '0.15rem 0.5rem',
+                            borderRadius: '4px', background: status.bg, color: status.color,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {status.label}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td style={{ padding: '0.5rem' }}>
                       <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.asin}</div>
                       {r.label && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{r.label}</div>}
@@ -428,7 +473,7 @@ export default function Reviews() {
                 ))}
                 {!reviewsLoading && filteredReviews.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                       No review data yet. Add ASINs and run the fetcher.
                     </td>
                   </tr>

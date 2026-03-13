@@ -15,9 +15,18 @@ router.get('/', async (req: Request, res: Response) => {
              pr.last_review_title, pr.last_review_text, pr.last_review_rating,
              pr.last_review_date, pr.last_review_author,
              pr.is_blocked, pr.checked_at, pr.updated_at,
-             rta.label
+             rta.label,
+             prev.rating AS prev_rating,
+             prev.review_count AS prev_review_count
       FROM product_reviews pr
       LEFT JOIN review_tracked_asins rta ON pr.asin = rta.asin AND pr.country_code = rta.country_code
+      LEFT JOIN LATERAL (
+        SELECT rating, review_count
+        FROM product_reviews_history h
+        WHERE h.asin = pr.asin AND h.country_code = pr.country_code
+        ORDER BY h.recorded_at DESC
+        OFFSET 1 LIMIT 1
+      ) prev ON true
       WHERE 1=1
     `;
     const params: any[] = [];
