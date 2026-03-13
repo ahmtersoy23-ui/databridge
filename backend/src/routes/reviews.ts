@@ -59,6 +59,29 @@ router.get('/:asin/history', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/v1/reviews/:asin/items — Archived review items for an ASIN
+router.get('/:asin/items', async (req: Request, res: Response) => {
+  try {
+    const { asin } = req.params;
+    const { country_code } = req.query;
+
+    let query = 'SELECT id, asin, country_code, title, body, rating, review_date, author, is_verified, fetched_at FROM product_review_items WHERE asin = $1';
+    const params: any[] = [asin.toUpperCase()];
+
+    if (country_code) {
+      params.push(String(country_code).toUpperCase());
+      query += ` AND country_code = $${params.length}`;
+    }
+
+    query += ' ORDER BY fetched_at DESC LIMIT 50';
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/v1/reviews/tracked — List tracked ASINs
 router.get('/tracked', async (_req: Request, res: Response) => {
   try {

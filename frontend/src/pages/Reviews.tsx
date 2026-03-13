@@ -33,6 +33,17 @@ interface HistoryRow {
   recorded_at: string;
 }
 
+interface ReviewItem {
+  id: number;
+  title: string | null;
+  body: string | null;
+  rating: string | null;
+  review_date: string | null;
+  author: string | null;
+  is_verified: boolean;
+  fetched_at: string;
+}
+
 const cardStyle = {
   background: '#fff',
   borderRadius: '8px',
@@ -87,11 +98,14 @@ export default function Reviews() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // History modal
+  // History/Review items modal
   const [historyAsin, setHistoryAsin] = useState<string | null>(null);
   const [historyCountry, setHistoryCountry] = useState('');
+  const [modalTab, setModalTab] = useState<'history' | 'items'>('history');
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+  const [reviewItemsLoading, setReviewItemsLoading] = useState(false);
 
   // Message
   const [message, setMessage] = useState('');
@@ -133,8 +147,10 @@ export default function Reviews() {
   const openHistory = async (asin: string, countryCode: string) => {
     setHistoryAsin(asin);
     setHistoryCountry(countryCode);
+    setModalTab('history');
     setHistoryLoading(true);
     setHistory([]);
+    setReviewItems([]);
     try {
       const res = await axios.get(`/api/v1/reviews/${asin}/history`, {
         params: { country_code: countryCode },
@@ -144,6 +160,21 @@ export default function Reviews() {
       // ignore
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const fetchReviewItems = async (asin: string, countryCode: string) => {
+    setReviewItemsLoading(true);
+    setReviewItems([]);
+    try {
+      const res = await axios.get(`/api/v1/reviews/${asin}/items`, {
+        params: { country_code: countryCode },
+      });
+      if (res.data.success) setReviewItems(res.data.data);
+    } catch {
+      // ignore
+    } finally {
+      setReviewItemsLoading(false);
     }
   };
 
@@ -516,56 +547,135 @@ export default function Reviews() {
             onClick={e => e.stopPropagation()}
             style={{
               background: '#fff', borderRadius: '12px', padding: '1.5rem',
-              width: '500px', maxHeight: '70vh', overflow: 'auto',
+              width: '600px', maxHeight: '75vh', overflow: 'auto',
               boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
               <h3 style={{ margin: 0 }}>
-                History: <span style={{ fontFamily: 'monospace' }}>{historyAsin}</span>
+                <span style={{ fontFamily: 'monospace' }}>{historyAsin}</span>
                 <span style={{ fontSize: '0.8rem', color: '#64748b', marginLeft: '0.5rem' }}>({historyCountry})</span>
               </h3>
               <button onClick={() => setHistoryAsin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#94a3b8' }}>✕</button>
             </div>
 
-            {historyLoading ? (
-              <p style={{ color: '#94a3b8' }}>Loading...</p>
-            ) : history.length === 0 ? (
-              <p style={{ color: '#94a3b8' }}>No history records yet.</p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
-                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Reviews</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.map((h, i) => {
-                    const prev = history[i + 1];
-                    const countDiff = prev ? h.review_count - prev.review_count : 0;
-                    return (
-                      <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
-                          {fmtDate(h.recorded_at)}
-                        </td>
-                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: ratingColor(h.rating) }}>
-                          {h.rating ? Number(h.rating).toFixed(1) : '—'}
-                        </td>
-                        <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
-                          {h.review_count.toLocaleString()}
-                          {countDiff > 0 && (
-                            <span style={{ color: '#059669', fontSize: '0.75rem', marginLeft: '0.35rem' }}>
-                              +{countDiff}
-                            </span>
-                          )}
-                        </td>
+            {/* Modal tabs */}
+            <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '2px solid #e2e8f0', marginBottom: '1rem' }}>
+              <button
+                style={tabBtn(modalTab === 'history')}
+                onClick={() => setModalTab('history')}
+              >
+                History
+              </button>
+              <button
+                style={tabBtn(modalTab === 'items')}
+                onClick={() => {
+                  setModalTab('items');
+                  if (reviewItems.length === 0 && !reviewItemsLoading) {
+                    fetchReviewItems(historyAsin!, historyCountry);
+                  }
+                }}
+              >
+                Reviews
+              </button>
+            </div>
+
+            {/* History tab */}
+            {modalTab === 'history' && (
+              <>
+                {historyLoading ? (
+                  <p style={{ color: '#94a3b8' }}>Loading...</p>
+                ) : history.length === 0 ? (
+                  <p style={{ color: '#94a3b8' }}>No history records yet.</p>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
+                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
+                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Reviews</th>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody>
+                      {history.map((h, i) => {
+                        const prev = history[i + 1];
+                        const countDiff = prev ? h.review_count - prev.review_count : 0;
+                        return (
+                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                              {fmtDate(h.recorded_at)}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: ratingColor(h.rating) }}>
+                              {h.rating ? Number(h.rating).toFixed(1) : '—'}
+                            </td>
+                            <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                              {h.review_count.toLocaleString()}
+                              {countDiff > 0 && (
+                                <span style={{ color: '#059669', fontSize: '0.75rem', marginLeft: '0.35rem' }}>
+                                  +{countDiff}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </>
+            )}
+
+            {/* Review items tab */}
+            {modalTab === 'items' && (
+              <>
+                {reviewItemsLoading ? (
+                  <p style={{ color: '#94a3b8' }}>Loading...</p>
+                ) : reviewItems.length === 0 ? (
+                  <p style={{ color: '#94a3b8' }}>No review items yet. Run the fetcher first.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    {reviewItems.map(item => (
+                      <div key={item.id} style={{
+                        padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '8px',
+                        background: '#fafafa',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            {item.rating && (
+                              <span style={{ color: ratingColor(item.rating), fontWeight: 600, fontSize: '0.85rem' }}>
+                                {'★'.repeat(Math.round(Number(item.rating)))}{'☆'.repeat(5 - Math.round(Number(item.rating)))}
+                              </span>
+                            )}
+                            {item.is_verified && (
+                              <span style={{ background: '#dbeafe', color: '#2563eb', fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                                Verified
+                              </span>
+                            )}
+                          </div>
+                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                            {item.author}
+                          </span>
+                        </div>
+                        {item.title && (
+                          <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                            {item.title}
+                          </div>
+                        )}
+                        {item.body && (
+                          <div style={{ fontSize: '0.82rem', color: '#374151', lineHeight: 1.5 }}>
+                            {item.body.length > 200 ? item.body.substring(0, 200) + '...' : item.body}
+                          </div>
+                        )}
+                        {item.review_date && (
+                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                            {item.review_date}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

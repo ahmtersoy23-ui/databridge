@@ -34,17 +34,19 @@ function randomUA(): string {
 
 // --- Types ---
 
-export interface ProductRating {
-  rating: number;
-  reviewCount: number;
-}
-
-export interface LatestReview {
+export interface ParsedReview {
   title: string;
-  text: string;
+  body: string;
   rating: number | null;
   date: string;
   author: string;
+  isVerified: boolean;
+}
+
+export interface ReviewsPageResult {
+  rating: number | null;
+  reviewCount: number | null;
+  reviews: ParsedReview[];
 }
 
 // --- CAPTCHA detection ---
@@ -111,35 +113,7 @@ async function fetchPage(url: string, countryCode: string): Promise<string | nul
   }
 }
 
-// --- Parse rating + review count from product page ---
-
-export async function fetchProductRating(asin: string, countryCode: string): Promise<ProductRating | null> {
-  const config = AMAZON_DOMAINS[countryCode];
-  if (!config) return null;
-
-  const url = `https://www.${config.domain}/dp/${asin}`;
-  const html = await fetchPage(url, countryCode);
-  if (!html) return null;
-
-  try {
-    const $ = cheerio.load(html);
-    const rating = parseRating($);
-    const reviewCount = parseReviewCount($);
-
-    if (rating === null && reviewCount === null) {
-      logger.warn(`[ReviewFetcher] Could not parse rating/count for ${asin} (${countryCode})`);
-      return null;
-    }
-
-    return {
-      rating: rating ?? 0,
-      reviewCount: reviewCount ?? 0,
-    };
-  } catch (err: any) {
-    logger.error(`[ReviewFetcher] Parse error for ${asin} (${countryCode}): ${err.message}`);
-    return null;
-  }
-}
+// --- Parse rating from review page header ---
 
 function parseRating($: cheerio.CheerioAPI): number | null {
   const selectors = [
@@ -147,6 +121,7 @@ function parseRating($: cheerio.CheerioAPI): number | null {
     'span[data-hook="rating-out-of-text"]',
     'i.a-icon-star span.a-icon-alt',
     '#averageCustomerReviews .a-icon-alt',
+    'i[data-hook="average-star-rating"] span.a-icon-alt',
   ];
 
   for (const sel of selectors) {
@@ -163,12 +138,15 @@ function parseRating($: cheerio.CheerioAPI): number | null {
   return null;
 }
 
+// --- Parse review count from review page header ---
+
 function parseReviewCount($: cheerio.CheerioAPI): number | null {
   const selectors = [
     '#acrCustomerReviewText',
     '#acrCustomerReviewLink span',
     'span[data-hook="total-review-count"]',
     '#averageCustomerReviews #acrCustomerReviewLink',
+    'div[data-hook="cr-filter-info-review-rating-count"]',
   ];
 
   for (const sel of selectors) {
@@ -183,45 +161,60 @@ function parseReviewCount($: cheerio.CheerioAPI): number | null {
   return null;
 }
 
-// --- Parse latest review from reviews page ---
+// --- Parse single review element ---
 
-export async function fetchLatestReview(asin: string, countryCode: string): Promise<LatestReview | null> {
+function parseReviewElement(reviewEl: cheerio.Cheerio<any>, $: cheerio.CheerioAPI): ParsedReview {
+  const title = reviewEl.find('a[data-hook="review-title"] span:not(.a-icon-alt)').text().trim()
+    || reviewEl.find('[data-hook="review-title"]').text().trim();
+
+  const rawBody = reviewEl.find('span[data-hook="review-body"] span').first().text().trim()
+    || reviewEl.find('span[data-hook="review-body"]').text().trim();
+  const body = rawBody.substring(0, 500);
+
+  const ratingText = reviewEl.find('i[data-hook="review-star-rating"] span.a-icon-alt').text().trim()
+    || reviewEl.find('i[data-hook="cmps-review-star-rating"] span.a-icon-alt').text().trim();
+  let rating: number | null = null;
+  if (ratingText) {
+    const match = ratingText.match(/([\d.,]+)/);
+    if (match) rating = parseFloat(match[1].replace(',', '.'));
+  }
+
+  const date = reviewEl.find('span[data-hook="review-date"]').text().trim();
+  const author = reviewEl.find('span.a-profile-name').first().text().trim();
+  const isVerified = reviewEl.find('span[data-hook="avp-badge"]').length > 0;
+
+  return { title, body, rating, date, author, isVerified };
+}
+
+// --- Main: fetch reviews page (rating + count + reviews) ---
+
+export async function fetchReviewsPage(asin: string, countryCode: string, pageNumber: number = 1): Promise<ReviewsPageResult | null> {
   const config = AMAZON_DOMAINS[countryCode];
   if (!config) return null;
 
-  const url = `https://www.${config.domain}/product-reviews/${asin}/?sortBy=recent&pageNumber=1`;
+  const url = `https://www.${config.domain}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
   const html = await fetchPage(url, countryCode);
   if (!html) return null;
 
   try {
     const $ = cheerio.load(html);
 
-    const reviewEl = $('[data-hook="review"]').first();
-    if (!reviewEl.length) {
-      logger.warn(`[ReviewFetcher] No reviews found on page for ${asin} (${countryCode})`);
+    const rating = parseRating($);
+    const reviewCount = parseReviewCount($);
+    const reviews: ParsedReview[] = [];
+
+    $('[data-hook="review"]').each((_i, el) => {
+      reviews.push(parseReviewElement($(el), $));
+    });
+
+    if (rating === null && reviewCount === null && reviews.length === 0) {
+      logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode}) page ${pageNumber}`);
       return null;
     }
 
-    const title = reviewEl.find('a[data-hook="review-title"] span:not(.a-icon-alt)').text().trim()
-      || reviewEl.find('[data-hook="review-title"]').text().trim();
-
-    const text = reviewEl.find('span[data-hook="review-body"] span').first().text().trim()
-      || reviewEl.find('span[data-hook="review-body"]').text().trim();
-
-    const ratingText = reviewEl.find('i[data-hook="review-star-rating"] span.a-icon-alt').text().trim()
-      || reviewEl.find('i[data-hook="cmps-review-star-rating"] span.a-icon-alt').text().trim();
-    let rating: number | null = null;
-    if (ratingText) {
-      const match = ratingText.match(/([\d.,]+)/);
-      if (match) rating = parseFloat(match[1].replace(',', '.'));
-    }
-
-    const date = reviewEl.find('span[data-hook="review-date"]').text().trim();
-    const author = reviewEl.find('span.a-profile-name').first().text().trim();
-
-    return { title, text, rating, date, author };
+    return { rating, reviewCount, reviews };
   } catch (err: any) {
-    logger.error(`[ReviewFetcher] Review parse error for ${asin} (${countryCode}): ${err.message}`);
+    logger.error(`[ReviewFetcher] Parse error for ${asin} (${countryCode}): ${err.message}`);
     return null;
   }
 }
