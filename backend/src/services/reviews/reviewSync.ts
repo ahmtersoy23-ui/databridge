@@ -61,8 +61,8 @@ export async function runReviewTracking(): Promise<void> {
         continue;
       }
 
-      // Single request: reviews page has rating + count + reviews
-      const result = await fetchReviewsPage(item.asin, item.country_code, 1);
+      // Single request: product page has rating + count + ~8 reviews
+      const result = await fetchReviewsPage(item.asin, item.country_code);
 
       if (!result) {
         consecutiveBlocks++;
@@ -90,17 +90,6 @@ export async function runReviewTracking(): Promise<void> {
       if (result.reviews.length > 0) {
         newReviewCount = await insertReviewItems(item.asin, item.country_code, result.reviews);
         logger.info(`[ReviewSync] ${item.asin} (${item.country_code}): ${rating}★, ${reviewCount} reviews, ${newReviewCount} new archived`);
-      }
-
-      // Smart pagination: all 10 reviews were new → check page 2
-      if (newReviewCount === result.reviews.length && result.reviews.length >= 10) {
-        logger.info(`[ReviewSync] All ${newReviewCount} reviews new for ${item.asin} — fetching page 2`);
-        await randomDelay();
-        const page2 = await fetchReviewsPage(item.asin, item.country_code, 2);
-        if (page2 && page2.reviews.length > 0) {
-          const newPage2 = await insertReviewItems(item.asin, item.country_code, page2.reviews);
-          logger.info(`[ReviewSync] Page 2: ${newPage2} new reviews archived`);
-        }
       }
 
       processed++;

@@ -186,13 +186,15 @@ function parseReviewElement(reviewEl: cheerio.Cheerio<any>, $: cheerio.CheerioAP
   return { title, body, rating, date, author, isVerified };
 }
 
-// --- Main: fetch reviews page (rating + count + reviews) ---
+// --- Main: fetch product page (rating + count + reviews) ---
+// Note: /product-reviews/ page now requires login, so we use /dp/ which
+// returns rating, count AND ~8 recent reviews in server-rendered HTML.
 
-export async function fetchReviewsPage(asin: string, countryCode: string, pageNumber: number = 1): Promise<ReviewsPageResult | null> {
+export async function fetchReviewsPage(asin: string, countryCode: string): Promise<ReviewsPageResult | null> {
   const config = AMAZON_DOMAINS[countryCode];
   if (!config) return null;
 
-  const url = `https://www.${config.domain}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
+  const url = `https://www.${config.domain}/dp/${asin}`;
   const html = await fetchPage(url, countryCode);
   if (!html) return null;
 
@@ -208,7 +210,7 @@ export async function fetchReviewsPage(asin: string, countryCode: string, pageNu
     });
 
     if (rating === null && reviewCount === null && reviews.length === 0) {
-      logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode}) page ${pageNumber}`);
+      logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode})`);
       return null;
     }
 
