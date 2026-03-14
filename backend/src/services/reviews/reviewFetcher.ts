@@ -119,7 +119,6 @@ function parseRating($: cheerio.CheerioAPI): number | null {
   const selectors = [
     '#acrPopover .a-icon-alt',
     'span[data-hook="rating-out-of-text"]',
-    'i.a-icon-star span.a-icon-alt',
     '#averageCustomerReviews .a-icon-alt',
     'i[data-hook="average-star-rating"] span.a-icon-alt',
   ];
@@ -212,6 +211,12 @@ export async function fetchReviewsPage(asin: string, countryCode: string): Promi
     if (rating === null && reviewCount === null && reviews.length === 0) {
       logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode})`);
       return null;
+    }
+
+    // Rating count 0/null ise rating ortalaması da olamaz — false positive temizle
+    if (rating !== null && (reviewCount === null || reviewCount === 0)) {
+      logger.warn(`[ReviewFetcher] ${asin} (${countryCode}): rating=${rating} but reviewCount=${reviewCount} — clearing rating`);
+      return { rating: null, reviewCount: null, reviews: [] };
     }
 
     return { rating, reviewCount, reviews };
