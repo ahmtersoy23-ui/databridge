@@ -4,6 +4,7 @@ import logger from '../../config/logger';
 
 const MAX_CONSECUTIVE_BLOCKS = 5;
 const CIRCUIT_BREAKER_PAUSE_MS = 30 * 60 * 1000; // 30 min
+const FETCH_COOLDOWN_DAYS = 7;
 
 interface TrackedAsin {
   id: number;
@@ -20,6 +21,19 @@ interface ExistingReview {
 }
 
 export async function runReviewTracking(): Promise<void> {
+  // Cooldown guard — skip if last fetch was less than 7 days ago
+  const cooldownResult = await pool.query(
+    "SELECT MAX(started_at) AS last_fetch FROM sync_jobs WHERE job_type = 'review_tracking' AND status = 'completed'"
+  );
+  const lastFetch = cooldownResult.rows[0]?.last_fetch;
+  if (lastFetch) {
+    const daysSince = (Date.now() - new Date(lastFetch).getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince < FETCH_COOLDOWN_DAYS) {
+      logger.info(`[ReviewSync] Skipping — last fetch was ${daysSince.toFixed(1)} days ago (min ${FETCH_COOLDOWN_DAYS})`);
+      return;
+    }
+  }
+
   const jobId = await createSyncJob();
 
   try {

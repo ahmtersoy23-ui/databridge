@@ -2,11 +2,14 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
+import { runReviewSync } from '../services/sync/scheduler';
 import logger from '../config/logger';
+
+const FETCH_COOLDOWN_DAYS = 7;
 
 const router = Router();
 
-// GET /api/v1/reviews — Current rating/review snapshot for all tracked ASINs
+// GET /api/v1/reviews — Snapshot + period trend for all active tracked ASINs
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { country_code } = req.query;
@@ -17,9 +20,13 @@ router.get('/', async (req: Request, res: Response) => {
              pr.is_blocked, pr.checked_at, pr.updated_at,
              rta.label,
              prev.rating AS prev_rating,
-             prev.review_count AS prev_review_count
+             prev.review_count AS prev_review_count,
+             h7.rating AS rating_7d, h7.review_count AS count_7d,
+             h30.rating AS rating_30d, h30.review_count AS count_30d,
+             h90.rating AS rating_90d, h90.review_count AS count_90d
       FROM product_reviews pr
-      LEFT JOIN review_tracked_asins rta ON pr.asin = rta.asin AND pr.country_code = rta.country_code
+      INNER JOIN review_tracked_asins rta
+        ON pr.asin = rta.asin AND pr.country_code = rta.country_code AND rta.is_active = true
       LEFT JOIN LATERAL (
         SELECT rating, review_count
         FROM product_reviews_history h
@@ -27,6 +34,27 @@ router.get('/', async (req: Request, res: Response) => {
         ORDER BY h.recorded_at DESC
         OFFSET 1 LIMIT 1
       ) prev ON true
+      LEFT JOIN LATERAL (
+        SELECT rating, review_count
+        FROM product_reviews_history h
+        WHERE h.asin = pr.asin AND h.country_code = pr.country_code
+          AND h.recorded_at <= NOW() - INTERVAL '7 days'
+        ORDER BY h.recorded_at DESC LIMIT 1
+      ) h7 ON true
+      LEFT JOIN LATERAL (
+        SELECT rating, review_count
+        FROM product_reviews_history h
+        WHERE h.asin = pr.asin AND h.country_code = pr.country_code
+          AND h.recorded_at <= NOW() - INTERVAL '30 days'
+        ORDER BY h.recorded_at DESC LIMIT 1
+      ) h30 ON true
+      LEFT JOIN LATERAL (
+        SELECT rating, review_count
+        FROM product_reviews_history h
+        WHERE h.asin = pr.asin AND h.country_code = pr.country_code
+          AND h.recorded_at <= NOW() - INTERVAL '90 days'
+        ORDER BY h.recorded_at DESC LIMIT 1
+      ) h90 ON true
       WHERE 1=1
     `;
     const params: any[] = [];
@@ -40,6 +68,26 @@ router.get('/', async (req: Request, res: Response) => {
 
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/v1/reviews/fetch-status — Last fetch info + next available date
+router.get('/fetch-status', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      "SELECT status, started_at, completed_at, records_processed FROM sync_jobs WHERE job_type = 'review_tracking' ORDER BY id DESC LIMIT 1"
+    );
+    const lastJob = result.rows[0] || null;
+
+    let nextAvailableAt: string | null = null;
+    if (lastJob?.started_at) {
+      const next = new Date(new Date(lastJob.started_at).getTime() + FETCH_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+      nextAvailableAt = next.toISOString();
+    }
+
+    res.json({ success: true, data: { lastJob, nextAvailableAt } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -98,6 +146,35 @@ router.get('/tracked', async (_req: Request, res: Response) => {
       'SELECT id, asin, country_code, label, is_active, created_at FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
     );
     res.json({ success: true, data: result.rows });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/v1/reviews/fetch — Trigger review fetch with 7-day cooldown
+router.post('/fetch', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      "SELECT MAX(started_at) AS last_fetch FROM sync_jobs WHERE job_type = 'review_tracking' AND status IN ('completed', 'running')"
+    );
+    const lastFetch = result.rows[0]?.last_fetch;
+
+    if (lastFetch) {
+      const daysSince = (Date.now() - new Date(lastFetch).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSince < FETCH_COOLDOWN_DAYS) {
+        const nextAvailableAt = new Date(new Date(lastFetch).getTime() + FETCH_COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+        res.status(400).json({
+          success: false,
+          error: `Too soon. Last fetch was ${daysSince.toFixed(1)} days ago (min ${FETCH_COOLDOWN_DAYS}).`,
+          lastFetchAt: lastFetch,
+          nextAvailableAt: nextAvailableAt.toISOString(),
+        });
+        return;
+      }
+    }
+
+    runReviewSync().catch(err => logger.error('[Reviews] Manual fetch error:', err));
+    res.json({ success: true, message: 'Review fetch started' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -18,6 +18,17 @@ interface ReviewRow {
   label: string | null;
   prev_rating: string | null;
   prev_review_count: number | null;
+  rating_7d: string | null;
+  count_7d: number | null;
+  rating_30d: string | null;
+  count_30d: number | null;
+  rating_90d: string | null;
+  count_90d: number | null;
+}
+
+interface FetchStatus {
+  lastJob: { status: string; started_at: string; completed_at: string | null; records_processed: number } | null;
+  nextAvailableAt: string | null;
 }
 
 interface TrackedRow {
@@ -109,6 +120,10 @@ export default function Reviews() {
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [reviewItemsLoading, setReviewItemsLoading] = useState(false);
 
+  // Fetch status
+  const [fetchStatus, setFetchStatus] = useState<FetchStatus | null>(null);
+  const [fetching, setFetching] = useState(false);
+
   // Message
   const [message, setMessage] = useState('');
 
@@ -144,6 +159,30 @@ export default function Reviews() {
     if (tab === 'reviews') fetchReviews();
     else fetchTracked();
   }, [tab]);
+
+  // --- Fetch status (for Fetch Reviews button) ---
+  useEffect(() => {
+    axios.get('/api/v1/reviews/fetch-status').then(res => {
+      if (res.data.success) setFetchStatus(res.data.data);
+    }).catch(() => {});
+  }, []);
+
+  // --- Trigger review fetch ---
+  const handleFetch = async () => {
+    setFetching(true);
+    setMessage('');
+    try {
+      const res = await axios.post('/api/v1/reviews/fetch');
+      setMessage(res.data.message || 'Fetch started');
+      // Refresh fetch status
+      const statusRes = await axios.get('/api/v1/reviews/fetch-status');
+      if (statusRes.data.success) setFetchStatus(statusRes.data.data);
+    } catch (err: any) {
+      setMessage(err.response?.data?.error || 'Fetch failed');
+    } finally {
+      setFetching(false);
+    }
+  };
 
   // --- Fetch history ---
   const openHistory = async (asin: string, countryCode: string) => {
@@ -368,10 +407,29 @@ export default function Reviews() {
               Refresh
             </button>
 
-            <div style={{ marginLeft: 'auto' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
               <button onClick={handleResetBlocks} style={btnStyle('#d97706')}>
                 Reset Blocks
               </button>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
+                <button
+                  onClick={handleFetch}
+                  disabled={fetching || (fetchStatus?.nextAvailableAt ? new Date(fetchStatus.nextAvailableAt) > new Date() : false)}
+                  style={btnStyle('#7c3aed', fetching || (fetchStatus?.nextAvailableAt ? new Date(fetchStatus.nextAvailableAt) > new Date() : false))}
+                >
+                  {fetching ? 'Fetching...' : 'Fetch Reviews'}
+                </button>
+                {fetchStatus?.nextAvailableAt && new Date(fetchStatus.nextAvailableAt) > new Date() && (
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    Next: {new Date(fetchStatus.nextAvailableAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                  </span>
+                )}
+                {fetchStatus?.lastJob && (
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    Last: {new Date(fetchStatus.lastJob.started_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} ({fetchStatus.lastJob.records_processed} processed)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -395,6 +453,9 @@ export default function Reviews() {
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
                   <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
                   <th style={{ textAlign: 'right', padding: '0.5rem' }}>Reviews</th>
+                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>7d</th>
+                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>30d</th>
+                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>90d</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Latest Review</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Checked</th>
                   <th style={{ padding: '0.5rem', width: '70px' }}></th>
@@ -439,6 +500,33 @@ export default function Reviews() {
                     <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
                       {r.review_count.toLocaleString()}
                     </td>
+                    {/* 7d / 30d / 90d diff columns */}
+                    {([
+                      { count: r.count_7d, rating: r.rating_7d },
+                      { count: r.count_30d, rating: r.rating_30d },
+                      { count: r.count_90d, rating: r.rating_90d },
+                    ] as const).map((period, idx) => {
+                      const diff = period.count != null ? r.review_count - period.count : null;
+                      const currRating = r.rating ? parseFloat(r.rating) : null;
+                      const periodRating = period.rating ? parseFloat(period.rating) : null;
+                      const ratingUp = currRating != null && periodRating != null && currRating > periodRating;
+                      const ratingDown = currRating != null && periodRating != null && currRating < periodRating;
+                      return (
+                        <td key={idx} style={{ padding: '0.5rem', textAlign: 'center', fontFamily: 'monospace', fontSize: '0.8rem', width: '60px' }}>
+                          {diff == null ? (
+                            <span style={{ color: '#d1d5db' }}>—</span>
+                          ) : (
+                            <span>
+                              <span style={{ color: diff > 0 ? '#059669' : '#64748b' }}>
+                                {diff > 0 ? `+${diff}` : diff === 0 ? '0' : String(diff)}
+                              </span>
+                              {ratingUp && <span style={{ color: '#059669', fontSize: '0.7rem', marginLeft: '2px' }}>▲</span>}
+                              {ratingDown && <span style={{ color: '#dc2626', fontSize: '0.7rem', marginLeft: '2px' }}>▼</span>}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td style={{ padding: '0.5rem', maxWidth: '250px' }}>
                       {r.last_review_title ? (
                         <div title={r.last_review_text || ''}>
@@ -473,7 +561,7 @@ export default function Reviews() {
                 ))}
                 {!reviewsLoading && filteredReviews.length === 0 && (
                   <tr>
-                    <td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                       No review data yet. Add ASINs and run the fetcher.
                     </td>
                   </tr>
