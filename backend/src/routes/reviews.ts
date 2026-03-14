@@ -95,7 +95,7 @@ router.get('/:asin/items', async (req: Request, res: Response) => {
 router.get('/tracked', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, asin, country_code, label, is_active, created_at FROM review_tracked_asins ORDER BY country_code, asin'
+      'SELECT id, asin, country_code, label, is_active, created_at FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
     );
     res.json({ success: true, data: result.rows });
   } catch (err: any) {
