@@ -209,8 +209,8 @@ export async function fetchReviewsPage(asin: string, countryCode: string): Promi
     });
 
     if (rating === null && reviewCount === null && reviews.length === 0) {
-      logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode})`);
-      return null;
+      logger.info(`[ReviewFetcher] No rating/review data for ${asin} (${countryCode})`);
+      return { rating: null, reviewCount: null, reviews: [] };
     }
 
     // Rating count 0/null ise rating ortalaması da olamaz — false positive temizle
