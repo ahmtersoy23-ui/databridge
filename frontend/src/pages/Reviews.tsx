@@ -456,7 +456,7 @@ export default function Reviews() {
                   <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>7d</th>
                   <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>30d</th>
                   <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>90d</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Latest Review</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Fetched Review</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Checked</th>
                   <th style={{ padding: '0.5rem', width: '70px' }}></th>
                 </tr>
