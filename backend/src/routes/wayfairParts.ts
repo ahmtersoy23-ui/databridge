@@ -13,17 +13,27 @@ router.get('/', async (req: Request, res: Response) => {
     const filter = (req.query.filter as string) || 'all'; // all | matched | unmatched
     const includeOrders = req.query.includeOrders === 'true';
 
-    // Get all part_numbers from inventory + mapping table
+    // Get all part_numbers from inventory + orders + mapping table
     const dbResult = await pool.query(`
+      WITH all_parts AS (
+        SELECT part_number FROM wayfair_inventory
+        UNION
+        SELECT part_number FROM wayfair_orders
+        UNION
+        SELECT part_number FROM wayfair_sku_mapping
+      )
       SELECT
-        COALESCE(wi.part_number, m.part_number) as part_number,
+        ap.part_number,
         m.iwasku,
         COALESCE(SUM(wi.quantity), 0) as inv_qty,
-        CASE WHEN MAX(wi.part_number) IS NOT NULL THEN true ELSE false END as in_inventory
-      FROM wayfair_sku_mapping m
-      FULL OUTER JOIN wayfair_inventory wi ON wi.part_number = m.part_number
-      GROUP BY COALESCE(wi.part_number, m.part_number), m.iwasku
-      ORDER BY part_number
+        CASE WHEN MAX(wi.part_number) IS NOT NULL THEN true ELSE false END as in_inventory,
+        CASE WHEN MAX(wo.part_number) IS NOT NULL THEN true ELSE false END as in_orders
+      FROM all_parts ap
+      LEFT JOIN wayfair_sku_mapping m ON m.part_number = ap.part_number
+      LEFT JOIN wayfair_inventory wi ON wi.part_number = ap.part_number
+      LEFT JOIN (SELECT DISTINCT part_number FROM wayfair_orders) wo ON wo.part_number = ap.part_number
+      GROUP BY ap.part_number, m.iwasku
+      ORDER BY ap.part_number
     `);
 
     // Build parts map
@@ -34,7 +44,7 @@ router.get('/', async (req: Request, res: Response) => {
         iwasku: r.iwasku || null,
         inv_qty: Number(r.inv_qty),
         in_inventory: r.in_inventory,
-        in_orders: false,
+        in_orders: r.in_orders,
       });
     }
 
