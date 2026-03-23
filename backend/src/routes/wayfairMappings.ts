@@ -6,6 +6,7 @@ import { validateBody } from '../middleware/validate';
 import { refreshWayfairAggregation } from '../services/sync/wayfairSync';
 import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
+import { getAccountById } from '../services/wayfair/client';
 
 const router = Router();
 
@@ -206,9 +207,10 @@ router.get('/export', async (_req: Request, res: Response) => {
     // Also include part_numbers from live orders (CG + Dropship)
     const knownPns = new Set(rows.map(r => r.part_number));
     try {
+      const defaultAccount = await getAccountById(1);
       const [cgOrders, dsOrders] = await Promise.all([
-        fetchWayfairPurchaseOrders(),
-        fetchDropshipOrders(),
+        fetchWayfairPurchaseOrders(defaultAccount),
+        fetchDropshipOrders(defaultAccount),
       ]);
       for (const o of cgOrders) for (const p of o.products) {
         if (!knownPns.has(p.partNumber)) {

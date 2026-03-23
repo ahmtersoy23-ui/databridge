@@ -2,6 +2,7 @@ import { pool, sharedPool } from '../../config/database';
 import { fetchWayfairInventory } from '../wayfair/inventory';
 import { fetchWayfairPurchaseOrders } from '../wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
+import { getActiveAccounts, type WayfairAccount } from '../wayfair/client';
 import { writeWayfairSalesData } from './wayfairSalesDataWriter';
 import logger from '../../config/logger';
 
@@ -48,6 +49,7 @@ async function loadMappings(): Promise<Map<string, string>> {
 }
 
 async function upsertInventory(
+  accountId: number,
   items: Array<{ partNumber: string; warehouseId: string; warehouseName: string; quantity: number; availableQty: number; iwasku: string | null }>
 ): Promise<void> {
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
@@ -56,15 +58,15 @@ async function upsertInventory(
     const params: unknown[] = [];
 
     batch.forEach((item, idx) => {
-      const offset = idx * 6;
-      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
-      params.push(item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.availableQty, item.iwasku);
+      const offset = idx * 7;
+      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+      params.push(accountId, item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.availableQty, item.iwasku);
     });
 
     await pool.query(`
-      INSERT INTO wayfair_inventory (part_number, warehouse_id, warehouse_name, quantity, available_qty, iwasku)
+      INSERT INTO wayfair_inventory (account_id, part_number, warehouse_id, warehouse_name, quantity, available_qty, iwasku)
       VALUES ${values.join(', ')}
-      ON CONFLICT (part_number, warehouse_id) DO UPDATE SET
+      ON CONFLICT (account_id, part_number, warehouse_id) DO UPDATE SET
         warehouse_name = EXCLUDED.warehouse_name,
         quantity = EXCLUDED.quantity,
         available_qty = EXCLUDED.available_qty,
@@ -74,16 +76,15 @@ async function upsertInventory(
   }
 }
 
-async function syncOrders(mappings: Map<string, string>): Promise<number> {
+async function syncOrders(account: WayfairAccount, mappings: Map<string, string>): Promise<number> {
   let totalUpserted = 0;
 
   try {
     const [cgOrders, dsOrders] = await Promise.all([
-      fetchWayfairPurchaseOrders(),
-      fetchDropshipOrders(),
+      fetchWayfairPurchaseOrders(account),
+      fetchDropshipOrders(account),
     ]);
 
-    // Flatten CG orders into product rows
     const rows: Array<{
       po_number: string; po_date: string | null; supplier_id: number | null;
       order_type: string; part_number: string; iwasku: string | null;
@@ -113,8 +114,7 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
       }
     }
 
-    // Deduplicate by (po_number, part_number, order_type) — Wayfair API can
-    // return the same part twice within one PO. Sum quantities, keep last price.
+    // Deduplicate by (po_number, part_number, order_type)
     const deduped = new Map<string, typeof rows[number]>();
     for (const r of rows) {
       const key = `${r.po_number}|${r.part_number}|${r.order_type}`;
@@ -132,22 +132,21 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
     }
     const uniqueRows = [...deduped.values()];
 
-    // Upsert in batches
     for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
       const batch = uniqueRows.slice(i, i + BATCH_SIZE);
       const values: string[] = [];
       const params: unknown[] = [];
 
       batch.forEach((r, idx) => {
-        const o = idx * 9;
-        values.push(`($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9})`);
-        params.push(r.po_number, r.po_date, r.supplier_id, r.order_type, r.part_number, r.iwasku, r.quantity, r.price, r.total_cost);
+        const o = idx * 10;
+        values.push(`($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9}, $${o+10})`);
+        params.push(account.id, r.po_number, r.po_date, r.supplier_id, r.order_type, r.part_number, r.iwasku, r.quantity, r.price, r.total_cost);
       });
 
       await pool.query(`
-        INSERT INTO wayfair_orders (po_number, po_date, supplier_id, order_type, part_number, iwasku, quantity, price, total_cost)
+        INSERT INTO wayfair_orders (account_id, po_number, po_date, supplier_id, order_type, part_number, iwasku, quantity, price, total_cost)
         VALUES ${values.join(', ')}
-        ON CONFLICT (po_number, part_number, order_type) DO UPDATE SET
+        ON CONFLICT (account_id, po_number, part_number, order_type) DO UPDATE SET
           po_date = EXCLUDED.po_date,
           supplier_id = EXCLUDED.supplier_id,
           iwasku = EXCLUDED.iwasku,
@@ -160,35 +159,30 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
       totalUpserted += batch.length;
     }
 
-    logger.info(`[WayfairSync] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS orders, ${rows.length - uniqueRows.length} duplicates merged)`);
+    logger.info(`[WayfairSync][${account.label}] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS, ${rows.length - uniqueRows.length} dupes merged)`);
   } catch (err: any) {
-    logger.warn(`[WayfairSync] Order sync failed (non-fatal): ${err.message}`);
+    logger.warn(`[WayfairSync][${account.label}] Order sync failed (non-fatal): ${err.message}`);
   }
 
   return totalUpserted;
 }
 
-async function aggregateToFbaInventory(): Promise<number> {
-  // Aggregate wayfair_inventory → fba_inventory (only mapped iwasku rows)
-  // Pick the part_number with highest quantity per iwasku as the "asin" identifier
+async function aggregateToFbaInventory(account: WayfairAccount): Promise<number> {
   const result = await pool.query(`
     SELECT iwasku,
            SUM(quantity)::int AS fulfillable_quantity,
            (array_agg(part_number ORDER BY quantity DESC))[1] AS part_number
     FROM wayfair_inventory
-    WHERE iwasku IS NOT NULL
+    WHERE iwasku IS NOT NULL AND account_id = $1
     GROUP BY iwasku
-  `);
+  `, [account.id]);
 
   if (result.rows.length === 0) return 0;
 
-  const BATCH_SIZE = 500;
   const client = await sharedPool.connect();
   try {
     await client.query('BEGIN');
-
-    // Delete stale rows inside transaction — readers won't see empty state until COMMIT
-    await client.query(`DELETE FROM fba_inventory WHERE warehouse = 'WFS'`);
+    await client.query('DELETE FROM fba_inventory WHERE warehouse = $1', [account.warehouse]);
 
     for (let i = 0; i < result.rows.length; i += BATCH_SIZE) {
       const batch = result.rows.slice(i, i + BATCH_SIZE);
@@ -198,13 +192,7 @@ async function aggregateToFbaInventory(): Promise<number> {
       batch.forEach((row: { iwasku: string; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
         const offset = idx * 5;
         values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
-        params.push(
-          row.iwasku,
-          'WFS',
-          row.fulfillable_quantity,
-          row.fulfillable_quantity, // total_quantity = fulfillable for Wayfair
-          row.part_number || null   // asin = part_number for Wayfair
-        );
+        params.push(row.iwasku, account.warehouse, row.fulfillable_quantity, row.fulfillable_quantity, row.part_number || null);
       });
 
       await client.query(`
@@ -228,64 +216,76 @@ async function aggregateToFbaInventory(): Promise<number> {
   }
 }
 
-export async function syncWayfair(): Promise<number> {
-  const jobId = await createSyncJob('wayfair_sync', 'WAYFAIR');
+/** Sync a single Wayfair account (inventory + orders + aggregation) */
+export async function syncWayfairAccount(account: WayfairAccount): Promise<number> {
+  const jobId = await createSyncJob('wayfair_sync', `WAYFAIR_${account.label.toUpperCase()}`);
 
   try {
     await updateSyncJob(jobId, 'running');
 
-    // 1. Fetch inventory from CastleGate API
-    const rawItems = await fetchWayfairInventory();
-    logger.info(`[WayfairSync] Fetched ${rawItems.length} inventory items`);
+    const rawItems = await fetchWayfairInventory(account);
+    logger.info(`[WayfairSync][${account.label}] Fetched ${rawItems.length} inventory items`);
 
     if (rawItems.length === 0) {
       await updateSyncJob(jobId, 'completed', 0);
       return 0;
     }
 
-    // 2. Load user-managed mappings
     const mappings = await loadMappings();
-    logger.info(`[WayfairSync] Loaded ${mappings.size} part_number → iwasku mappings`);
-
-    // 3. Assign iwasku from mapping
     const enriched = rawItems.map(item => ({
       ...item,
       iwasku: mappings.get(item.partNumber) || null,
     }));
 
     const matched = enriched.filter(i => i.iwasku !== null).length;
-    logger.info(`[WayfairSync] ${matched}/${enriched.length} items have iwasku mapping`);
+    logger.info(`[WayfairSync][${account.label}] ${matched}/${enriched.length} items have iwasku mapping`);
 
-    // 4. Upsert into wayfair_inventory (DataBridge internal)
-    await upsertInventory(enriched);
+    await upsertInventory(account.id, enriched);
 
-    // 5. Sync orders (CG + Dropship) → wayfair_orders
-    const orderLines = await syncOrders(mappings);
+    const orderLines = await syncOrders(account, mappings);
 
-    // 6. Aggregate to pricelab_db.fba_inventory (warehouse='WFS')
-    const aggregated = await aggregateToFbaInventory();
-    logger.info(`[WayfairSync] Aggregated ${aggregated} iwasku rows to fba_inventory (WFS)`);
+    const aggregated = await aggregateToFbaInventory(account);
+    logger.info(`[WayfairSync][${account.label}] Aggregated ${aggregated} rows to fba_inventory (${account.warehouse})`);
 
-    // 7. Aggregate orders to pricelab_db.sales_data (channel='wfs')
-    const salesRows = await writeWayfairSalesData();
-    logger.info(`[WayfairSync] Wrote ${salesRows} sales_data rows (channel=wfs)`);
+    const salesRows = await writeWayfairSalesData(account);
+    logger.info(`[WayfairSync][${account.label}] Wrote ${salesRows} sales_data rows (channel=${account.channel})`);
 
     await updateSyncJob(jobId, 'completed', rawItems.length + orderLines);
-    logger.info(`[WayfairSync] Completed: ${rawItems.length} items, ${aggregated} mapped to StockPulse`);
+    logger.info(`[WayfairSync][${account.label}] Completed: ${rawItems.length} items, ${aggregated} mapped to StockPulse`);
     return rawItems.length;
   } catch (err: any) {
-    logger.error('[WayfairSync] Failed:', err.message);
+    logger.error(`[WayfairSync][${account.label}] Failed: ${err.message}`);
     await updateSyncJob(jobId, 'failed', 0, err.message);
     throw err;
   }
 }
 
-/**
- * Refresh WF aggregation from existing wayfair_inventory data (no API call).
- * Call this after mapping changes to immediately reflect updates in StockPulse.
- */
+/** Sync all active Wayfair accounts */
+export async function syncWayfair(): Promise<void> {
+  const accounts = await getActiveAccounts();
+  if (accounts.length === 0) {
+    logger.info('[WayfairSync] No active Wayfair accounts configured');
+    return;
+  }
+
+  for (const account of accounts) {
+    try {
+      await syncWayfairAccount(account);
+    } catch (err: any) {
+      logger.error(`[WayfairSync] Account '${account.label}' failed: ${err.message}`);
+      // Continue to next account
+    }
+  }
+}
+
+/** Refresh aggregation for all active accounts (no API call) */
 export async function refreshWayfairAggregation(): Promise<number> {
-  const count = await aggregateToFbaInventory();
-  logger.info(`[WayfairSync] Aggregation refresh: ${count} iwasku rows written to fba_inventory (WFS)`);
-  return count;
+  const accounts = await getActiveAccounts();
+  let total = 0;
+  for (const account of accounts) {
+    const count = await aggregateToFbaInventory(account);
+    logger.info(`[WayfairSync] Aggregation refresh [${account.label}]: ${count} rows → fba_inventory (${account.warehouse})`);
+    total += count;
+  }
+  return total;
 }

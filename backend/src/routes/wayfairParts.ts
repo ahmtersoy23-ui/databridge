@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../config/database';
 import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
+import { getAccountById } from '../services/wayfair/client';
 
 const router = Router();
 
@@ -40,9 +41,10 @@ router.get('/', async (req: Request, res: Response) => {
     // Optionally add order part_numbers
     if (includeOrders) {
       try {
+        const defaultAccount = await getAccountById(1);
         const [cgOrders, dsOrders] = await Promise.all([
-          fetchWayfairPurchaseOrders(),
-          fetchDropshipOrders(),
+          fetchWayfairPurchaseOrders(defaultAccount),
+          fetchDropshipOrders(defaultAccount),
         ]);
         for (const o of cgOrders) for (const p of o.products) {
           const existing = partsMap.get(p.partNumber);

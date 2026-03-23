@@ -1,4 +1,4 @@
-import { graphqlQuery, getCredentials, getDropshipApiBase } from './client';
+import { graphqlQuery, getDropshipApiBase, type WayfairAccount } from './client';
 import logger from '../../config/logger';
 
 export interface WayfairDropshipProduct {
@@ -14,8 +14,6 @@ export interface WayfairDropshipOrder {
   products: WayfairDropshipProduct[];
 }
 
-// Dropship endpoint: api.wayfair.com (different from CastleGate api.wayfair.io)
-// Rate limit: max 25 orders per call, query every 30 minutes
 const DS_QUERY = `
   query getDropshipPurchaseOrders(
     $limit: Int32
@@ -43,13 +41,13 @@ interface DSResponse {
   getDropshipPurchaseOrders: WayfairDropshipOrder[];
 }
 
-export async function fetchDropshipOrders(hasResponse?: boolean): Promise<WayfairDropshipOrder[]> {
-  const creds = await getCredentials();
-  const endpoint = getDropshipApiBase(creds.use_sandbox);
+export async function fetchDropshipOrders(account: WayfairAccount, hasResponse?: boolean): Promise<WayfairDropshipOrder[]> {
+  const endpoint = getDropshipApiBase(account.use_sandbox);
 
   let result: DSResponse;
   try {
     result = await graphqlQuery<DSResponse>(
+      account,
       DS_QUERY,
       {
         limit: 25,
@@ -60,11 +58,11 @@ export async function fetchDropshipOrders(hasResponse?: boolean): Promise<Wayfai
     );
   } catch (err: any) {
     const msg: string = err.message || '';
-    logger.info(`[Wayfair DS] ${msg}`);
+    logger.info(`[Wayfair DS][${account.label}] ${msg}`);
     return [];
   }
 
   const orders = result.getDropshipPurchaseOrders || [];
-  logger.info(`[Wayfair DS] ${orders.length} dropship orders fetched (hasResponse=${hasResponse ?? 'all'})`);
+  logger.info(`[Wayfair DS][${account.label}] ${orders.length} dropship orders fetched (hasResponse=${hasResponse ?? 'all'})`);
   return orders;
 }

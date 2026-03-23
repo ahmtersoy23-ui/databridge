@@ -1,4 +1,4 @@
-import { graphqlQuery, getSupplierId } from './client';
+import { graphqlQuery, getSupplierId, type WayfairAccount } from './client';
 import logger from '../../config/logger';
 
 export interface WayfairInventoryItem {
@@ -68,8 +68,8 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
  * Returns one row per warehouse per part (or a single CASTLEGATE row if no breakdown).
  * Wayfair API rate limit: 10 req/sec — throttled to ~2 req/sec for safety.
  */
-export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
-  const supplierId = await getSupplierId();
+export async function fetchWayfairInventory(account: WayfairAccount): Promise<WayfairInventoryItem[]> {
+  const supplierId = await getSupplierId(account);
   const all: WayfairInventoryItem[] = [];
   let cursor: string | null = null;
   let page = 0;
@@ -77,7 +77,7 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
   while (true) {
     let result: InventoryResponse;
     try {
-      result = await graphqlQuery<InventoryResponse>(INVENTORY_QUERY, {
+      result = await graphqlQuery<InventoryResponse>(account, INVENTORY_QUERY, {
         supplierId,
         first: 100,
         cursor: cursor ?? undefined,
@@ -88,7 +88,7 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
         msg.includes('wrongly returned a null value') ||
         msg.includes('Internal Server Error')
       ) {
-        logger.info('[Wayfair] Inventory data unavailable (sandbox has no data for this supplier)');
+        logger.info(`[Wayfair][${account.label}] Inventory data unavailable (sandbox has no data)`);
         break;
       }
       throw err;
@@ -127,7 +127,7 @@ export async function fetchWayfairInventory(): Promise<WayfairInventoryItem[]> {
       }
     }
 
-    logger.info(`[Wayfair] Page ${page}: ${conn.edges.length} items (total: ${all.length})`);
+    logger.info(`[Wayfair][${account.label}] Page ${page}: ${conn.edges.length} items (total: ${all.length})`);
 
     if (!conn.pageInfo?.hasNextPage) break;
     cursor = conn.pageInfo.endCursor;

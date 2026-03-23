@@ -1,5 +1,6 @@
 import { pool } from '../../config/database';
 import { upsertSalesData, SalesRow } from './salesDataWriter';
+import { type WayfairAccount } from '../wayfair/client';
 import logger from '../../config/logger';
 
 const WAYFAIR_ROLLING_WINDOW_SQL = `
@@ -24,6 +25,7 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
       COALESCE(SUM(CASE WHEN po_date BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN quantity END), 0)::int as pre_year_next180
     FROM wayfair_orders
     WHERE iwasku IS NOT NULL
+      AND account_id = $1
       AND po_date >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, part_number
   )
@@ -44,9 +46,9 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
   ORDER BY iwasku
 `;
 
-export async function writeWayfairSalesData(): Promise<number> {
-  const result = await pool.query<SalesRow>(WAYFAIR_ROLLING_WINDOW_SQL);
-  const count = await upsertSalesData('wfs', result.rows);
-  logger.info(`[WayfairSalesData] Wrote ${count} rows to sales_data (channel=wfs)`);
+export async function writeWayfairSalesData(account: WayfairAccount): Promise<number> {
+  const result = await pool.query<SalesRow>(WAYFAIR_ROLLING_WINDOW_SQL, [account.id]);
+  const count = await upsertSalesData(account.channel, result.rows);
+  logger.info(`[WayfairSalesData] Wrote ${count} rows to sales_data (channel=${account.channel})`);
   return count;
 }

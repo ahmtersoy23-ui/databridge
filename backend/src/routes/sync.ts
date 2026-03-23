@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
 import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
@@ -11,7 +11,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'ads']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -61,11 +61,24 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       runWisersellSync().catch(err => logger.error('[Sync] Manual Wisersell sync error:', err));
       res.json({ success: true, message: 'Wisersell catalog sync started' });
     } else if (type === 'wayfair') {
-      runWayfairSync().catch(err => logger.error('[Sync] Manual Wayfair sync error:', err));
-      res.json({ success: true, message: 'Wayfair CastleGate sync started' });
+      const accountLabel = req.body.account as string | undefined;
+      if (accountLabel) {
+        // Sync specific account
+        const { getAccountByLabel } = require('../services/wayfair/client');
+        const { syncWayfairAccount } = require('../services/sync/wayfairSync');
+        const account = await getAccountByLabel(accountLabel);
+        syncWayfairAccount(account).catch((err: any) => logger.error(`[Sync] Wayfair ${accountLabel} error:`, err));
+        res.json({ success: true, message: `Wayfair sync started for '${accountLabel}'` });
+      } else {
+        runWayfairSync().catch(err => logger.error('[Sync] Manual Wayfair sync error:', err));
+        res.json({ success: true, message: 'Wayfair sync started for all accounts' });
+      }
     } else if (type === 'reviews') {
       runReviewSync().catch(err => logger.error('[Sync] Manual review sync error:', err));
       res.json({ success: true, message: 'Review tracking sync started' });
+    } else if (type === 'ads') {
+      runAdsSync().catch(err => logger.error('[Sync] Manual Ads sync error:', err));
+      res.json({ success: true, message: 'Ads sync started for all active profiles' });
     } else if (type === 'transactions') {
       if (marketplace) {
         const mp = await getMarketplaceByCode(marketplace);

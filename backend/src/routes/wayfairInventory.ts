@@ -1,20 +1,36 @@
 import { Router, Request, Response } from 'express';
-import { graphqlQuery, getSupplierId } from '../services/wayfair/client';
+import { graphqlQuery, getSupplierId, getAccountById, getAccountByLabel } from '../services/wayfair/client';
 import { pool } from '../config/database';
 
 const router = Router();
 
-// GET /api/v1/wayfair/inventory?search=&page=1&limit=50
+// GET /api/v1/wayfair/inventory?account=cg&search=&page=1&limit=50
 router.get('/', async (req: Request, res: Response) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
     const search = ((req.query.search as string) || '').trim();
+    const accountLabel = req.query.account as string | undefined;
     const offset = (page - 1) * limit;
 
-    const searchParam = search ? `%${search}%` : null;
-    const whereClause = searchParam ? 'WHERE wi.part_number ILIKE $1 OR wi.iwasku ILIKE $1' : '';
-    const params: unknown[] = searchParam ? [searchParam] : [];
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (accountLabel) {
+      const account = await getAccountByLabel(accountLabel);
+      conditions.push(`wi.account_id = $${idx}`);
+      params.push(account.id);
+      idx++;
+    }
+
+    if (search) {
+      conditions.push(`(wi.part_number ILIKE $${idx} OR wi.iwasku ILIKE $${idx})`);
+      params.push(`%${search}%`);
+      idx++;
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const countRes = await pool.query(
       `SELECT COUNT(DISTINCT wi.part_number) FROM wayfair_inventory wi ${whereClause}`,
@@ -23,7 +39,6 @@ router.get('/', async (req: Request, res: Response) => {
     const total = parseInt(countRes.rows[0].count);
 
     const dataParams = [...params, limit, offset];
-    const limitIdx = params.length + 1;
     const rows = await pool.query(`
       SELECT
         wi.part_number,
@@ -35,7 +50,7 @@ router.get('/', async (req: Request, res: Response) => {
       ${whereClause}
       GROUP BY wi.part_number, wi.iwasku
       ORDER BY on_hand_qty DESC, wi.part_number
-      LIMIT $${limitIdx} OFFSET $${limitIdx + 1}
+      LIMIT $${idx} OFFSET $${idx + 1}
     `, dataParams);
 
     res.json({
@@ -47,11 +62,13 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/v1/wayfair/inventory/raw — ham inventorySummaryList response (ilk 5 kayıt, debug)
-router.get('/raw', async (_req: Request, res: Response) => {
+// GET /api/v1/wayfair/inventory/raw?account=cg
+router.get('/raw', async (req: Request, res: Response) => {
   try {
-    const supplierId = await getSupplierId();
-    const result = await graphqlQuery<unknown>(`
+    const label = req.query.account as string | undefined;
+    const account = label ? await getAccountByLabel(label) : await getAccountById(1);
+    const supplierId = await getSupplierId(account);
+    const result = await graphqlQuery<unknown>(account, `
       query inventorySummaryList($supplierId: Int!, $first: Int!) {
         inventorySummaryList(
           supplierId: $supplierId
