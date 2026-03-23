@@ -223,36 +223,43 @@ export async function syncWayfairAccount(account: WayfairAccount): Promise<numbe
   try {
     await updateSyncJob(jobId, 'running');
 
-    const rawItems = await fetchWayfairInventory(account);
-    logger.info(`[WayfairSync][${account.label}] Fetched ${rawItems.length} inventory items`);
+    const mappings = await loadMappings();
+    let inventoryCount = 0;
 
-    if (rawItems.length === 0) {
-      await updateSyncJob(jobId, 'completed', 0);
-      return 0;
+    // 1. Inventory (non-fatal — some accounts may not have CG inventory access)
+    try {
+      const rawItems = await fetchWayfairInventory(account);
+      logger.info(`[WayfairSync][${account.label}] Fetched ${rawItems.length} inventory items`);
+
+      if (rawItems.length > 0) {
+        const enriched = rawItems.map(item => ({
+          ...item,
+          iwasku: mappings.get(item.partNumber) || null,
+        }));
+
+        const matched = enriched.filter(i => i.iwasku !== null).length;
+        logger.info(`[WayfairSync][${account.label}] ${matched}/${enriched.length} items have iwasku mapping`);
+
+        await upsertInventory(account.id, enriched);
+        inventoryCount = rawItems.length;
+
+        const aggregated = await aggregateToFbaInventory(account);
+        logger.info(`[WayfairSync][${account.label}] Aggregated ${aggregated} rows to fba_inventory (${account.warehouse})`);
+      }
+    } catch (err: any) {
+      logger.warn(`[WayfairSync][${account.label}] Inventory sync skipped: ${err.message}`);
     }
 
-    const mappings = await loadMappings();
-    const enriched = rawItems.map(item => ({
-      ...item,
-      iwasku: mappings.get(item.partNumber) || null,
-    }));
-
-    const matched = enriched.filter(i => i.iwasku !== null).length;
-    logger.info(`[WayfairSync][${account.label}] ${matched}/${enriched.length} items have iwasku mapping`);
-
-    await upsertInventory(account.id, enriched);
-
+    // 2. Orders (CG + Dropship)
     const orderLines = await syncOrders(account, mappings);
 
-    const aggregated = await aggregateToFbaInventory(account);
-    logger.info(`[WayfairSync][${account.label}] Aggregated ${aggregated} rows to fba_inventory (${account.warehouse})`);
-
+    // 3. Sales data aggregation
     const salesRows = await writeWayfairSalesData(account);
     logger.info(`[WayfairSync][${account.label}] Wrote ${salesRows} sales_data rows (channel=${account.channel})`);
 
-    await updateSyncJob(jobId, 'completed', rawItems.length + orderLines);
-    logger.info(`[WayfairSync][${account.label}] Completed: ${rawItems.length} items, ${aggregated} mapped to StockPulse`);
-    return rawItems.length;
+    await updateSyncJob(jobId, 'completed', inventoryCount + orderLines);
+    logger.info(`[WayfairSync][${account.label}] Completed: ${inventoryCount} inv + ${orderLines} orders`);
+    return inventoryCount;
   } catch (err: any) {
     logger.error(`[WayfairSync][${account.label}] Failed: ${err.message}`);
     await updateSyncJob(jobId, 'failed', 0, err.message);
