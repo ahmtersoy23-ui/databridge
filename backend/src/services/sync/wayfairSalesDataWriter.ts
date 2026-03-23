@@ -7,6 +7,7 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
     SELECT
       iwasku,
       part_number,
+      COALESCE(SUM(CASE WHEN po_date >= CURRENT_DATE - 3 THEN quantity END), 0)::int as last3,
       COALESCE(SUM(CASE WHEN po_date >= CURRENT_DATE - 7 THEN quantity END), 0)::int as last7,
       COALESCE(SUM(CASE WHEN po_date >= CURRENT_DATE - 30 THEN quantity END), 0)::int as last30,
       COALESCE(SUM(CASE WHEN po_date >= CURRENT_DATE - 90 THEN quantity END), 0)::int as last90,
@@ -29,6 +30,7 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
   SELECT
     iwasku,
     (array_agg(part_number ORDER BY last30 DESC))[1] as asin,
+    SUM(last3)::int as last3,
     SUM(last7)::int as last7, SUM(last30)::int as last30,
     SUM(last90)::int as last90, SUM(last180)::int as last180,
     SUM(last366)::int as last366,

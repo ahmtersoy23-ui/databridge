@@ -11,6 +11,7 @@ const ROLLING_WINDOW_SQL = `
     SELECT
       COALESCE(o.iwasku, o.sku) as iwasku,
       o.asin,
+      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 3 THEN o.quantity END), 0)::int as last3,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::int as last7,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::int as last30,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::int as last90,
@@ -35,6 +36,7 @@ const ROLLING_WINDOW_SQL = `
   SELECT
     iwasku,
     (array_agg(asin ORDER BY last30 DESC))[1] as asin,
+    SUM(last3)::int as last3,
     SUM(last7)::int as last7, SUM(last30)::int as last30,
     SUM(last90)::int as last90, SUM(last180)::int as last180,
     SUM(last366)::int as last366,
@@ -54,6 +56,7 @@ const EU_AGGREGATE_SQL = `
     SELECT
       COALESCE(o.iwasku, o.sku) as iwasku,
       o.asin,
+      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 3 THEN o.quantity END), 0)::int as last3,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::int as last7,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::int as last30,
       COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::int as last90,
@@ -78,6 +81,7 @@ const EU_AGGREGATE_SQL = `
   SELECT
     iwasku,
     (array_agg(asin ORDER BY last30 DESC))[1] as asin,
+    SUM(last3)::int as last3,
     SUM(last7)::int as last7, SUM(last30)::int as last30,
     SUM(last90)::int as last90, SUM(last180)::int as last180,
     SUM(last366)::int as last366,
@@ -94,6 +98,7 @@ const EU_AGGREGATE_SQL = `
 export interface SalesRow {
   iwasku: string;
   asin: string;
+  last3: number;
   last7: number;
   last30: number;
   last90: number;
@@ -131,12 +136,12 @@ export async function upsertSalesData(channel: string, rows: SalesRow[]): Promis
       const params: any[] = [];
 
       batch.forEach((row, idx) => {
-        const offset = idx * 17;
-        const placeholders = Array.from({ length: 17 }, (_, j) => `$${offset + j + 1}`);
+        const offset = idx * 18;
+        const placeholders = Array.from({ length: 18 }, (_, j) => `$${offset + j + 1}`);
         values.push(`(${placeholders.join(', ')})`);
         params.push(
           channel, row.iwasku, row.asin || null,
-          row.last7, row.last30, row.last90, row.last180, row.last366,
+          row.last3, row.last7, row.last30, row.last90, row.last180, row.last366,
           row.pre_year_last7, row.pre_year_last30, row.pre_year_last90,
           row.pre_year_last180, row.pre_year_last365,
           row.pre_year_next7, row.pre_year_next30, row.pre_year_next90, row.pre_year_next180
@@ -145,7 +150,7 @@ export async function upsertSalesData(channel: string, rows: SalesRow[]): Promis
 
       await client.query(`
         INSERT INTO sales_data (channel, iwasku, asin,
-          last7, last30, last90, last180, last366,
+          last3, last7, last30, last90, last180, last366,
           pre_year_last7, pre_year_last30, pre_year_last90, pre_year_last180, pre_year_last365,
           pre_year_next7, pre_year_next30, pre_year_next90, pre_year_next180)
         VALUES ${values.join(', ')}
