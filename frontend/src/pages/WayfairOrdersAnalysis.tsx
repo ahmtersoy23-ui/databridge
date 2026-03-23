@@ -8,6 +8,18 @@ interface DSOrder { poNumber: string; poDate: string; products: DSProduct[]; }
 
 type MappingMap = Record<string, string>;
 
+interface WfAccount {
+  id: number;
+  label: string;
+  channel: string;
+  is_active: boolean;
+}
+
+const ACCOUNT_LABELS: Record<string, string> = {
+  cg: 'Shukran (CG)',
+  mdn: 'MDN',
+};
+
 interface AggRow {
   partNumber: string;
   iwasku: string | null;
@@ -32,6 +44,8 @@ const COL_ZERO = '#d1d5db';
 type SortKey = keyof AggRow;
 
 export default function WayfairOrdersAnalysis() {
+  const [accounts, setAccounts] = useState<WfAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState('cg');
   const [tab, setTab] = useState<'total' | 'castlegate' | 'dropship'>('total');
   const [cgOrders, setCgOrders] = useState<CGOrder[]>([]);
   const [dsOrders, setDsOrders] = useState<DSOrder[]>([]);
@@ -42,13 +56,20 @@ export default function WayfairOrdersAnalysis() {
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
+    axios.get('/api/v1/wayfair/settings').then(r => {
+      const active = (r.data.accounts || []).filter((a: WfAccount) => a.is_active);
+      setAccounts(active);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     Promise.all([
-      axios.get('/api/v1/wayfair/orders').then(r => setCgOrders(r.data.data)).catch(() => {}),
-      axios.get('/api/v1/wayfair/orders/dropship').then(r => setDsOrders(r.data.data)).catch(() => {}),
+      axios.get('/api/v1/wayfair/orders', { params: { account: selectedAccount } }).then(r => setCgOrders(r.data.data)).catch(() => {}),
+      axios.get('/api/v1/wayfair/orders/dropship', { params: { account: selectedAccount } }).then(r => setDsOrders(r.data.data)).catch(() => {}),
       axios.get('/api/v1/wayfair/mappings/all').then(r => setMappings(r.data.data || {})).catch(() => {}),
     ]).finally(() => setLoading(false));
-  }, []);
+  }, [selectedAccount]);
 
   const aggregate = (orders: Array<{ products: Array<{ partNumber: string; quantity: number; price: number; totalCost?: number }> }>) => {
     const map = new Map<string, { totalQty: number; totalCost: number; poNumbers: Set<string>; prices: number[] }>();
@@ -163,6 +184,24 @@ export default function WayfairOrdersAnalysis() {
   return (
     <div>
       <h1 style={{ marginBottom: '1rem' }}>Wayfair Orders Analysis</h1>
+
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          {accounts.map(a => (
+            <button key={a.label} onClick={() => { setSelectedAccount(a.label); setSearch(''); }}
+              style={{
+                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
+                background: selectedAccount === a.label ? '#0891b2' : '#fff',
+                color: selectedAccount === a.label ? '#fff' : '#334155',
+                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
+              }}>
+              {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* CG / DS subtab */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>

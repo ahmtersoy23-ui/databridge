@@ -18,6 +18,13 @@ interface Pagination {
   pages: number;
 }
 
+interface WfAccount {
+  id: number;
+  label: string;
+  channel: string;
+  is_active: boolean;
+}
+
 const cardStyle = {
   background: '#fff',
   borderRadius: '8px',
@@ -26,7 +33,12 @@ const cardStyle = {
   marginBottom: '1rem',
 } as const;
 
-function OrdersTable({ orderType }: { orderType: 'castlegate' | 'dropship' }) {
+const ACCOUNT_LABELS: Record<string, string> = {
+  cg: 'Shukran (CG)',
+  mdn: 'MDN',
+};
+
+function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropship'; account: string }) {
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, pages: 1 });
   const [loading, setLoading] = useState(true);
@@ -37,7 +49,7 @@ function OrdersTable({ orderType }: { orderType: 'castlegate' | 'dropship' }) {
     setLoading(true);
     try {
       const res = await axios.get('/api/v1/wayfair/orders/browse', {
-        params: { type: orderType, page, limit: 50, search: s },
+        params: { type: orderType, account, page, limit: 50, search: s },
       });
       setRows(res.data.data);
       setPagination(res.data.pagination);
@@ -48,7 +60,7 @@ function OrdersTable({ orderType }: { orderType: 'castlegate' | 'dropship' }) {
     }
   };
 
-  useEffect(() => { fetchData(1); }, [orderType]);
+  useEffect(() => { setSearch(''); setSearchInput(''); fetchData(1, ''); }, [orderType, account]);
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -78,7 +90,7 @@ function OrdersTable({ orderType }: { orderType: 'castlegate' | 'dropship' }) {
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
         ) : rows.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            No orders found. Run a Wayfair sync to populate order data.
+            No orders found.
           </div>
         ) : (
           <>
@@ -132,11 +144,43 @@ function OrdersTable({ orderType }: { orderType: 'castlegate' | 'dropship' }) {
 }
 
 export default function WayfairOrders() {
+  const [accounts, setAccounts] = useState<WfAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState('cg');
   const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
+
+  useEffect(() => {
+    axios.get('/api/v1/wayfair/settings').then(r => {
+      const active = (r.data.accounts || []).filter((a: WfAccount) => a.is_active);
+      setAccounts(active);
+      if (active.length > 0 && !active.find((a: WfAccount) => a.label === selectedAccount)) {
+        setSelectedAccount(active[0].label);
+      }
+    }).catch(() => {});
+  }, []);
 
   return (
     <div>
       <h1 style={{ marginBottom: '1rem' }}>Wayfair Orders</h1>
+
+      {/* Account selector */}
+      {accounts.length > 1 && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          {accounts.map(a => (
+            <button key={a.label} onClick={() => setSelectedAccount(a.label)}
+              style={{
+                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
+                background: selectedAccount === a.label ? '#0891b2' : '#fff',
+                color: selectedAccount === a.label ? '#fff' : '#334155',
+                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
+              }}>
+              {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* CastleGate / Dropship sub-tabs */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
         {(['castlegate', 'dropship'] as const).map(t => (
           <button key={t} onClick={() => setOrderSubTab(t)}
@@ -151,7 +195,8 @@ export default function WayfairOrders() {
           </button>
         ))}
       </div>
-      <OrdersTable orderType={orderSubTab} />
+
+      <OrdersTable orderType={orderSubTab} account={selectedAccount} />
     </div>
   );
 }
