@@ -16,7 +16,7 @@ interface WfAccount {
 }
 
 const ACCOUNT_LABELS: Record<string, string> = {
-  cg: 'Shukran (CG)',
+  shukran: 'Shukran',
   mdn: 'MDN',
 };
 
@@ -45,7 +45,7 @@ type SortKey = keyof AggRow;
 
 export default function WayfairOrdersAnalysis() {
   const [accounts, setAccounts] = useState<WfAccount[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState('cg');
+  const [selectedAccount, setSelectedAccount] = useState('shukran');
   const [tab, setTab] = useState<'total' | 'castlegate' | 'dropship'>('total');
   const [cgOrders, setCgOrders] = useState<CGOrder[]>([]);
   const [dsOrders, setDsOrders] = useState<DSOrder[]>([]);

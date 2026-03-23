@@ -34,7 +34,7 @@ const cardStyle = {
 } as const;
 
 const ACCOUNT_LABELS: Record<string, string> = {
-  cg: 'Shukran (CG)',
+  shukran: 'Shukran',
   mdn: 'MDN',
 };
 
@@ -145,7 +145,7 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
 
 export default function WayfairOrders() {
   const [accounts, setAccounts] = useState<WfAccount[]>([]);
-  const [selectedAccount, setSelectedAccount] = useState('cg');
+  const [selectedAccount, setSelectedAccount] = useState('shukran');
   const [orderSubTab, setOrderSubTab] = useState<'castlegate' | 'dropship'>('castlegate');
 
   useEffect(() => {
