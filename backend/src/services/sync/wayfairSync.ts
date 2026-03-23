@@ -218,7 +218,7 @@ async function aggregateToFbaInventory(account: WayfairAccount): Promise<number>
 
 /** Sync a single Wayfair account (inventory + orders + aggregation) */
 export async function syncWayfairAccount(account: WayfairAccount): Promise<number> {
-  const jobId = await createSyncJob('wayfair_sync', `WAYFAIR_${account.label.toUpperCase()}`);
+  const jobId = await createSyncJob('wayfair_sync', `WF_${account.label.toUpperCase()}`);
 
   try {
     await updateSyncJob(jobId, 'running');
