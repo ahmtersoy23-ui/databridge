@@ -113,9 +113,28 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
       }
     }
 
+    // Deduplicate by (po_number, part_number, order_type) — Wayfair API can
+    // return the same part twice within one PO. Sum quantities, keep last price.
+    const deduped = new Map<string, typeof rows[number]>();
+    for (const r of rows) {
+      const key = `${r.po_number}|${r.part_number}|${r.order_type}`;
+      const existing = deduped.get(key);
+      if (existing) {
+        existing.quantity += r.quantity;
+        existing.price = r.price;
+        existing.total_cost =
+          existing.total_cost != null && r.total_cost != null
+            ? existing.total_cost + r.total_cost
+            : r.total_cost ?? existing.total_cost;
+      } else {
+        deduped.set(key, { ...r });
+      }
+    }
+    const uniqueRows = [...deduped.values()];
+
     // Upsert in batches
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < uniqueRows.length; i += BATCH_SIZE) {
+      const batch = uniqueRows.slice(i, i + BATCH_SIZE);
       const values: string[] = [];
       const params: unknown[] = [];
 
@@ -141,7 +160,7 @@ async function syncOrders(mappings: Map<string, string>): Promise<number> {
       totalUpserted += batch.length;
     }
 
-    logger.info(`[WayfairSync] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS orders)`);
+    logger.info(`[WayfairSync] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS orders, ${rows.length - uniqueRows.length} duplicates merged)`);
   } catch (err: any) {
     logger.warn(`[WayfairSync] Order sync failed (non-fatal): ${err.message}`);
   }
