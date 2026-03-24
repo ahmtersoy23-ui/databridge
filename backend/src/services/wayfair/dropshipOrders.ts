@@ -43,7 +43,7 @@ interface DSResponse {
   getDropshipPurchaseOrders: WayfairDropshipOrder[];
 }
 
-const PAGE_LIMIT = 200;
+const PAGE_LIMIT = 100;
 
 /**
  * Fetch all Dropship POs from fromDate onwards using date-cursor pagination.

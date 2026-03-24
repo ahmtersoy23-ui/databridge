@@ -1,33 +1,33 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
-interface CGProduct { partNumber: string; quantity: number; price: number; totalCost?: number; }
-interface CGOrder { id: string; poNumber: string; poDate: string; products: CGProduct[]; }
-interface DSProduct { partNumber: string; quantity: number; price: number; }
-interface DSOrder { poNumber: string; poDate: string; products: DSProduct[]; }
-
-type MappingMap = Record<string, string>;
-
 interface WfAccount {
   id: number;
   label: string;
-  channel: string;
   is_active: boolean;
+}
+
+interface AggRow {
+  part_number: string;
+  iwasku: string | null;
+  total_qty: number;
+  total_cost: number;
+  po_count: number;
+  avg_price: number;
+}
+
+interface Summary {
+  totalParts: number;
+  totalQty: number;
+  totalCost: number;
+  matched: number;
+  unmatched: number;
 }
 
 const ACCOUNT_LABELS: Record<string, string> = {
   shukran: 'Shukran',
   mdn: 'MDN',
 };
-
-interface AggRow {
-  partNumber: string;
-  iwasku: string | null;
-  totalQty: number;
-  totalCost: number;
-  poCount: number;
-  avgPrice: number;
-}
 
 const cardStyle = {
   background: '#fff',
@@ -41,18 +41,28 @@ const COL_GREEN = '#059669';
 const COL_BLUE = '#2563eb';
 const COL_ZERO = '#d1d5db';
 
+const btnStyle = (bg: string) => ({
+  padding: '0.25rem 0.75rem',
+  background: bg,
+  color: '#fff',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer' as const,
+  fontSize: '0.8rem',
+  marginRight: '0.25rem',
+});
+
 type SortKey = keyof AggRow;
 
 export default function WayfairOrdersAnalysis() {
   const [accounts, setAccounts] = useState<WfAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState('shukran');
   const [tab, setTab] = useState<'total' | 'castlegate' | 'dropship'>('total');
-  const [cgOrders, setCgOrders] = useState<CGOrder[]>([]);
-  const [dsOrders, setDsOrders] = useState<DSOrder[]>([]);
-  const [mappings, setMappings] = useState<MappingMap>({});
+  const [rows, setRows] = useState<AggRow[]>([]);
+  const [summary, setSummary] = useState<Summary>({ totalParts: 0, totalQty: 0, totalCost: 0, matched: 0, unmatched: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('totalQty');
+  const [sortKey, setSortKey] = useState<SortKey>('total_qty');
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
@@ -64,75 +74,15 @@ export default function WayfairOrdersAnalysis() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      axios.get('/api/v1/wayfair/orders', { params: { account: selectedAccount } }).then(r => setCgOrders(r.data.data)).catch(() => {}),
-      axios.get('/api/v1/wayfair/orders/dropship', { params: { account: selectedAccount } }).then(r => setDsOrders(r.data.data)).catch(() => {}),
-      axios.get('/api/v1/wayfair/mappings/all').then(r => setMappings(r.data.data || {})).catch(() => {}),
-    ]).finally(() => setLoading(false));
-  }, [selectedAccount]);
-
-  const aggregate = (orders: Array<{ products: Array<{ partNumber: string; quantity: number; price: number; totalCost?: number }> }>) => {
-    const map = new Map<string, { totalQty: number; totalCost: number; poNumbers: Set<string>; prices: number[] }>();
-    for (const order of orders) {
-      const poNum = (order as any).poNumber || (order as any).id || '';
-      for (const p of order.products || []) {
-        const qty = Number(p.quantity) || 0;
-        const price = Number(p.price) || 0;
-        const cost = Number((p as any).totalCost) || price * qty;
-        const existing = map.get(p.partNumber);
-        if (existing) {
-          existing.totalQty += qty;
-          existing.totalCost += cost;
-          existing.poNumbers.add(poNum);
-          existing.prices.push(price);
-        } else {
-          map.set(p.partNumber, {
-            totalQty: qty,
-            totalCost: cost,
-            poNumbers: new Set([poNum]),
-            prices: [price],
-          });
-        }
-      }
-    }
-    const rows: AggRow[] = [];
-    for (const [partNumber, v] of map) {
-      rows.push({
-        partNumber,
-        iwasku: mappings[partNumber] || null,
-        totalQty: v.totalQty,
-        totalCost: v.totalCost,
-        poCount: v.poNumbers.size,
-        avgPrice: v.prices.length > 0 ? v.prices.reduce((a, b) => a + b, 0) / v.prices.length : 0,
-      });
-    }
-    return rows;
-  };
-
-  const cgAgg = useMemo(() => aggregate(cgOrders), [cgOrders, mappings]);
-  const dsAgg = useMemo(() => aggregate(dsOrders), [dsOrders, mappings]);
-  const totalAgg = useMemo(() => {
-    const map = new Map<string, AggRow>();
-    for (const r of cgAgg) {
-      map.set(r.partNumber, { ...r });
-    }
-    for (const r of dsAgg) {
-      const existing = map.get(r.partNumber);
-      if (existing) {
-        const totalQty = existing.totalQty + r.totalQty;
-        const totalCost = existing.totalCost + r.totalCost;
-        const totalPOs = existing.poCount + r.poCount;
-        existing.totalQty = totalQty;
-        existing.totalCost = totalCost;
-        existing.poCount = totalPOs;
-        existing.avgPrice = totalQty > 0 ? totalCost / totalQty : 0;
-      } else {
-        map.set(r.partNumber, { ...r });
-      }
-    }
-    return Array.from(map.values());
-  }, [cgAgg, dsAgg]);
-  const rows = tab === 'total' ? totalAgg : tab === 'castlegate' ? cgAgg : dsAgg;
+    axios.get('/api/v1/wayfair/orders/analysis', {
+      params: { account: selectedAccount, type: tab },
+    }).then(r => {
+      setRows(r.data.data || []);
+      setSummary(r.data.summary || { totalParts: 0, totalQty: 0, totalCost: 0, matched: 0, unmatched: 0 });
+    }).catch(() => {
+      setRows([]);
+    }).finally(() => setLoading(false));
+  }, [selectedAccount, tab]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -143,26 +93,17 @@ export default function WayfairOrdersAnalysis() {
     let data = rows;
     if (search) {
       const q = search.toLowerCase();
-      data = data.filter(r => r.partNumber.toLowerCase().includes(q) || (r.iwasku && r.iwasku.toLowerCase().includes(q)));
+      data = data.filter(r => r.part_number.toLowerCase().includes(q) || (r.iwasku && r.iwasku.toLowerCase().includes(q)));
     }
     return [...data].sort((a, b) => {
       const av = a[sortKey] ?? '';
       const bv = b[sortKey] ?? '';
-      if (sortKey === 'partNumber' || sortKey === 'iwasku') {
+      if (sortKey === 'part_number' || sortKey === 'iwasku') {
         return sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
       }
       return sortAsc ? (Number(av) || 0) - (Number(bv) || 0) : (Number(bv) || 0) - (Number(av) || 0);
     });
   }, [rows, search, sortKey, sortAsc]);
-
-  // Summary
-  const summary = useMemo(() => {
-    const totalParts = filtered.length;
-    const totalQty = filtered.reduce((s, r) => s + r.totalQty, 0);
-    const totalCost = filtered.reduce((s, r) => s + r.totalCost, 0);
-    const matched = filtered.filter(r => r.iwasku).length;
-    return { totalParts, totalQty, totalCost, matched, unmatched: totalParts - matched };
-  }, [filtered]);
 
   const summaryCards = [
     { label: 'Part Numbers', value: summary.totalParts.toLocaleString(), color: '#334155' },
@@ -171,7 +112,7 @@ export default function WayfairOrdersAnalysis() {
     { label: 'Matched', value: `${summary.matched} / ${summary.totalParts}`, color: summary.unmatched > 0 ? '#d97706' : COL_GREEN },
   ];
 
-  const thStyle = (_key: SortKey, align: string = 'left') => ({
+  const thStyle = (align: string = 'left') => ({
     textAlign: align as any,
     padding: '0.5rem',
     cursor: 'pointer',
@@ -181,11 +122,12 @@ export default function WayfairOrdersAnalysis() {
     fontWeight: 600,
   });
 
+  const sortIcon = (key: SortKey) => sortKey === key ? (sortAsc ? '\u2191' : '\u2193') : '';
+
   return (
     <div>
       <h1 style={{ marginBottom: '1rem' }}>Wayfair Orders Analysis</h1>
 
-      {/* Account selector */}
       {accounts.length > 1 && (
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
           {accounts.map(a => (
@@ -203,7 +145,6 @@ export default function WayfairOrdersAnalysis() {
         </div>
       )}
 
-      {/* CG / DS subtab */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
         {(['total', 'castlegate', 'dropship'] as const).map(t => (
           <button key={t} onClick={() => { setTab(t); setSearch(''); }}
@@ -219,7 +160,6 @@ export default function WayfairOrdersAnalysis() {
         ))}
       </div>
 
-      {/* Summary cards */}
       {!loading && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
           {summaryCards.map(card => (
@@ -231,14 +171,12 @@ export default function WayfairOrdersAnalysis() {
         </div>
       )}
 
-      {/* Search */}
       <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
         <input type="text" placeholder="Search part number / iwasku..." value={search} onChange={e => setSearch(e.target.value)}
           style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '240px' }} />
         <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{filtered.length} items</span>
       </div>
 
-      {/* Table */}
       <div style={{ ...cardStyle, padding: 0 }}>
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
@@ -248,35 +186,23 @@ export default function WayfairOrdersAnalysis() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th onClick={() => handleSort('partNumber')} style={thStyle('partNumber')}>
-                  Part Number {sortKey === 'partNumber' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
-                <th onClick={() => handleSort('iwasku')} style={thStyle('iwasku')}>
-                  IWASKU {sortKey === 'iwasku' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
-                <th onClick={() => handleSort('totalQty')} style={thStyle('totalQty', 'right')}>
-                  Total Qty {sortKey === 'totalQty' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
-                <th onClick={() => handleSort('avgPrice')} style={thStyle('avgPrice', 'right')}>
-                  Avg Price {sortKey === 'avgPrice' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
-                <th onClick={() => handleSort('totalCost')} style={thStyle('totalCost', 'right')}>
-                  Total Cost {sortKey === 'totalCost' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
-                <th onClick={() => handleSort('poCount')} style={thStyle('poCount', 'right')}>
-                  POs {sortKey === 'poCount' ? (sortAsc ? '\u2191' : '\u2193') : ''}
-                </th>
+                <th onClick={() => handleSort('part_number')} style={thStyle()}>Part Number {sortIcon('part_number')}</th>
+                <th onClick={() => handleSort('iwasku')} style={thStyle()}>IWASKU {sortIcon('iwasku')}</th>
+                <th onClick={() => handleSort('total_qty')} style={thStyle('right')}>Total Qty {sortIcon('total_qty')}</th>
+                <th onClick={() => handleSort('avg_price')} style={thStyle('right')}>Avg Price {sortIcon('avg_price')}</th>
+                <th onClick={() => handleSort('total_cost')} style={thStyle('right')}>Total Cost {sortIcon('total_cost')}</th>
+                <th onClick={() => handleSort('po_count')} style={thStyle('right')}>POs {sortIcon('po_count')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={r.partNumber} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.partNumber}</td>
+                <tr key={r.part_number} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.part_number}</td>
                   <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem', color: r.iwasku ? '#0f172a' : '#94a3b8' }}>{r.iwasku || '—'}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: r.totalQty > 0 ? COL_GREEN : COL_ZERO }}>{r.totalQty.toLocaleString()}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right', color: '#475569' }}>${r.avgPrice.toFixed(2)}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: r.totalCost > 0 ? COL_BLUE : COL_ZERO }}>${r.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.poCount}</td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: r.total_qty > 0 ? COL_GREEN : COL_ZERO }}>{r.total_qty.toLocaleString()}</td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right', color: '#475569' }}>${Number(r.avg_price).toFixed(2)}</td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: Number(r.total_cost) > 0 ? COL_BLUE : COL_ZERO }}>${Number(r.total_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.po_count}</td>
                 </tr>
               ))}
             </tbody>

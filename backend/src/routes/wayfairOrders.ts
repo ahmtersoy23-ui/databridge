@@ -65,6 +65,62 @@ router.get('/browse', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/v1/wayfair/orders/analysis?account=shukran&type=total|castlegate|dropship
+router.get('/analysis', async (req: Request, res: Response) => {
+  try {
+    const accountLabel = req.query.account as string | undefined;
+    const orderType = (req.query.type as string) || 'total';
+
+    const conditions = ['1=1'];
+    const params: unknown[] = [];
+    let idx = 1;
+
+    if (accountLabel) {
+      const account = await getAccountByLabel(accountLabel);
+      conditions.push(`wo.account_id = $${idx}`);
+      params.push(account.id);
+      idx++;
+    }
+    if (orderType !== 'total') {
+      conditions.push(`wo.order_type = $${idx}`);
+      params.push(orderType);
+      idx++;
+    }
+
+    const where = conditions.join(' AND ');
+    const result = await pool.query(`
+      SELECT
+        wo.part_number,
+        m.iwasku,
+        SUM(wo.quantity)::int as total_qty,
+        COALESCE(SUM(wo.total_cost), SUM(wo.price * wo.quantity))::numeric(12,2) as total_cost,
+        COUNT(DISTINCT wo.po_number)::int as po_count,
+        AVG(wo.price)::numeric(12,2) as avg_price
+      FROM wayfair_orders wo
+      LEFT JOIN wayfair_sku_mapping m ON m.part_number = wo.part_number
+      WHERE ${where}
+      GROUP BY wo.part_number, m.iwasku
+      ORDER BY total_qty DESC
+    `, params);
+
+    const rows = result.rows;
+    const matched = rows.filter((r: any) => r.iwasku).length;
+    res.json({
+      success: true,
+      data: rows,
+      summary: {
+        totalParts: rows.length,
+        totalQty: rows.reduce((s: number, r: any) => s + r.total_qty, 0),
+        totalCost: rows.reduce((s: number, r: any) => s + Number(r.total_cost), 0),
+        matched,
+        unmatched: rows.length - matched,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET /api/v1/wayfair/orders?account=cg&hasResponse=false|true (live API)
 router.get('/', async (req: Request, res: Response) => {
   try {

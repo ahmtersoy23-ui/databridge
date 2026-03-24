@@ -47,7 +47,7 @@ interface CGResponse {
   getCastleGatePurchaseOrders: WayfairCGOrder[];
 }
 
-const PAGE_LIMIT = 200;
+const PAGE_LIMIT = 100;
 
 /**
  * Fetch all CastleGate POs from fromDate onwards using date-cursor pagination.
