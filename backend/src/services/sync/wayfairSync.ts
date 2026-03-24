@@ -2,6 +2,7 @@ import { pool, sharedPool } from '../../config/database';
 import { fetchWayfairInventory } from '../wayfair/inventory';
 import { fetchWayfairPurchaseOrders } from '../wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
+import { fetchCancellations } from '../wayfair/cancellations';
 import { getActiveAccounts, type WayfairAccount } from '../wayfair/client';
 import { writeWayfairSalesData } from './wayfairSalesDataWriter';
 import logger from '../../config/logger';
@@ -177,11 +178,47 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
     }
 
     logger.info(`[WayfairSync][${account.label}] Upserted ${totalUpserted} order lines (${cgOrders.length} CG + ${dsOrders.length} DS, ${rows.length - uniqueRows.length} dupes merged)`);
+
+    // Cross-check cancellations via dedicated cancellation API (more reliable than isCancelled field)
+    await syncCancellations(account);
   } catch (err: any) {
     logger.warn(`[WayfairSync][${account.label}] Order sync failed (non-fatal): ${err.message}`);
   }
 
   return totalUpserted;
+}
+
+/** Check all non-cancelled orders against the cancellation API and update is_cancelled */
+async function syncCancellations(account: WayfairAccount): Promise<void> {
+  try {
+    // Get all PO numbers for this account that aren't already cancelled
+    const result = await pool.query(
+      `SELECT DISTINCT po_number FROM wayfair_orders WHERE account_id = $1 AND is_cancelled = false`,
+      [account.id]
+    );
+    const poNumbers = result.rows.map((r: { po_number: string }) => r.po_number);
+    if (poNumbers.length === 0) return;
+
+    const cancelledKeys = await fetchCancellations(account, poNumbers);
+    if (cancelledKeys.size === 0) return;
+
+    // Update cancelled orders in DB
+    let updated = 0;
+    for (const key of cancelledKeys) {
+      const [poNumber, partNumber] = key.split('|');
+      const res = await pool.query(
+        `UPDATE wayfair_orders SET is_cancelled = true WHERE account_id = $1 AND po_number = $2 AND part_number = $3 AND is_cancelled = false`,
+        [account.id, poNumber, partNumber]
+      );
+      updated += res.rowCount || 0;
+    }
+
+    if (updated > 0) {
+      logger.info(`[WayfairSync][${account.label}] Cancellation cross-check: ${updated} orders marked cancelled`);
+    }
+  } catch (err: any) {
+    logger.warn(`[WayfairSync][${account.label}] Cancellation cross-check failed (non-fatal): ${err.message}`);
+  }
 }
 
 async function aggregateToFbaInventory(account: WayfairAccount): Promise<number> {
