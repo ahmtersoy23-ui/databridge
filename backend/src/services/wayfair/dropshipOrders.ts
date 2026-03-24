@@ -5,6 +5,7 @@ export interface WayfairDropshipProduct {
   partNumber: string;
   quantity: number;
   price: number;
+  isCancelled?: boolean;
 }
 
 export interface WayfairDropshipOrder {
@@ -34,6 +35,7 @@ const DS_QUERY = `
         partNumber
         quantity
         price
+        isCancelled
       }
     }
   }

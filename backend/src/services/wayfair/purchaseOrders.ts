@@ -6,6 +6,7 @@ export interface WayfairCGProduct {
   quantity: number;
   price: number;
   totalCost?: number;
+  isCancelled?: boolean;
 }
 
 export interface WayfairCGOrder {
@@ -38,6 +39,7 @@ const CG_QUERY = `
         quantity
         price
         totalCost
+        isCancelled
       }
     }
   }

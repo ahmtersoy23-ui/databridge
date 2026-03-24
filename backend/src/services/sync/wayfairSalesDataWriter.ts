@@ -26,6 +26,7 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
     FROM wayfair_orders
     WHERE iwasku IS NOT NULL
       AND account_id = $1
+      AND is_cancelled = false
       AND po_date >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, part_number
   )

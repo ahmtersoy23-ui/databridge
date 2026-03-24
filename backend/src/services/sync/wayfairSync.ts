@@ -101,6 +101,7 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
       po_number: string; po_date: string | null; supplier_id: number | null;
       order_type: string; part_number: string; iwasku: string | null;
       quantity: number; price: number; total_cost: number | null;
+      is_cancelled: boolean;
     }> = [];
 
     for (const o of cgOrders) {
@@ -111,6 +112,7 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
           iwasku: mappings.get(p.partNumber) || null,
           quantity: Number(p.quantity) || 0, price: Number(p.price) || 0,
           total_cost: p.totalCost != null ? Number(p.totalCost) : null,
+          is_cancelled: p.isCancelled === true,
         });
       }
     }
@@ -122,6 +124,7 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
           iwasku: mappings.get(p.partNumber) || null,
           quantity: Number(p.quantity) || 0, price: Number(p.price) || 0,
           total_cost: null,
+          is_cancelled: p.isCancelled === true,
         });
       }
     }
@@ -138,6 +141,7 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
           existing.total_cost != null && r.total_cost != null
             ? existing.total_cost + r.total_cost
             : r.total_cost ?? existing.total_cost;
+        existing.is_cancelled = existing.is_cancelled && r.is_cancelled;
       } else {
         deduped.set(key, { ...r });
       }
@@ -150,13 +154,13 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
       const params: unknown[] = [];
 
       batch.forEach((r, idx) => {
-        const o = idx * 10;
-        values.push(`($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9}, $${o+10})`);
-        params.push(account.id, r.po_number, r.po_date, r.supplier_id, r.order_type, r.part_number, r.iwasku, r.quantity, r.price, r.total_cost);
+        const o = idx * 11;
+        values.push(`($${o+1}, $${o+2}, $${o+3}, $${o+4}, $${o+5}, $${o+6}, $${o+7}, $${o+8}, $${o+9}, $${o+10}, $${o+11})`);
+        params.push(account.id, r.po_number, r.po_date, r.supplier_id, r.order_type, r.part_number, r.iwasku, r.quantity, r.price, r.total_cost, r.is_cancelled);
       });
 
       await pool.query(`
-        INSERT INTO wayfair_orders (account_id, po_number, po_date, supplier_id, order_type, part_number, iwasku, quantity, price, total_cost)
+        INSERT INTO wayfair_orders (account_id, po_number, po_date, supplier_id, order_type, part_number, iwasku, quantity, price, total_cost, is_cancelled)
         VALUES ${values.join(', ')}
         ON CONFLICT (account_id, po_number, part_number, order_type) DO UPDATE SET
           po_date = EXCLUDED.po_date,
@@ -165,6 +169,7 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
           quantity = EXCLUDED.quantity,
           price = EXCLUDED.price,
           total_cost = EXCLUDED.total_cost,
+          is_cancelled = EXCLUDED.is_cancelled,
           fetched_at = NOW()
       `, params);
 
