@@ -45,8 +45,8 @@ export async function fetchCancellations(
   const endpoint = getApiBase(account.use_sandbox);
   const cancelledKeys = new Set<string>();
 
-  // Batch in chunks of 200 PO numbers
-  const CHUNK = 200;
+  // API limit: max 50 PO numbers per request
+  const CHUNK = 50;
   for (let i = 0; i < poNumbers.length; i += CHUNK) {
     const chunk = poNumbers.slice(i, i + CHUNK);
     try {
