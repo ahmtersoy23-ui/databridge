@@ -131,19 +131,12 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
     }
 
     // Deduplicate by (po_number, part_number, order_type)
+    // API can return the same line item multiple times (different warehouses).
+    // Keep first occurrence — don't sum, since they represent the same order line.
     const deduped = new Map<string, typeof rows[number]>();
     for (const r of rows) {
       const key = `${r.po_number}|${r.part_number}|${r.order_type}`;
-      const existing = deduped.get(key);
-      if (existing) {
-        existing.quantity += r.quantity;
-        existing.price = r.price;
-        existing.total_cost =
-          existing.total_cost != null && r.total_cost != null
-            ? existing.total_cost + r.total_cost
-            : r.total_cost ?? existing.total_cost;
-        existing.is_cancelled = existing.is_cancelled && r.is_cancelled;
-      } else {
+      if (!deduped.has(key)) {
         deduped.set(key, { ...r });
       }
     }
