@@ -41,17 +41,6 @@ const COL_GREEN = '#059669';
 const COL_BLUE = '#2563eb';
 const COL_ZERO = '#d1d5db';
 
-const btnStyle = (bg: string) => ({
-  padding: '0.25rem 0.75rem',
-  background: bg,
-  color: '#fff',
-  border: 'none',
-  borderRadius: '4px',
-  cursor: 'pointer' as const,
-  fontSize: '0.8rem',
-  marginRight: '0.25rem',
-});
-
 type SortKey = keyof AggRow;
 
 export default function WayfairOrdersAnalysis() {
