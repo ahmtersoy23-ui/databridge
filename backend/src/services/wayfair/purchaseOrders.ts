@@ -21,7 +21,7 @@ const CG_QUERY = `
     $limit: Int32
     $hasResponse: Boolean
     $sortOrder: SortOrder
-    $fromDate: String
+    $fromDate: IsoDateTime
   ) {
     getCastleGatePurchaseOrders(
       limit: $limit

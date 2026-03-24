@@ -19,7 +19,7 @@ const DS_QUERY = `
     $limit: Int32
     $hasResponse: Boolean
     $sortOrder: SortOrder
-    $fromDate: String
+    $fromDate: IsoDateTime
   ) {
     getDropshipPurchaseOrders(
       limit: $limit
