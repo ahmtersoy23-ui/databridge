@@ -19,11 +19,13 @@ const DS_QUERY = `
     $limit: Int32
     $hasResponse: Boolean
     $sortOrder: SortOrder
+    $fromDate: String
   ) {
     getDropshipPurchaseOrders(
       limit: $limit
       hasResponse: $hasResponse
       sortOrder: $sortOrder
+      fromDate: $fromDate
     ) {
       poNumber
       poDate
@@ -41,28 +43,48 @@ interface DSResponse {
   getDropshipPurchaseOrders: WayfairDropshipOrder[];
 }
 
-export async function fetchDropshipOrders(account: WayfairAccount, hasResponse?: boolean): Promise<WayfairDropshipOrder[]> {
-  const endpoint = getDropshipApiBase(account.use_sandbox);
+const PAGE_LIMIT = 200;
 
-  let result: DSResponse;
-  try {
-    result = await graphqlQuery<DSResponse>(
-      account,
-      DS_QUERY,
-      {
-        limit: 25,
-        hasResponse: hasResponse ?? null,
-        sortOrder: 'DESC',
-      },
-      endpoint
-    );
-  } catch (err: any) {
-    const msg: string = err.message || '';
-    logger.info(`[Wayfair DS][${account.label}] ${msg}`);
-    return [];
+/**
+ * Fetch all Dropship POs from fromDate onwards using date-cursor pagination.
+ */
+export async function fetchDropshipOrders(
+  account: WayfairAccount,
+  fromDate?: string,
+  hasResponse?: boolean,
+): Promise<WayfairDropshipOrder[]> {
+  const endpoint = getDropshipApiBase(account.use_sandbox);
+  const all: WayfairDropshipOrder[] = [];
+  let cursor = fromDate || null;
+
+  while (true) {
+    let result: DSResponse;
+    try {
+      result = await graphqlQuery<DSResponse>(
+        account,
+        DS_QUERY,
+        {
+          limit: PAGE_LIMIT,
+          hasResponse: hasResponse ?? null,
+          sortOrder: 'ASC',
+          fromDate: cursor,
+        },
+        endpoint
+      );
+    } catch (err: any) {
+      logger.info(`[Wayfair DS][${account.label}] ${err.message || ''}`);
+      break;
+    }
+
+    const orders = result.getDropshipPurchaseOrders || [];
+    if (orders.length === 0) break;
+
+    all.push(...orders);
+
+    if (orders.length < PAGE_LIMIT) break;
+    cursor = orders[orders.length - 1].poDate;
   }
 
-  const orders = result.getDropshipPurchaseOrders || [];
-  logger.info(`[Wayfair DS][${account.label}] ${orders.length} dropship orders fetched (hasResponse=${hasResponse ?? 'all'})`);
-  return orders;
+  logger.info(`[Wayfair DS][${account.label}] ${all.length} dropship orders fetched (fromDate=${fromDate || 'all'})`);
+  return all;
 }

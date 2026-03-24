@@ -74,7 +74,7 @@ router.get('/', async (req: Request, res: Response) => {
       : req.query.hasResponse === 'false'
       ? false
       : undefined;
-    const orders = await fetchWayfairPurchaseOrders(account, hasResponse);
+    const orders = await fetchWayfairPurchaseOrders(account, undefined, hasResponse);
     res.json({ data: orders, total: orders.length });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
@@ -90,7 +90,7 @@ router.get('/dropship', async (req: Request, res: Response) => {
       : req.query.hasResponse === 'false'
       ? false
       : undefined;
-    const orders = await fetchDropshipOrders(account, hasResponse);
+    const orders = await fetchDropshipOrders(account, undefined, hasResponse);
     res.json({ data: orders, total: orders.length });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });

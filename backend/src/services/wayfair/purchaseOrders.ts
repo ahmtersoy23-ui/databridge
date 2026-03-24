@@ -21,11 +21,13 @@ const CG_QUERY = `
     $limit: Int32
     $hasResponse: Boolean
     $sortOrder: SortOrder
+    $fromDate: String
   ) {
     getCastleGatePurchaseOrders(
       limit: $limit
       hasResponse: $hasResponse
       sortOrder: $sortOrder
+      fromDate: $fromDate
     ) {
       id
       poNumber
@@ -45,28 +47,50 @@ interface CGResponse {
   getCastleGatePurchaseOrders: WayfairCGOrder[];
 }
 
-export async function fetchWayfairPurchaseOrders(account: WayfairAccount, hasResponse?: boolean): Promise<WayfairCGOrder[]> {
-  const endpoint = getDropshipApiBase(account.use_sandbox);
+const PAGE_LIMIT = 200;
 
-  let result: CGResponse;
-  try {
-    result = await graphqlQuery<CGResponse>(
-      account,
-      CG_QUERY,
-      {
-        limit: 25,
-        hasResponse: hasResponse ?? null,
-        sortOrder: 'DESC',
-      },
-      endpoint
-    );
-  } catch (err: any) {
-    const msg: string = err.message || '';
-    logger.info(`[Wayfair CG][${account.label}] ${msg}`);
-    return [];
+/**
+ * Fetch all CastleGate POs from fromDate onwards using date-cursor pagination.
+ * Each batch returns up to PAGE_LIMIT orders sorted ASC. We advance fromDate
+ * to the last order's poDate and repeat until fewer than PAGE_LIMIT are returned.
+ */
+export async function fetchWayfairPurchaseOrders(
+  account: WayfairAccount,
+  fromDate?: string,
+  hasResponse?: boolean,
+): Promise<WayfairCGOrder[]> {
+  const endpoint = getDropshipApiBase(account.use_sandbox);
+  const all: WayfairCGOrder[] = [];
+  let cursor = fromDate || null;
+
+  while (true) {
+    let result: CGResponse;
+    try {
+      result = await graphqlQuery<CGResponse>(
+        account,
+        CG_QUERY,
+        {
+          limit: PAGE_LIMIT,
+          hasResponse: hasResponse ?? null,
+          sortOrder: 'ASC',
+          fromDate: cursor,
+        },
+        endpoint
+      );
+    } catch (err: any) {
+      logger.info(`[Wayfair CG][${account.label}] ${err.message || ''}`);
+      break;
+    }
+
+    const orders = result.getCastleGatePurchaseOrders || [];
+    if (orders.length === 0) break;
+
+    all.push(...orders);
+
+    if (orders.length < PAGE_LIMIT) break; // last page
+    cursor = orders[orders.length - 1].poDate;
   }
 
-  const orders = result.getCastleGatePurchaseOrders || [];
-  logger.info(`[Wayfair CG][${account.label}] ${orders.length} CastleGate orders fetched (hasResponse=${hasResponse ?? 'all'})`);
-  return orders;
+  logger.info(`[Wayfair CG][${account.label}] ${all.length} CastleGate orders fetched (fromDate=${fromDate || 'all'})`);
+  return all;
 }

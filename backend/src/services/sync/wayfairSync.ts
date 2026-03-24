@@ -76,13 +76,25 @@ async function upsertInventory(
   }
 }
 
+async function getLastOrderDate(accountId: number): Promise<string | undefined> {
+  const result = await pool.query(
+    `SELECT MAX(po_date) as last_date FROM wayfair_orders WHERE account_id = $1`,
+    [accountId]
+  );
+  const d = result.rows[0]?.last_date;
+  return d ? new Date(d).toISOString() : undefined;
+}
+
 async function syncOrders(account: WayfairAccount, mappings: Map<string, string>): Promise<number> {
   let totalUpserted = 0;
 
   try {
+    // Fetch from last known order date (incremental)
+    const fromDate = await getLastOrderDate(account.id);
+
     const [cgOrders, dsOrders] = await Promise.all([
-      fetchWayfairPurchaseOrders(account),
-      fetchDropshipOrders(account),
+      fetchWayfairPurchaseOrders(account, fromDate),
+      fetchDropshipOrders(account, fromDate),
     ]);
 
     const rows: Array<{
