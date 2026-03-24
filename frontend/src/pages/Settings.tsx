@@ -8,12 +8,16 @@ interface WisersellConfig {
   updated_at?: string;
 }
 
-interface WayfairConfig {
-  configured: boolean;
-  client_id?: string;
-  use_sandbox?: boolean;
-  supplier_id?: number;
-  updated_at?: string;
+interface WayfairAccount {
+  id: number;
+  label: string;
+  client_id: string;
+  use_sandbox: boolean;
+  supplier_id: number | null;
+  channel: string;
+  warehouse: string;
+  is_active: boolean;
+  updated_at: string;
 }
 
 interface Credential {
@@ -58,10 +62,10 @@ const btnStyle = (bg: string) => ({
 });
 
 const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
-const emptyWayfairForm = { client_id: '', client_secret: '', use_sandbox: true, supplier_id: '' };
+const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sandbox: false, supplier_id: '', channel: '', warehouse: '' };
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'wisersell'>('amazon');
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'wisersell' | 'ads'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -74,11 +78,21 @@ export default function Settings() {
   const [wisersellSaving, setWisersellSaving] = useState(false);
   const [wisersellMessage, setWisersellMessage] = useState('');
 
-  const [wayfairConfig, setWayfairConfig] = useState<WayfairConfig | null>(null);
+  const [wayfairAccounts, setWayfairAccounts] = useState<WayfairAccount[]>([]);
   const [wayfairForm, setWayfairForm] = useState(emptyWayfairForm);
+  const [wayfairEditingId, setWayfairEditingId] = useState<number | null>(null);
   const [wayfairSaving, setWayfairSaving] = useState(false);
   const [wayfairMessage, setWayfairMessage] = useState('');
-  const [wayfairTesting, setWayfairTesting] = useState(false);
+  const [wayfairTesting, setWayfairTesting] = useState<number | null>(null);
+  const [wayfairDeleting, setWayfairDeleting] = useState<number | null>(null);
+
+  // Ads state
+  const [adsCredentials, setAdsCredentials] = useState<Array<{ id: number; region: string; account_name: string; is_active: boolean; has_ads_token: boolean }>>([]);
+  const [adsProfiles, setAdsProfiles] = useState<Array<{ id: number; credential_id: number; profile_id: number; country_code: string; account_name: string; is_active: boolean; credential_name: string; region: string }>>([]);
+  const [adsTokenForm, setAdsTokenForm] = useState<{ credentialId: number | null; token: string }>({ credentialId: null, token: '' });
+  const [adsSaving, setAdsSaving] = useState(false);
+  const [adsDiscovering, setAdsDiscovering] = useState(false);
+  const [adsMessage, setAdsMessage] = useState('');
 
   const fetchCredentials = async () => {
     try {
@@ -101,24 +115,30 @@ export default function Settings() {
     }
   };
 
-  const fetchWayfairConfig = async () => {
+  const fetchWayfairAccounts = async () => {
     try {
       const res = await axios.get('/api/v1/wayfair/settings');
-      setWayfairConfig(res.data);
-      if (res.data.configured) {
-        setWayfairForm(prev => ({
-          ...prev,
-          client_id: res.data.client_id,
-          use_sandbox: res.data.use_sandbox,
-          supplier_id: res.data.supplier_id ? String(res.data.supplier_id) : '',
-        }));
-      }
+      setWayfairAccounts(res.data.accounts || []);
     } catch {
       // ignore
     }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairConfig(); }, []);
+  const fetchAdsCredentials = async () => {
+    try {
+      const res = await axios.get('/api/v1/ads/credentials');
+      setAdsCredentials(res.data.data);
+    } catch { /* ignore */ }
+  };
+
+  const fetchAdsProfiles = async () => {
+    try {
+      const res = await axios.get('/api/v1/ads/profiles');
+      setAdsProfiles(res.data.data);
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -189,20 +209,58 @@ export default function Settings() {
     }
   };
 
+  const handleWayfairEdit = (a: WayfairAccount) => {
+    setWayfairEditingId(a.id);
+    setWayfairForm({
+      label: a.label,
+      client_id: a.client_id,
+      client_secret: '',
+      use_sandbox: a.use_sandbox,
+      supplier_id: a.supplier_id ? String(a.supplier_id) : '',
+      channel: a.channel,
+      warehouse: a.warehouse,
+    });
+    setWayfairMessage('');
+  };
+
+  const handleWayfairCancelEdit = () => {
+    setWayfairEditingId(null);
+    setWayfairForm(emptyWayfairForm);
+    setWayfairMessage('');
+  };
+
   const handleWayfairSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setWayfairSaving(true);
     setWayfairMessage('');
     try {
-      const payload: Record<string, unknown> = {
-        client_id: wayfairForm.client_id,
-        client_secret: wayfairForm.client_secret || undefined,
-        use_sandbox: wayfairForm.use_sandbox,
-      };
-      if (wayfairForm.supplier_id) payload.supplier_id = parseInt(wayfairForm.supplier_id, 10);
-      await axios.post('/api/v1/wayfair/settings', payload);
-      setWayfairMessage('Saved successfully!');
-      fetchWayfairConfig();
+      if (wayfairEditingId) {
+        const updates: Record<string, unknown> = {};
+        if (wayfairForm.label) updates.label = wayfairForm.label;
+        if (wayfairForm.client_id) updates.client_id = wayfairForm.client_id;
+        if (wayfairForm.client_secret) updates.client_secret = wayfairForm.client_secret;
+        updates.use_sandbox = wayfairForm.use_sandbox;
+        if (wayfairForm.supplier_id) updates.supplier_id = parseInt(wayfairForm.supplier_id, 10);
+        if (wayfairForm.channel) updates.channel = wayfairForm.channel;
+        if (wayfairForm.warehouse) updates.warehouse = wayfairForm.warehouse;
+        await axios.put(`/api/v1/wayfair/settings/${wayfairEditingId}`, updates);
+        setWayfairMessage('Updated successfully!');
+        setWayfairEditingId(null);
+      } else {
+        const payload: Record<string, unknown> = {
+          label: wayfairForm.label,
+          client_id: wayfairForm.client_id,
+          client_secret: wayfairForm.client_secret,
+          use_sandbox: wayfairForm.use_sandbox,
+          channel: wayfairForm.channel,
+          warehouse: wayfairForm.warehouse,
+        };
+        if (wayfairForm.supplier_id) payload.supplier_id = parseInt(wayfairForm.supplier_id, 10);
+        await axios.post('/api/v1/wayfair/settings', payload);
+        setWayfairMessage('Account added successfully!');
+      }
+      setWayfairForm(emptyWayfairForm);
+      fetchWayfairAccounts();
     } catch (err: any) {
       setWayfairMessage(err.response?.data?.error || 'Failed to save');
     } finally {
@@ -210,16 +268,36 @@ export default function Settings() {
     }
   };
 
-  const handleWayfairTest = async () => {
-    setWayfairTesting(true);
+  const handleWayfairTest = async (id: number) => {
+    setWayfairTesting(id);
     setWayfairMessage('');
     try {
-      const res = await axios.post('/api/v1/wayfair/settings/test');
-      setWayfairMessage(`Connection OK (${res.data.sandbox ? 'Sandbox' : 'Production'})`);
+      const res = await axios.post(`/api/v1/wayfair/settings/${id}/test`);
+      setWayfairMessage(`Connection OK — ${res.data.sandbox ? 'Sandbox' : 'Production'}${res.data.supplierId ? `, Supplier: ${res.data.supplierId}` : ''}`);
     } catch (err: any) {
       setWayfairMessage(err.response?.data?.error || 'Connection failed');
     } finally {
-      setWayfairTesting(false);
+      setWayfairTesting(null);
+    }
+  };
+
+  const handleWayfairToggle = async (id: number, currentActive: boolean) => {
+    try {
+      await axios.put(`/api/v1/wayfair/settings/${id}`, { is_active: !currentActive });
+      fetchWayfairAccounts();
+    } catch { /* ignore */ }
+  };
+
+  const handleWayfairDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete Wayfair account "${label}"?`)) return;
+    setWayfairDeleting(id);
+    try {
+      await axios.delete(`/api/v1/wayfair/settings/${id}`);
+      fetchWayfairAccounts();
+    } catch (err: any) {
+      setWayfairMessage(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setWayfairDeleting(null);
     }
   };
 
@@ -236,6 +314,43 @@ export default function Settings() {
     } finally {
       setWisersellSaving(false);
     }
+  };
+
+  const handleAdsSaveToken = async (credId: number) => {
+    if (!adsTokenForm.token) return;
+    setAdsSaving(true);
+    setAdsMessage('');
+    try {
+      await axios.put(`/api/v1/ads/credentials/${credId}`, { ads_refresh_token: adsTokenForm.token });
+      setAdsMessage('Ads refresh token saved!');
+      setAdsTokenForm({ credentialId: null, token: '' });
+      fetchAdsCredentials();
+    } catch (err: any) {
+      setAdsMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setAdsSaving(false);
+    }
+  };
+
+  const handleAdsDiscover = async (credId: number) => {
+    setAdsDiscovering(true);
+    setAdsMessage('');
+    try {
+      const res = await axios.post('/api/v1/ads/profiles/discover', { credential_id: credId });
+      setAdsMessage(`Discovered ${res.data.count} profiles`);
+      fetchAdsProfiles();
+    } catch (err: any) {
+      setAdsMessage(err.response?.data?.error || 'Discovery failed');
+    } finally {
+      setAdsDiscovering(false);
+    }
+  };
+
+  const handleAdsToggleProfile = async (id: number) => {
+    try {
+      await axios.patch(`/api/v1/ads/profiles/${id}/toggle`);
+      fetchAdsProfiles();
+    } catch { /* ignore */ }
   };
 
   const tabBtn = (tab: typeof activeTab, label: string) => (
@@ -258,6 +373,7 @@ export default function Settings() {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0' }}>
         {tabBtn('amazon', 'Amazon SP-API')}
+        {tabBtn('ads', 'Amazon Ads')}
         {tabBtn('wayfair', 'Wayfair')}
         {tabBtn('wisersell', 'Wisersell')}
       </div>
@@ -372,77 +488,235 @@ export default function Settings() {
         </form>
       </div>}
 
-      {/* Wayfair credentials */}
-      {activeTab === 'wayfair' && <div style={cardStyle}>
-        <h2 style={{ marginBottom: '0.5rem' }}>Wayfair CastleGate API</h2>
-        {wayfairConfig?.configured && (
-          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
-            Current: <strong>{wayfairConfig.client_id}</strong> — {wayfairConfig.use_sandbox ? 'Sandbox' : 'Production'}
-            {wayfairConfig.supplier_id && ` — Supplier ID: ${wayfairConfig.supplier_id}`}
-            {wayfairConfig.updated_at && ` (updated ${new Date(wayfairConfig.updated_at).toLocaleDateString()})`}
-          </p>
-        )}
-        <form onSubmit={handleWayfairSubmit}>
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client ID</label>
-          <input
-            type="text"
-            placeholder="Wayfair Partner Portal Client ID"
-            value={wayfairForm.client_id}
-            onChange={e => setWayfairForm({ ...wayfairForm, client_id: e.target.value })}
-            style={inputStyle}
-            required
-          />
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client Secret</label>
-          <input
-            type="password"
-            placeholder={wayfairConfig?.configured ? 'Leave blank to keep current' : 'Client Secret'}
-            value={wayfairForm.client_secret}
-            onChange={e => setWayfairForm({ ...wayfairForm, client_secret: e.target.value })}
-            style={inputStyle}
-            required={!wayfairConfig?.configured}
-          />
-          <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
-            Supplier ID <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8rem' }}>(optional — auto-discovered if blank)</span>
-          </label>
-          <input
-            type="number"
-            placeholder="e.g. 12345"
-            value={wayfairForm.supplier_id}
-            onChange={e => setWayfairForm({ ...wayfairForm, supplier_id: e.target.value })}
-            style={inputStyle}
-          />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={wayfairForm.use_sandbox}
-                onChange={e => setWayfairForm({ ...wayfairForm, use_sandbox: e.target.checked })}
-              />
-              <span style={{ fontWeight: 500 }}>Sandbox mode</span>
-            </label>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-              {wayfairForm.use_sandbox ? 'api.wayfair.io/sandbox/...' : 'api.wayfair.io/...'}
-            </span>
-          </div>
+      {/* Wayfair accounts */}
+      {activeTab === 'wayfair' && <>
+        <div style={cardStyle}>
+          <h2 style={{ marginBottom: '1rem' }}>Wayfair Accounts</h2>
           {wayfairMessage && (
-            <p style={{ color: wayfairMessage.includes('OK') || wayfairMessage.includes('success') ? '#059669' : '#dc2626', marginBottom: '0.75rem' }}>
+            <p style={{ color: wayfairMessage.includes('OK') || wayfairMessage.includes('success') || wayfairMessage.includes('Updated') || wayfairMessage.includes('added') ? '#059669' : '#dc2626', marginBottom: '0.75rem' }}>
               {wayfairMessage}
             </p>
           )}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button type="submit" disabled={wayfairSaving}
-              style={{ padding: '0.5rem 2rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-              {wayfairSaving ? 'Saving...' : wayfairConfig?.configured ? 'Update' : 'Save'}
-            </button>
-            {wayfairConfig?.configured && (
-              <button type="button" disabled={wayfairTesting} onClick={handleWayfairTest}
-                style={{ padding: '0.5rem 1.5rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                {wayfairTesting ? 'Testing...' : 'Test Connection'}
+          {wayfairAccounts.length === 0 ? (
+            <p style={{ color: '#64748b' }}>No Wayfair accounts configured yet.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Account</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Client ID</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Channel</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Warehouse</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Supplier</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Updated</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {wayfairAccounts.map(a => (
+                  <tr key={a.id} style={{ borderBottom: '1px solid #e2e8f0', background: wayfairEditingId === a.id ? '#eff6ff' : undefined }}>
+                    <td style={{ padding: '0.5rem', fontWeight: 600, textTransform: 'capitalize' }}>{a.label}</td>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{a.client_id.slice(0, 8)}...{a.client_id.slice(-4)}</td>
+                    <td style={{ padding: '0.5rem' }}>{a.channel}</td>
+                    <td style={{ padding: '0.5rem' }}>{a.warehouse}</td>
+                    <td style={{ padding: '0.5rem' }}>{a.supplier_id || '—'}</td>
+                    <td style={{ padding: '0.5rem' }}>
+                      <span style={{ color: a.is_active ? '#059669' : '#9ca3af' }}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.5rem', fontSize: '0.82rem', color: '#64748b' }}>
+                      {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>
+                      <button onClick={() => handleWayfairTest(a.id)} disabled={wayfairTesting === a.id} style={btnStyle('#6366f1')}>
+                        {wayfairTesting === a.id ? '...' : 'Test'}
+                      </button>
+                      <button onClick={() => handleWayfairToggle(a.id, a.is_active)} style={btnStyle(a.is_active ? '#d97706' : '#059669')}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleWayfairEdit(a)} style={btnStyle('#2563eb')}>Edit</button>
+                      <button onClick={() => handleWayfairDelete(a.id, a.label)} disabled={wayfairDeleting === a.id} style={btnStyle('#dc2626')}>
+                        {wayfairDeleting === a.id ? '...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Wayfair Add/Edit form */}
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2>{wayfairEditingId ? `Edit — ${wayfairForm.label}` : 'Add Wayfair Account'}</h2>
+            {wayfairEditingId && (
+              <button onClick={handleWayfairCancelEdit} style={{ ...btnStyle('#6b7280'), fontSize: '0.85rem', padding: '0.35rem 1rem' }}>
+                Cancel
               </button>
             )}
           </div>
-        </form>
-      </div>}
+          <form onSubmit={handleWayfairSubmit}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 1rem' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Account Label</label>
+                <input type="text" placeholder="e.g. shukran, mdn" value={wayfairForm.label}
+                  onChange={e => setWayfairForm({ ...wayfairForm, label: e.target.value })}
+                  style={inputStyle} required />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>
+                  Supplier ID <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8rem' }}>(auto-discovered)</span>
+                </label>
+                <input type="number" placeholder="e.g. 194115" value={wayfairForm.supplier_id}
+                  onChange={e => setWayfairForm({ ...wayfairForm, supplier_id: e.target.value })}
+                  style={inputStyle} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client ID</label>
+                <input type="text" placeholder="Wayfair Client ID" value={wayfairForm.client_id}
+                  onChange={e => setWayfairForm({ ...wayfairForm, client_id: e.target.value })}
+                  style={inputStyle} required={!wayfairEditingId} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Client Secret</label>
+                <input type="password" placeholder={wayfairEditingId ? 'Leave blank to keep current' : 'Client Secret'}
+                  value={wayfairForm.client_secret}
+                  onChange={e => setWayfairForm({ ...wayfairForm, client_secret: e.target.value })}
+                  style={inputStyle} required={!wayfairEditingId} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Sales Channel</label>
+                <input type="text" placeholder="e.g. wfs, wfm" value={wayfairForm.channel}
+                  onChange={e => setWayfairForm({ ...wayfairForm, channel: e.target.value })}
+                  style={inputStyle} required={!wayfairEditingId} />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Warehouse Code</label>
+                <input type="text" placeholder="e.g. WFS, WFM" value={wayfairForm.warehouse}
+                  onChange={e => setWayfairForm({ ...wayfairForm, warehouse: e.target.value })}
+                  style={inputStyle} required={!wayfairEditingId} />
+              </div>
+            </div>
+            <button type="submit" disabled={wayfairSaving}
+              style={{ padding: '0.5rem 2rem', background: wayfairEditingId ? '#059669' : '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+              {wayfairSaving ? 'Saving...' : wayfairEditingId ? 'Update Account' : 'Add Account'}
+            </button>
+          </form>
+        </div>
+      </>}
+
+      {/* Amazon Ads tab */}
+      {activeTab === 'ads' && <>
+        <div style={cardStyle}>
+          <h2 style={{ marginBottom: '1rem' }}>Ads API Credentials</h2>
+          <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem' }}>
+            Each SP-API credential needs a separate Ads refresh token with <code>advertising::campaign_management</code> scope.
+          </p>
+          {adsMessage && (
+            <p style={{ color: adsMessage.includes('saved') || adsMessage.includes('Discovered') ? '#059669' : '#dc2626', marginBottom: '0.75rem' }}>
+              {adsMessage}
+            </p>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Region</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Account</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Ads Token</th>
+                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {adsCredentials.map(c => (
+                <tr key={c.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '0.5rem' }}>{c.region}</td>
+                  <td style={{ padding: '0.5rem' }}>{c.account_name || '-'}</td>
+                  <td style={{ padding: '0.5rem' }}>
+                    {adsTokenForm.credentialId === c.id ? (
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        <input
+                          type="password"
+                          placeholder="Atzr|xxx..."
+                          value={adsTokenForm.token}
+                          onChange={e => setAdsTokenForm({ ...adsTokenForm, token: e.target.value })}
+                          style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                        />
+                        <button onClick={() => handleAdsSaveToken(c.id)} disabled={adsSaving} style={btnStyle('#059669')}>
+                          {adsSaving ? '...' : 'Save'}
+                        </button>
+                        <button onClick={() => setAdsTokenForm({ credentialId: null, token: '' })} style={btnStyle('#6b7280')}>
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <span style={{ color: c.has_ads_token ? '#059669' : '#9ca3af' }}>
+                        {c.has_ads_token ? 'Configured' : 'Not set'}
+                      </span>
+                    )}
+                  </td>
+                  <td style={{ padding: '0.5rem' }}>
+                    {adsTokenForm.credentialId !== c.id && (
+                      <>
+                        <button onClick={() => setAdsTokenForm({ credentialId: c.id, token: '' })} style={btnStyle('#2563eb')}>
+                          {c.has_ads_token ? 'Update Token' : 'Set Token'}
+                        </button>
+                        {c.has_ads_token && (
+                          <button onClick={() => handleAdsDiscover(c.id)} disabled={adsDiscovering} style={btnStyle('#6366f1')}>
+                            {adsDiscovering ? '...' : 'Discover Profiles'}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={cardStyle}>
+          <h2 style={{ marginBottom: '1rem' }}>Ads Profiles</h2>
+          {adsProfiles.length === 0 ? (
+            <p style={{ color: '#64748b' }}>No profiles discovered yet. Set an Ads token and click "Discover Profiles".</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Account</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Profile ID</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Credential</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {adsProfiles.map(p => (
+                  <tr key={p.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '0.5rem', fontWeight: 500 }}>{p.country_code}</td>
+                    <td style={{ padding: '0.5rem' }}>{p.account_name || '-'}</td>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.8rem' }}>{p.profile_id}</td>
+                    <td style={{ padding: '0.5rem' }}>{p.credential_name} ({p.region})</td>
+                    <td style={{ padding: '0.5rem' }}>
+                      <span style={{ color: p.is_active ? '#059669' : '#9ca3af' }}>
+                        {p.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '0.5rem' }}>
+                      <button onClick={() => handleAdsToggleProfile(p.id)} style={btnStyle(p.is_active ? '#d97706' : '#059669')}>
+                        {p.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </>}
 
       {/* Add/Edit credentials form */}
       {activeTab === 'amazon' && <div style={cardStyle}>
