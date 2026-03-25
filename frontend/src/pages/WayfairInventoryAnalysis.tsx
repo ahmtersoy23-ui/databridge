@@ -9,6 +9,10 @@ interface InvRow {
   last_synced_at: string | null;
 }
 
+interface WfAccount { id: number; label: string; channel: string; is_active: boolean; }
+
+const ACCOUNT_LABELS: Record<string, string> = { shukran: 'Shukran', mdn: 'MDN' };
+
 const cardStyle = {
   background: '#fff',
   borderRadius: '8px',
@@ -31,15 +35,26 @@ export default function WayfairInventoryAnalysis() {
   const [matchFilter, setMatchFilter] = useState<'all' | 'matched' | 'unmatched'>('all');
   const [sortKey, setSortKey] = useState<SortKey>('on_hand_qty');
   const [sortAsc, setSortAsc] = useState(false);
+  const [accounts, setAccounts] = useState<WfAccount[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState('shukran');
+
+  useEffect(() => {
+    axios.get('/api/v1/wayfair/settings').then(r => {
+      const active = (r.data.accounts || []).filter((a: WfAccount) => a.is_active);
+      setAccounts(active);
+      if (active.length > 0 && !active.find((a: WfAccount) => a.label === selectedAccount)) {
+        setSelectedAccount(active[0].label);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
-    // Fetch all inventory (high limit to get everything for analysis)
-    axios.get('/api/v1/wayfair/inventory', { params: { page: 1, limit: 200 } })
+    axios.get('/api/v1/wayfair/inventory', { params: { page: 1, limit: 200, account: selectedAccount } })
       .then(res => setRows(res.data.data))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedAccount]);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -104,6 +119,23 @@ export default function WayfairInventoryAnalysis() {
   return (
     <div>
       <h1 style={{ marginBottom: '1.5rem' }}>Wayfair Inventory Analysis</h1>
+
+      {accounts.length > 1 && (
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+          {accounts.map(a => (
+            <button key={a.label} onClick={() => setSelectedAccount(a.label)}
+              style={{
+                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
+                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
+                background: selectedAccount === a.label ? '#0891b2' : '#fff',
+                color: selectedAccount === a.label ? '#fff' : '#334155',
+                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
+              }}>
+              {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary cards */}
       {!loading && (

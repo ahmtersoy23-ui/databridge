@@ -53,6 +53,10 @@ async function upsertInventory(
   accountId: number,
   items: Array<{ partNumber: string; warehouseId: string; warehouseName: string; quantity: number; availableQty: number; iwasku: string | null }>
 ): Promise<void> {
+  // Delete all existing inventory for this account, then re-insert fresh data.
+  // This ensures stale warehouse rows (qty went to 0) are cleaned up.
+  await pool.query('DELETE FROM wayfair_inventory WHERE account_id = $1', [accountId]);
+
   for (let i = 0; i < items.length; i += BATCH_SIZE) {
     const batch = items.slice(i, i + BATCH_SIZE);
     const values: string[] = [];
@@ -217,7 +221,8 @@ async function syncCancellations(account: WayfairAccount): Promise<void> {
 async function aggregateToFbaInventory(account: WayfairAccount): Promise<number> {
   const result = await pool.query(`
     SELECT iwasku,
-           SUM(quantity)::int AS fulfillable_quantity,
+           SUM(quantity)::int AS total_quantity,
+           MAX(available_qty)::int AS fulfillable_quantity,
            (array_agg(part_number ORDER BY quantity DESC))[1] AS part_number
     FROM wayfair_inventory
     WHERE iwasku IS NOT NULL AND account_id = $1
@@ -236,10 +241,10 @@ async function aggregateToFbaInventory(account: WayfairAccount): Promise<number>
       const values: string[] = [];
       const params: unknown[] = [];
 
-      batch.forEach((row: { iwasku: string; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
+      batch.forEach((row: { iwasku: string; total_quantity: number; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
         const offset = idx * 5;
         values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
-        params.push(row.iwasku, account.warehouse, row.fulfillable_quantity, row.fulfillable_quantity, row.part_number || null);
+        params.push(row.iwasku, account.warehouse, row.fulfillable_quantity, row.total_quantity, row.part_number || null);
       });
 
       await client.query(`

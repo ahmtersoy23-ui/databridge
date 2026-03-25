@@ -5,7 +5,10 @@ import * as XLSX from 'xlsx';
 interface MappingRow {
   part_number: string;
   iwasku: string | null;
+  accounts: string[];
 }
+
+const ACCOUNT_LABELS: Record<string, string> = { shukran: 'Shukran', mdn: 'MDN' };
 
 interface Pagination {
   total: number;
@@ -41,7 +44,7 @@ export default function WayfairMappings() {
       const res = await axios.get('/api/v1/wayfair/parts', {
         params: { filter, page, limit: pagination.limit, search, includeOrders: 'true' },
       });
-      setRows(res.data.data.map((r: any) => ({ part_number: r.part_number, iwasku: r.iwasku })));
+      setRows(res.data.data.map((r: any) => ({ part_number: r.part_number, iwasku: r.iwasku, accounts: r.accounts || [] })));
       setPagination(res.data.pagination);
     } catch {
       // ignore
@@ -210,6 +213,7 @@ export default function WayfairMappings() {
           <thead>
             <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Part Number</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Account</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
               <th style={{ textAlign: 'left', padding: '0.5rem', width: '80px' }}></th>
             </tr>
@@ -218,6 +222,9 @@ export default function WayfairMappings() {
             {rows.map(row => (
               <tr key={row.part_number} style={{ borderBottom: '1px solid #f1f5f9' }}>
                 <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{row.part_number}</td>
+                <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: row.accounts[0] === 'shukran' ? '#1e40af' : row.accounts[0] === 'mdn' ? '#9d174d' : '#94a3b8', fontWeight: 500 }}>
+                  {row.accounts[0] ? (ACCOUNT_LABELS[row.accounts[0]] || row.accounts[0].toUpperCase()) : '—'}
+                </td>
                 <td style={{ padding: '0.5rem' }}>
                   {editingPn === row.part_number ? (
                     <div style={{ display: 'flex', gap: '0.35rem' }}>
@@ -260,7 +267,7 @@ export default function WayfairMappings() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                   No items found. Run a Wayfair sync first to populate part numbers.
                 </td>
               </tr>
