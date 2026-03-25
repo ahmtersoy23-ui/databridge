@@ -220,13 +220,15 @@ async function syncCancellations(account: WayfairAccount): Promise<void> {
 
 async function aggregateToFbaInventory(account: WayfairAccount): Promise<number> {
   const result = await pool.query(`
-    SELECT iwasku,
-           SUM(quantity)::int AS total_quantity,
-           MAX(available_qty)::int AS fulfillable_quantity,
-           (array_agg(part_number ORDER BY quantity DESC))[1] AS part_number
-    FROM wayfair_inventory
-    WHERE iwasku IS NOT NULL AND account_id = $1
-    GROUP BY iwasku
+    SELECT wi.iwasku,
+           SUM(wi.quantity)::int AS total_quantity,
+           MAX(wi.available_qty)::int AS fulfillable_quantity,
+           (array_agg(wi.part_number ORDER BY wi.quantity DESC))[1] AS part_number,
+           MAX(m.shipping_cost) AS shipping_cost
+    FROM wayfair_inventory wi
+    LEFT JOIN wayfair_sku_mapping m ON m.part_number = wi.part_number
+    WHERE wi.iwasku IS NOT NULL AND wi.account_id = $1
+    GROUP BY wi.iwasku
   `, [account.id]);
 
   if (result.rows.length === 0) return 0;
@@ -241,19 +243,20 @@ async function aggregateToFbaInventory(account: WayfairAccount): Promise<number>
       const values: string[] = [];
       const params: unknown[] = [];
 
-      batch.forEach((row: { iwasku: string; total_quantity: number; fulfillable_quantity: number; part_number: string | null }, idx: number) => {
-        const offset = idx * 5;
-        values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5})`);
-        params.push(row.iwasku, account.warehouse, row.fulfillable_quantity, row.total_quantity, row.part_number || null);
+      batch.forEach((row: { iwasku: string; total_quantity: number; fulfillable_quantity: number; part_number: string | null; shipping_cost: string | null }, idx: number) => {
+        const offset = idx * 6;
+        values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6})`);
+        params.push(row.iwasku, account.warehouse, row.fulfillable_quantity, row.total_quantity, row.part_number || null, row.shipping_cost ? parseFloat(row.shipping_cost) : null);
       });
 
       await client.query(`
-        INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity, asin)
+        INSERT INTO fba_inventory (iwasku, warehouse, fulfillable_quantity, total_quantity, asin, shipping_cost)
         VALUES ${values.join(', ')}
         ON CONFLICT (iwasku, warehouse) DO UPDATE SET
           fulfillable_quantity = EXCLUDED.fulfillable_quantity,
           total_quantity = EXCLUDED.total_quantity,
           asin = EXCLUDED.asin,
+          shipping_cost = EXCLUDED.shipping_cost,
           updated_at = NOW()
       `, params);
     }

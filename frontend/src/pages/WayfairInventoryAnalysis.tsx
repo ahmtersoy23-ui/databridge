@@ -6,6 +6,7 @@ interface InvRow {
   iwasku: string | null;
   on_hand_qty: number;
   available_qty: number;
+  shipping_cost: number | null;
   last_synced_at: string | null;
 }
 
@@ -26,7 +27,7 @@ const COL_BLUE = '#2563eb';
 const COL_ORANGE = '#d97706';
 const COL_ZERO = '#9ca3af';
 
-type SortKey = 'part_number' | 'iwasku' | 'on_hand_qty' | 'available_qty';
+type SortKey = 'part_number' | 'iwasku' | 'on_hand_qty' | 'available_qty' | 'shipping_cost';
 
 export default function WayfairInventoryAnalysis() {
   const [rows, setRows] = useState<InvRow[]>([]);
@@ -37,6 +38,9 @@ export default function WayfairInventoryAnalysis() {
   const [sortAsc, setSortAsc] = useState(false);
   const [accounts, setAccounts] = useState<WfAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState('shukran');
+  const [editingPn, setEditingPn] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     axios.get('/api/v1/wayfair/settings').then(r => {
@@ -48,13 +52,26 @@ export default function WayfairInventoryAnalysis() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
+  const fetchData = () => {
     setLoading(true);
     axios.get('/api/v1/wayfair/inventory', { params: { page: 1, limit: 200, account: selectedAccount } })
       .then(res => setRows(res.data.data))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [selectedAccount]);
+  };
+
+  useEffect(() => { fetchData(); }, [selectedAccount]);
+
+  const saveCost = async (partNumber: string) => {
+    setSaving(true);
+    try {
+      const cost = editValue.trim() === '' ? null : editValue.trim();
+      await axios.put('/api/v1/wayfair/inventory/shipping-cost', { part_number: partNumber, shipping_cost: cost });
+      setRows(prev => prev.map(r => r.part_number === partNumber ? { ...r, shipping_cost: cost ? parseFloat(cost) : null } : r));
+      setEditingPn(null);
+    } catch { /* ignore */ }
+    finally { setSaving(false); }
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -97,7 +114,7 @@ export default function WayfairInventoryAnalysis() {
   ];
 
   const thStyle = (_key: SortKey, align: string = 'left') => ({
-    textAlign: align as any,
+    textAlign: align as React.CSSProperties['textAlign'],
     padding: '0.5rem',
     cursor: 'pointer',
     userSelect: 'none' as const,
@@ -198,6 +215,9 @@ export default function WayfairInventoryAnalysis() {
                 <th onClick={() => handleSort('available_qty')} style={thStyle('available_qty', 'right')}>
                   Available {sortKey === 'available_qty' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
+                <th onClick={() => handleSort('shipping_cost')} style={thStyle('shipping_cost', 'right')}>
+                  Ship Cost {sortKey === 'shipping_cost' ? (sortAsc ? '\u2191' : '\u2193') : ''}
+                </th>
                 <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 600 }}>Status</th>
               </tr>
             </thead>
@@ -208,6 +228,34 @@ export default function WayfairInventoryAnalysis() {
                   <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem', color: r.iwasku ? '#0f172a' : '#94a3b8' }}>{r.iwasku || '—'}</td>
                   <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 500, color: (r.on_hand_qty || 0) > 0 ? '#0f172a' : COL_ZERO }}>{r.on_hand_qty ?? 0}</td>
                   <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: (r.available_qty || 0) > 0 ? COL_GREEN : COL_ZERO }}>{r.available_qty ?? 0}</td>
+                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                    {editingPn === r.part_number ? (
+                      <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                        <input
+                          autoFocus type="number" step="0.01" value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') saveCost(r.part_number); if (e.key === 'Escape') setEditingPn(null); }}
+                          style={{ width: '70px', padding: '0.2rem 0.4rem', border: '1px solid #2563eb', borderRadius: '4px', fontSize: '0.82rem', textAlign: 'right' }}
+                        />
+                        <button disabled={saving} onClick={() => saveCost(r.part_number)}
+                          style={{ padding: '0.2rem 0.4rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
+                          {saving ? '..' : '✓'}
+                        </button>
+                        <button onClick={() => setEditingPn(null)}
+                          style={{ padding: '0.2rem 0.4rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <span
+                        onClick={() => { setEditingPn(r.part_number); setEditValue(r.shipping_cost != null ? String(r.shipping_cost) : ''); }}
+                        style={{ cursor: 'pointer', color: r.shipping_cost != null ? '#0f172a' : '#94a3b8', fontWeight: 500 }}
+                        title="Click to edit"
+                      >
+                        {r.shipping_cost != null ? `$${Number(r.shipping_cost).toFixed(2)}` : '—'}
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding: '0.5rem' }}>
                     <span style={{
                       padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem',
