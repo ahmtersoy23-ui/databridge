@@ -15,6 +15,7 @@ export const SYNC_WAYFAIR_CRON = '0 1,9,17 * * *';    // Every 8h at 01:00, 09:0
 export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for overlap
 export const SYNC_TRANSACTIONS_CRON = '0 5 * * *';  // Daily at 05:00 UTC
 export const TRANSACTION_OVERLAP_DAYS = 35;          // Fetch last 35 days (settlement delays)
+export const SYNC_ADS_CRON = '0 6 * * *';           // Daily at 06:00 UTC (after transactions)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';

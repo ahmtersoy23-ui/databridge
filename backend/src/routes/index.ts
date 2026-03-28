@@ -15,6 +15,7 @@ import wayfairOrdersRouter from './wayfairOrders';
 import wayfairInventoryRouter from './wayfairInventory';
 import wayfairPartsRouter from './wayfairParts';
 import reviewsRouter from './reviews';
+import adsRouter from './ads';
 import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -38,6 +39,7 @@ router.use('/wayfair/orders', wayfairOrdersRouter);
 router.use('/wayfair/inventory', wayfairInventoryRouter);
 router.use('/wayfair/parts', wayfairPartsRouter);
 router.use('/reviews', reviewsRouter);
+router.use('/ads', adsRouter);
 router.use('/sync', syncRouter);
 router.use('/status', statusRouter);
 router.use('/credentials', credentialsRouter);
