@@ -17,6 +17,7 @@ import WayfairInventory from './pages/WayfairInventory';
 import WayfairOrdersAnalysis from './pages/WayfairOrdersAnalysis';
 import WayfairInventoryAnalysis from './pages/WayfairInventoryAnalysis';
 import Reviews from './pages/Reviews';
+import Ads from './pages/Ads';
 
 // Axios global config — tüm isteklerde cookie gönder
 axios.defaults.withCredentials = true;
@@ -34,7 +35,7 @@ axios.interceptors.response.use(
   }
 );
 
-const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis', '/reviews'];
+const AMAZON_PATHS = ['/orders', '/inventory', '/sales-analysis', '/inventory-analysis', '/reviews', '/ads'];
 const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders-analysis', '/wayfair/inventory-analysis', '/wayfair/mappings'];
 
 function UserMenu() {
@@ -148,6 +149,7 @@ function Nav() {
           <NavLink to="/sales-analysis" style={subLink}>Sales Analysis</NavLink>
           <NavLink to="/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
           <NavLink to="/reviews" style={subLink}>Reviews</NavLink>
+          <NavLink to="/ads" style={subLink}>Ads</NavLink>
         </nav>
       )}
 
@@ -187,6 +189,7 @@ export default function App() {
               <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
               <Route path="/wayfair/mappings" element={<WayfairMappings />} />
               <Route path="/reviews" element={<Reviews />} />
+              <Route path="/ads" element={<Ads />} />
               <Route path="/logs" element={<Logs />} />
             </Routes>
           </main>

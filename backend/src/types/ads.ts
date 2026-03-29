@@ -184,7 +184,7 @@ export const ADS_REPORT_TYPE_MAP: Record<AdsReportType, string> = {
 // Columns requested per report type (Ads API V3 — validated against API schema)
 export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
   search_term: [
-    'startDate', 'endDate', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
+    'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
     'adGroupName', 'adGroupId', 'targeting', 'matchType',
     'searchTerm', 'impressions', 'clicks', 'clickThroughRate', 'costPerClick',
     'spend', 'sales7d', 'acosClicks7d', 'roasClicks7d', 'purchases7d', 'unitsSoldClicks7d',
@@ -192,7 +192,7 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
     'attributedSalesSameSku7d', 'salesOtherSku7d',
   ],
   targeting: [
-    'startDate', 'endDate', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
+    'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
     'adGroupName', 'adGroupId', 'targeting', 'matchType',
     'impressions', 'topOfSearchImpressionShare', 'clicks', 'clickThroughRate',
     'costPerClick', 'cost', 'acosClicks7d', 'roasClicks7d', 'sales7d', 'purchases7d',
@@ -200,7 +200,7 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
     'attributedSalesSameSku7d', 'salesOtherSku7d',
   ],
   advertised_product: [
-    'startDate', 'endDate', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
+    'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
     'adGroupName', 'adGroupId', 'impressions', 'clicks', 'clickThroughRate',
     'costPerClick', 'spend', 'sales7d', 'acosClicks7d', 'roasClicks7d',
     'purchases7d', 'unitsSoldClicks7d',
@@ -208,7 +208,7 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
     'attributedSalesSameSku7d', 'salesOtherSku7d',
   ],
   purchased_product: [
-    'startDate', 'endDate', 'portfolioId', 'campaignName', 'campaignId',
+    'date', 'portfolioId', 'campaignName', 'campaignId',
     'campaignBudgetCurrencyCode', 'adGroupName', 'adGroupId',
     'targeting', 'matchType',
     'unitsSoldOtherSku7d', 'salesOtherSku7d',

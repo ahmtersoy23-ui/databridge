@@ -25,7 +25,7 @@ export async function createAdsReport(
       groupBy: ADS_REPORT_GROUP_BY[reportType],
       columns: ADS_REPORT_COLUMNS[reportType],
       reportTypeId: ADS_REPORT_TYPE_MAP[reportType],
-      timeUnit: 'SUMMARY',
+      timeUnit: 'DAILY',
       format: 'GZIP_JSON',
     },
   };
