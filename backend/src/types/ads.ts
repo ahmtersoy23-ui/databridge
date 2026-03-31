@@ -201,7 +201,9 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
   ],
   advertised_product: [
     'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
-    'adGroupName', 'adGroupId', 'impressions', 'clicks', 'clickThroughRate',
+    'adGroupName', 'adGroupId',
+    'advertisedSku', 'advertisedAsin',
+    'impressions', 'clicks', 'clickThroughRate',
     'costPerClick', 'spend', 'sales7d', 'acosClicks7d', 'roasClicks7d',
     'purchases7d', 'unitsSoldClicks7d',
     'purchasesSameSku7d', 'unitsSoldSameSku7d', 'unitsSoldOtherSku7d',
@@ -210,8 +212,9 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
   purchased_product: [
     'date', 'portfolioId', 'campaignName', 'campaignId',
     'campaignBudgetCurrencyCode', 'adGroupName', 'adGroupId',
+    'advertisedSku', 'advertisedAsin', 'purchasedAsin',
     'targeting', 'matchType',
-    'unitsSoldOtherSku7d', 'salesOtherSku7d',
+    'unitsSoldOtherSku7d', 'salesOtherSku7d', 'otherSkuOrdersClicks7d',
   ],
 };
 
@@ -219,6 +222,6 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
 export const ADS_REPORT_GROUP_BY: Record<AdsReportType, string[]> = {
   search_term: ['searchTerm'],
   targeting: ['targeting'],
-  advertised_product: ['advertiser'],
+  advertised_product: ['asin'],
   purchased_product: ['asin'],
 };
