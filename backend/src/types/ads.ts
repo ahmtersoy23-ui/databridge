@@ -220,6 +220,6 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
 export const ADS_REPORT_GROUP_BY: Record<AdsReportType, string[]> = {
   search_term: ['searchTerm'],
   targeting: ['targeting'],
-  advertised_product: ['asin'],
+  advertised_product: ['advertiser'],
   purchased_product: ['asin'],
 };
