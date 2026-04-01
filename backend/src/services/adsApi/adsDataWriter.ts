@@ -28,8 +28,8 @@ export async function writeSearchTermData(profileId: number, startDate: string, 
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 18;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18})`);
+      const offset = j * 22;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21}, $${offset + 22})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -49,6 +49,10 @@ export async function writeSearchTermData(profileId: number, startDate: string, 
         r.purchases7d || 0,
         r.unitsSoldClicks7d || 0,
         r.costPerClick || 0,
+        r.unitsSoldSameSku7d || 0,       // adv_sku_units_7d
+        r.unitsSoldOtherSku7d || 0,      // other_sku_units_7d
+        r.attributedSalesSameSku7d || 0,  // adv_sku_sales_7d
+        r.salesOtherSku7d || 0,           // other_sku_sales_7d
       );
     }
 
@@ -57,7 +61,8 @@ export async function writeSearchTermData(profileId: number, startDate: string, 
         profile_id, report_date, portfolio_name, currency,
         campaign_name, campaign_id, ad_group_name, ad_group_id,
         targeting, match_type, customer_search_term,
-        impressions, clicks, spend, sales_7d, orders_7d, units_7d, cpc
+        impressions, clicks, spend, sales_7d, orders_7d, units_7d, cpc,
+        adv_sku_units_7d, other_sku_units_7d, adv_sku_sales_7d, other_sku_sales_7d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, customer_search_term, targeting, match_type)
       DO UPDATE SET
@@ -68,6 +73,10 @@ export async function writeSearchTermData(profileId: number, startDate: string, 
         orders_7d = EXCLUDED.orders_7d,
         units_7d = EXCLUDED.units_7d,
         cpc = EXCLUDED.cpc,
+        adv_sku_units_7d = EXCLUDED.adv_sku_units_7d,
+        other_sku_units_7d = EXCLUDED.other_sku_units_7d,
+        adv_sku_sales_7d = EXCLUDED.adv_sku_sales_7d,
+        other_sku_sales_7d = EXCLUDED.other_sku_sales_7d,
         synced_at = NOW()`,
       values
     );
@@ -93,8 +102,8 @@ export async function writeTargetingData(profileId: number, startDate: string, e
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 16;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16})`);
+      const offset = j * 20;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -112,6 +121,10 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         r.sales7d || 0,
         r.purchases7d || 0,
         r.unitsSoldClicks7d || 0,
+        r.unitsSoldSameSku7d || 0,       // adv_sku_units_7d
+        r.unitsSoldOtherSku7d || 0,      // other_sku_units_7d
+        r.attributedSalesSameSku7d || 0,  // adv_sku_sales_7d
+        r.salesOtherSku7d || 0,           // other_sku_sales_7d
       );
     }
 
@@ -120,7 +133,8 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         profile_id, report_date, portfolio_name, currency,
         campaign_name, campaign_id, ad_group_name, ad_group_id,
         targeting, match_type,
-        impressions, clicks, spend, sales_7d, orders_7d, units_7d
+        impressions, clicks, spend, sales_7d, orders_7d, units_7d,
+        adv_sku_units_7d, other_sku_units_7d, adv_sku_sales_7d, other_sku_sales_7d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, targeting, match_type)
       DO UPDATE SET
@@ -130,6 +144,10 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         sales_7d = EXCLUDED.sales_7d,
         orders_7d = EXCLUDED.orders_7d,
         units_7d = EXCLUDED.units_7d,
+        adv_sku_units_7d = EXCLUDED.adv_sku_units_7d,
+        other_sku_units_7d = EXCLUDED.other_sku_units_7d,
+        adv_sku_sales_7d = EXCLUDED.adv_sku_sales_7d,
+        other_sku_sales_7d = EXCLUDED.other_sku_sales_7d,
         synced_at = NOW()`,
       values
     );
