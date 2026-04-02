@@ -212,6 +212,7 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
   purchased_product: [
     'date', 'portfolioId', 'campaignName', 'campaignId',
     'campaignBudgetCurrencyCode', 'adGroupName', 'adGroupId',
+    'advertisedAsin', 'advertisedSku', 'purchasedAsin',
     'targeting', 'matchType',
     'unitsSoldOtherSku7d', 'salesOtherSku7d',
   ],

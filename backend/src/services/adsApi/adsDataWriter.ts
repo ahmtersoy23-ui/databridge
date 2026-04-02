@@ -102,8 +102,8 @@ export async function writeTargetingData(profileId: number, startDate: string, e
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 20;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20})`);
+      const offset = j * 21;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -116,6 +116,7 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         r.targeting || null,
         r.matchType || null,
         r.impressions || 0,
+        r.topOfSearchImpressionShare || null, // TOS — decimal or null
         r.clicks || 0,
         r.cost || r.spend || 0,
         r.sales7d || 0,
@@ -133,12 +134,13 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         profile_id, report_date, portfolio_name, currency,
         campaign_name, campaign_id, ad_group_name, ad_group_id,
         targeting, match_type,
-        impressions, clicks, spend, sales_7d, orders_7d, units_7d,
+        impressions, top_of_search_impression_share, clicks, spend, sales_7d, orders_7d, units_7d,
         adv_sku_units_7d, other_sku_units_7d, adv_sku_sales_7d, other_sku_sales_7d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, targeting, match_type)
       DO UPDATE SET
         impressions = EXCLUDED.impressions,
+        top_of_search_impression_share = EXCLUDED.top_of_search_impression_share,
         clicks = EXCLUDED.clicks,
         spend = EXCLUDED.spend,
         sales_7d = EXCLUDED.sales_7d,
