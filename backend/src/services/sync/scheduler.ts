@@ -280,9 +280,13 @@ async function runInventoryAgingSync(): Promise<void> {
   try {
     const eligibleMarketplaces = await getEligibleMarketplaces();
 
+    // AE/SA don't support GET_FBA_INVENTORY_AGED_DATA — skip them
+    const AGING_EXCLUDED_WAREHOUSES = ['AE', 'SA'];
+
     // Group by credential_id + warehouse (same as inventory sync)
     const byGroup = new Map<string, MarketplaceConfig[]>();
     for (const mp of eligibleMarketplaces) {
+      if (AGING_EXCLUDED_WAREHOUSES.includes(mp.warehouse)) continue;
       const key = `${mp.credential_id}|${mp.warehouse}`;
       if (!byGroup.has(key)) byGroup.set(key, []);
       byGroup.get(key)!.push(mp);
