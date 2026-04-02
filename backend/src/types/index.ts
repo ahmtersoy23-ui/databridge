@@ -150,6 +150,45 @@ export interface ReviewHistory {
   recorded_at: Date;
 }
 
+export interface FbaInventoryAgingItem {
+  warehouse: string;
+  marketplace_id: string;
+  snapshot_date: string | null;
+  sku: string;
+  fnsku: string | null;
+  asin: string | null;
+  iwasku: string | null;
+  product_name: string | null;
+  condition: string | null;
+  available_quantity: number;
+  qty_with_removals_in_progress: number;
+  inv_age_0_to_90_days: number;
+  inv_age_91_to_180_days: number;
+  inv_age_181_to_270_days: number;
+  inv_age_271_to_365_days: number;
+  inv_age_365_plus_days: number;
+  currency: string | null;
+  estimated_ltsf_next_charge: number;
+  per_unit_volume: number | null;
+  is_hazmat: boolean;
+  in_date: string | null;
+  units_shipped_last_7_days: number;
+  units_shipped_last_30_days: number;
+  units_shipped_last_60_days: number;
+  units_shipped_last_90_days: number;
+  recommended_removal_quantity: number;
+  estimated_ltsf_6_mo: number;
+  estimated_ltsf_12_mo: number;
+  alert: string | null;
+  your_price: number | null;
+  sales_price: number | null;
+  sell_through: number | null;
+  storage_type: string | null;
+  recommended_action: string | null;
+  estimated_cost_savings: number;
+  healthy_inventory_level: number | null;
+}
+
 // StockPulse-compatible inventory response item
 export interface InventoryResponseItem {
   iwasku: string;
