@@ -301,6 +301,13 @@ export default function Dashboard() {
           >
             {syncing === 'wayfair' ? 'Syncing...' : 'Sync Wayfair'}
           </button>
+          <button
+            onClick={() => triggerSync('ads')}
+            disabled={!!syncing}
+            style={{ padding: '0.5rem 1.5rem', background: '#be185d', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+          >
+            {syncing === 'ads' ? 'Syncing...' : 'Sync Ads'}
+          </button>
         </div>
       </div>
 

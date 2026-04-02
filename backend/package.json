@@ -1,7 +1,7 @@
 {
   "name": "databridge-backend",
   "version": "1.0.0",
-  "description": "DataBridge Backend - Amazon SP-API Integration",
+  "description": "DataBridge Backend - Marketplace data hub",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "amazon-sp-api": "^1.0.11",
-    "axios": "^1.13.2",
+    "axios": "1.13.2",
     "cheerio": "^1.2.0",
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",

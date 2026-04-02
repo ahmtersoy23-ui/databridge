@@ -20,12 +20,12 @@ export const AMAZON_DOMAINS: Record<string, { domain: string; lang: string }> = 
 // --- User-Agent rotation ---
 
 const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
 ];
 
 function randomUA(): string {
@@ -85,7 +85,7 @@ async function fetchPage(url: string, countryCode: string): Promise<string | nul
         'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1',
         ...(ua.includes('Chrome') ? {
-          'Sec-CH-UA': '"Chromium";v="131", "Not_A Brand";v="24"',
+          'Sec-CH-UA': '"Chromium";v="134", "Not_A Brand";v="24"',
           'Sec-CH-UA-Mobile': '?0',
           'Sec-CH-UA-Platform': '"Windows"',
         } : {}),
@@ -119,7 +119,6 @@ function parseRating($: cheerio.CheerioAPI): number | null {
   const selectors = [
     '#acrPopover .a-icon-alt',
     'span[data-hook="rating-out-of-text"]',
-    'i.a-icon-star span.a-icon-alt',
     '#averageCustomerReviews .a-icon-alt',
     'i[data-hook="average-star-rating"] span.a-icon-alt',
   ];
@@ -210,8 +209,14 @@ export async function fetchReviewsPage(asin: string, countryCode: string): Promi
     });
 
     if (rating === null && reviewCount === null && reviews.length === 0) {
-      logger.warn(`[ReviewFetcher] Could not parse anything for ${asin} (${countryCode})`);
-      return null;
+      logger.info(`[ReviewFetcher] No rating/review data for ${asin} (${countryCode})`);
+      return { rating: null, reviewCount: null, reviews: [] };
+    }
+
+    // Rating count 0/null ise rating ortalaması da olamaz — false positive temizle
+    if (rating !== null && (reviewCount === null || reviewCount === 0)) {
+      logger.warn(`[ReviewFetcher] ${asin} (${countryCode}): rating=${rating} but reviewCount=${reviewCount} — clearing rating`);
+      return { rating: null, reviewCount: null, reviews: [] };
     }
 
     return { rating, reviewCount, reviews };
@@ -223,7 +228,7 @@ export async function fetchReviewsPage(asin: string, countryCode: string): Promi
 
 // --- Delay helper (~1 min average) ---
 
-export function randomDelay(minMs: number = 50_000, maxMs: number = 70_000): Promise<void> {
+export function randomDelay(minMs: number = 280_000, maxMs: number = 320_000): Promise<void> {
   const ms = minMs + Math.random() * (maxMs - minMs);
   return new Promise(resolve => setTimeout(resolve, ms));
 }

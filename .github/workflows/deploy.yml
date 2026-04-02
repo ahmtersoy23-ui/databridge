@@ -101,5 +101,5 @@ jobs:
           port: 2222
           script: |
             cd /var/www/databridge
-            npm ci --omit=dev
+            npm ci --omit=dev --ignore-scripts
             pm2 restart databridge-backend || pm2 start dist/index.js --name databridge-backend

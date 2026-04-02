@@ -4,7 +4,7 @@ import logger from '../../config/logger';
 
 const MAX_CONSECUTIVE_BLOCKS = 5;
 const CIRCUIT_BREAKER_PAUSE_MS = 30 * 60 * 1000; // 30 min
-const FETCH_COOLDOWN_DAYS = 7;
+const DAILY_ACTIVE_DAYS = 6; // Tue–Sun (Monday off)
 
 interface TrackedAsin {
   id: number;
@@ -21,15 +21,22 @@ interface ExistingReview {
 }
 
 export async function runReviewTracking(): Promise<void> {
-  // Cooldown guard — skip if last fetch was less than 7 days ago
+  // Monday off
+  const dayOfWeek = new Date().getDay(); // 0=Sun, 1=Mon
+  if (dayOfWeek === 1) {
+    logger.info('[ReviewSync] Monday — rest day, skipping');
+    return;
+  }
+
+  // Daily guard — skip if already ran in last 20 hours
   const cooldownResult = await pool.query(
     "SELECT MAX(started_at) AS last_fetch FROM sync_jobs WHERE job_type = 'review_tracking' AND status = 'completed'"
   );
   const lastFetch = cooldownResult.rows[0]?.last_fetch;
   if (lastFetch) {
-    const daysSince = (Date.now() - new Date(lastFetch).getTime()) / (1000 * 60 * 60 * 24);
-    if (daysSince < FETCH_COOLDOWN_DAYS) {
-      logger.info(`[ReviewSync] Skipping — last fetch was ${daysSince.toFixed(1)} days ago (min ${FETCH_COOLDOWN_DAYS})`);
+    const hoursSince = (Date.now() - new Date(lastFetch).getTime()) / (1000 * 60 * 60);
+    if (hoursSince < 20) {
+      logger.info(`[ReviewSync] Skipping — last fetch was ${hoursSince.toFixed(1)} hours ago (min 20h)`);
       return;
     }
   }
@@ -39,15 +46,15 @@ export async function runReviewTracking(): Promise<void> {
   try {
     await updateSyncJob(jobId, 'running');
 
-    const rawTracked = await getTrackedAsins();
-    if (rawTracked.length === 0) {
-      logger.info('[ReviewSync] No tracked ASINs found');
+    const rawBatch = await getDailyBatch();
+    if (rawBatch.length === 0) {
+      logger.info('[ReviewSync] No ASINs due for checking');
       await updateSyncJob(jobId, 'completed', 0);
       return;
     }
 
-    const tracked = shuffle(rawTracked);
-    logger.info(`[ReviewSync] Starting review tracking for ${tracked.length} ASINs (shuffled)`);
+    const tracked = shuffle(rawBatch);
+    logger.info(`[ReviewSync] Daily batch: ${tracked.length} ASINs (shuffled)`);
 
     let processed = 0;
     let consecutiveBlocks = 0;
@@ -68,12 +75,8 @@ export async function runReviewTracking(): Promise<void> {
         consecutiveBlocks = 0;
       }
 
-      // Skip persistently blocked ASINs
+      // Existing data for change detection
       const existing = await getExistingReview(item.asin, item.country_code);
-      if (existing?.is_blocked && existing.block_count >= 3) {
-        logger.debug(`[ReviewSync] Skipping blocked ASIN ${item.asin} (${item.country_code})`);
-        continue;
-      }
 
       // Single request: product page has rating + count + ~8 reviews
       const result = await fetchReviewsPage(item.asin, item.country_code);
@@ -121,10 +124,25 @@ export async function runReviewTracking(): Promise<void> {
 
 // --- DB helpers ---
 
-async function getTrackedAsins(): Promise<TrackedAsin[]> {
-  const result = await pool.query(
-    'SELECT id, asin, country_code, label FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
+async function getDailyBatch(): Promise<TrackedAsin[]> {
+  // Calculate batch size: ceil(total / 6 active days)
+  const countResult = await pool.query(
+    'SELECT count(*)::int AS cnt FROM review_tracked_asins WHERE is_active = true'
   );
+  const total = countResult.rows[0]?.cnt ?? 0;
+  if (total === 0) return [];
+  const batchSize = Math.ceil(total / DAILY_ACTIVE_DAYS);
+
+  // Pick ASINs with oldest checked_at (never-checked first)
+  const result = await pool.query(`
+    SELECT t.id, t.asin, t.country_code, t.label
+    FROM review_tracked_asins t
+    LEFT JOIN product_reviews pr ON pr.asin = t.asin AND pr.country_code = t.country_code
+    WHERE t.is_active = true
+      AND (pr.is_blocked IS NULL OR pr.is_blocked = false OR pr.block_count < 3)
+    ORDER BY pr.checked_at ASC NULLS FIRST
+    LIMIT $1
+  `, [batchSize]);
   return result.rows;
 }
 

@@ -1,8 +1,9 @@
+import path from 'path';
 import { Pool } from 'pg';
 import winston from 'winston';
 import dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 // --- Database (SSH tunnel → sunucu PostgreSQL) ---
 

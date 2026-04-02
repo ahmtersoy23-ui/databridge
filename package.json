@@ -1,7 +1,7 @@
 {
   "name": "databridge",
   "version": "1.0.0",
-  "description": "DataBridge - Amazon SP-API Integration Hub",
+  "description": "DataBridge - Marketplace data hub",
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
