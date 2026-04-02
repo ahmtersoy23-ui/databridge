@@ -258,57 +258,48 @@ export default function Dashboard() {
       {/* Sync controls */}
       <div style={cardStyle}>
         <h2 style={{ marginBottom: '1rem' }}>Manual Sync</h2>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button
-            onClick={() => triggerSync('inventory')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'inventory' ? 'Syncing...' : 'Sync Inventory'}
-          </button>
-          <button
-            onClick={() => triggerSync('sales')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'sales' ? 'Syncing...' : 'Sync Sales'}
-          </button>
-          <button
-            onClick={() => triggerSync('nj_warehouse')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'nj_warehouse' ? 'Syncing...' : 'Sync NJ Warehouse'}
-          </button>
-          <button
-            onClick={() => triggerSync('wisersell')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#0891b2', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'wisersell' ? 'Syncing...' : 'Sync Catalog'}
-          </button>
-          <button
-            onClick={() => triggerSync('transactions')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#d97706', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'transactions' ? 'Syncing...' : 'Sync Transactions'}
-          </button>
-          <button
-            onClick={() => triggerSync('wayfair')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#ea580c', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'wayfair' ? 'Syncing...' : 'Sync Wayfair'}
-          </button>
-          <button
-            onClick={() => triggerSync('ads')}
-            disabled={!!syncing}
-            style={{ padding: '0.5rem 1.5rem', background: '#be185d', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            {syncing === 'ads' ? 'Syncing...' : 'Sync Ads'}
-          </button>
-        </div>
+        {(() => {
+          const btn = (type: string, label: string, bg: string) => (
+            <button
+              key={type}
+              onClick={() => triggerSync(type)}
+              disabled={!!syncing}
+              style={{ padding: '0.45rem 1.2rem', background: bg, color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', opacity: syncing ? 0.7 : 1 }}
+            >
+              {syncing === type ? 'Syncing...' : label}
+            </button>
+          );
+          const groupLabel = (text: string) => (
+            <div key={text} style={{ fontSize: '0.72rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: '0.4rem' }}>{text}</div>
+          );
+          return (
+            <div style={{ display: 'flex', gap: '2rem' }}>
+              <div>
+                {groupLabel('Amazon')}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {btn('inventory', 'Inventory', '#2563eb')}
+                  {btn('inventory_aging', 'Inv. Aging', '#6366f1')}
+                  {btn('sales', 'Sales', '#059669')}
+                  {btn('transactions', 'Transactions', '#d97706')}
+                  {btn('ads', 'Ads', '#be185d')}
+                </div>
+              </div>
+              <div>
+                {groupLabel('Wayfair')}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {btn('wayfair', 'Wayfair', '#ea580c')}
+                </div>
+              </div>
+              <div>
+                {groupLabel('Other')}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {btn('nj_warehouse', 'NJ Warehouse', '#7c3aed')}
+                  {btn('wisersell', 'Catalog', '#0891b2')}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Credentials status */}
