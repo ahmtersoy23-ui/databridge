@@ -202,8 +202,9 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType, string[]> = {
   advertised_product: [
     'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
     'adGroupName', 'adGroupId',
+    'advertisedAsin', 'advertisedSku',
     'impressions', 'clicks', 'clickThroughRate',
-    'costPerClick', 'spend', 'sales7d', 'acosClicks7d', 'roasClicks7d',
+    'costPerClick', 'cost', 'sales7d', 'acosClicks7d', 'roasClicks7d',
     'purchases7d', 'unitsSoldClicks7d',
     'purchasesSameSku7d', 'unitsSoldSameSku7d', 'unitsSoldOtherSku7d',
     'attributedSalesSameSku7d', 'salesOtherSku7d',

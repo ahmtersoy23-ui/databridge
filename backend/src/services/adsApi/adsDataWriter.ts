@@ -191,7 +191,7 @@ export async function writeAdvertisedProductData(profileId: number, startDate: s
         r.advertisedAsin || null,
         r.impressions || 0,
         r.clicks || 0,
-        r.spend || 0,
+        r.cost || r.spend || 0,     // V3 uses 'cost' not 'spend'
         r.sales7d || 0,
         r.purchases7d || 0,
         r.unitsSoldClicks7d || 0,
