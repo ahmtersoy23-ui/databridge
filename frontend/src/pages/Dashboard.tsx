@@ -278,7 +278,6 @@ export default function Dashboard() {
                 {groupLabel('Amazon')}
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {btn('inventory', 'Inventory', '#2563eb')}
-                  {btn('inventory_aging', 'Inv. Aging', '#6366f1')}
                   {btn('sales', 'Sales', '#059669')}
                   {btn('transactions', 'Transactions', '#d97706')}
                   {btn('ads', 'Ads', '#be185d')}

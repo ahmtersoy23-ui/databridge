@@ -6,10 +6,9 @@ interface AgingSummary {
   age_91_180: number;
   age_181_270: number;
   age_271_365: number;
-  age_365_plus: number;
-  total_ltsf_next: number;
-  total_ltsf_6_mo: number;
-  total_ltsf_12_mo: number;
+  age_366_455: number;
+  age_456_plus: number;
+  total_storage_cost: number;
   unique_skus: number;
   skus_270_plus: number;
 }
@@ -219,13 +218,14 @@ export default function InventoryAnalysis() {
         <>
           <div style={{ ...cardStyle, padding: '1rem 1.5rem', marginBottom: '0.5rem' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.75rem' }}>Inventory Aging</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
               {[
-                { label: '0-90 Days', value: agingSummary.age_0_90, color: COL_GREEN },
-                { label: '91-180 Days', value: agingSummary.age_91_180, color: COL_ORANGE },
-                { label: '181-270 Days', value: agingSummary.age_181_270, color: '#ea580c' },
-                { label: '271-365 Days', value: agingSummary.age_271_365, color: COL_RED },
-                { label: '365+ Days', value: agingSummary.age_365_plus, color: '#991b1b' },
+                { label: '0-90d', value: agingSummary.age_0_90, color: COL_GREEN },
+                { label: '91-180d', value: agingSummary.age_91_180, color: COL_ORANGE },
+                { label: '181-270d', value: agingSummary.age_181_270, color: '#ea580c' },
+                { label: '271-365d', value: agingSummary.age_271_365, color: COL_RED },
+                { label: '366-455d', value: agingSummary.age_366_455, color: '#991b1b' },
+                { label: '456+d', value: agingSummary.age_456_plus, color: '#991b1b' },
               ].map(item => (
                 <div key={item.label} style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.label}</div>
@@ -236,12 +236,12 @@ export default function InventoryAnalysis() {
               ))}
             </div>
           </div>
-          {(agingSummary.age_271_365 + agingSummary.age_365_plus) > 0 && (
+          {((agingSummary.age_271_365 || 0) + (agingSummary.age_366_455 || 0) + (agingSummary.age_456_plus || 0)) > 0 && (
             <div style={{
               background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
               padding: '0.6rem 1rem', marginBottom: '1rem', color: COL_RED, fontSize: '0.82rem', fontWeight: 500,
             }}>
-              {agingSummary.skus_270_plus} SKU has 270+ day inventory ({((agingSummary.age_271_365 || 0) + (agingSummary.age_365_plus || 0)).toLocaleString()} units). Est. LTSF: ${Number(agingSummary.total_ltsf_next || 0).toFixed(2)}
+              {agingSummary.skus_270_plus} SKU has 270+ day inventory ({((agingSummary.age_271_365 || 0) + (agingSummary.age_366_455 || 0) + (agingSummary.age_456_plus || 0)).toLocaleString()} units). Est. storage: ${Number(agingSummary.total_storage_cost || 0).toFixed(2)}
             </div>
           )}
         </>

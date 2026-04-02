@@ -10,9 +10,8 @@ import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { runReviewTracking } from '../reviews/reviewSync';
-import { syncInventoryAgingForMarketplace } from './inventoryAgingSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_INVENTORY_AGING_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON } from '../../config/constants';
 import { syncAllAdsProfiles } from '../adsApi/adsSync';
 import { withRetry } from '../../utils/retry';
 import type { MarketplaceConfig } from '../../types';
@@ -31,7 +30,6 @@ let isWisersellSyncing = false;
 let isWayfairSyncing = false;
 let isReviewSyncing = false; // kept for manual trigger via /sync/trigger
 let isAdsSyncing = false;
-let isInventoryAgingSyncing = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -270,46 +268,6 @@ async function runAdsSync(): Promise<void> {
   }
 }
 
-async function runInventoryAgingSync(): Promise<void> {
-  if (isInventoryAgingSyncing) {
-    logger.warn('[Scheduler] Skipping inventory aging sync - another sync is in progress');
-    return;
-  }
-
-  isInventoryAgingSyncing = true;
-  try {
-    const eligibleMarketplaces = await getEligibleMarketplaces();
-
-    // AE/SA don't support GET_FBA_INVENTORY_AGED_DATA — skip them
-    const AGING_EXCLUDED_WAREHOUSES = ['AE', 'SA'];
-
-    // Group by credential_id + warehouse (same as inventory sync)
-    const byGroup = new Map<string, MarketplaceConfig[]>();
-    for (const mp of eligibleMarketplaces) {
-      if (AGING_EXCLUDED_WAREHOUSES.includes(mp.warehouse)) continue;
-      const key = `${mp.credential_id}|${mp.warehouse}`;
-      if (!byGroup.has(key)) byGroup.set(key, []);
-      byGroup.get(key)!.push(mp);
-    }
-
-    logger.info(`[Scheduler] Inventory aging sync: ${byGroup.size} unique credential+warehouse groups`);
-
-    for (const [key, group] of byGroup) {
-      const representative = group[0];
-      const channels = group.map(m => m.country_code).join(',');
-      try {
-        logger.info(`[Scheduler] Inventory aging sync ${key}: ${channels} (via ${representative.country_code})`);
-        await withRetry(() => syncInventoryAgingForMarketplace(representative), { label: `inventory-aging:${key}` });
-      } catch (err: any) {
-        logger.error(`[Scheduler] Inventory aging sync failed for ${key} (${representative.country_code}):`, err.message);
-      }
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  } finally {
-    isInventoryAgingSyncing = false;
-  }
-}
-
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     logger.info('[Scheduler] Starting scheduled inventory sync');
@@ -346,12 +304,8 @@ export function startScheduler(): void {
     runAdsSync().catch(err => logger.error('[Scheduler] Ads sync error:', err));
   });
 
-  const inventoryAgingTask = cron.schedule(SYNC_INVENTORY_AGING_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled inventory aging sync');
-    runInventoryAgingSync().catch(err => logger.error('[Scheduler] Inventory aging sync error:', err));
-  });
-
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
+  // Inventory aging: manual CSV upload — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
@@ -360,7 +314,6 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
   logger.info(`[Scheduler] Wayfair CastleGate sync: ${SYNC_WAYFAIR_CRON}`);
   logger.info(`[Scheduler] Ads sync: ${SYNC_ADS_CRON}`);
-  logger.info(`[Scheduler] Inventory aging sync: ${SYNC_INVENTORY_AGING_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -375,4 +328,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runInventoryAgingSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };

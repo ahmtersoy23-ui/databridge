@@ -166,27 +166,29 @@ export interface FbaInventoryAgingItem {
   inv_age_91_to_180_days: number;
   inv_age_181_to_270_days: number;
   inv_age_271_to_365_days: number;
-  inv_age_365_plus_days: number;
+  inv_age_366_to_455_days: number;
+  inv_age_456_plus_days: number;
   currency: string | null;
-  estimated_ltsf_next_charge: number;
-  per_unit_volume: number | null;
-  is_hazmat: boolean;
-  in_date: string | null;
+  estimated_storage_cost_next_month: number;
   units_shipped_last_7_days: number;
   units_shipped_last_30_days: number;
   units_shipped_last_60_days: number;
   units_shipped_last_90_days: number;
   recommended_removal_quantity: number;
-  estimated_ltsf_6_mo: number;
-  estimated_ltsf_12_mo: number;
   alert: string | null;
   your_price: number | null;
   sales_price: number | null;
   sell_through: number | null;
   storage_type: string | null;
   recommended_action: string | null;
-  estimated_cost_savings: number;
-  healthy_inventory_level: number | null;
+  days_of_supply: number | null;
+  estimated_excess_quantity: number;
+  weeks_of_cover_t30: number | null;
+  weeks_of_cover_t90: number | null;
+  no_sale_last_6_months: number;
+  inbound_quantity: number;
+  sales_rank: number | null;
+  product_group: string | null;
 }
 
 // StockPulse-compatible inventory response item
