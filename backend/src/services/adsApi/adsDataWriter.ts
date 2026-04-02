@@ -94,6 +94,8 @@ export async function writeSearchTermData(profileId: number, startDate: string, 
 export async function writeTargetingData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
   if (!rows.length) return 0;
 
+
+
   let total = 0;
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     const batch = rows.slice(i, i + BATCH_SIZE);
@@ -116,7 +118,7 @@ export async function writeTargetingData(profileId: number, startDate: string, e
         r.targeting || null,
         r.matchType || null,
         r.impressions || 0,
-        r.topOfSearchImpressionShare || null, // TOS — decimal or null
+        r.topOfSearchImpressionShare ?? null, // TOS — preserve 0 values
         r.clicks || 0,
         r.cost || r.spend || 0,
         r.sales7d || 0,
