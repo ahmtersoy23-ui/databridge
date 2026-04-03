@@ -112,7 +112,38 @@ export async function downloadAdsReport<T = Record<string, any>>(url: string): P
 }
 
 /**
+ * Find a pending/running report for the same type and download it.
+ * Amazon returns 425 when a duplicate report already exists — reuse it instead.
+ */
+async function findAndDownloadPendingReport<T>(
+  client: AxiosInstance,
+  reportType: AdsReportType,
+): Promise<T[] | null> {
+  try {
+    // Query ads_sync_jobs for the most recent report ID of this type
+    const { pool } = await import('../../config/database');
+    const result = await pool.query(
+      `SELECT amazon_report_id FROM ads_sync_jobs
+       WHERE report_type = $1 AND amazon_report_id IS NOT NULL AND status IN ('running', 'failed')
+       ORDER BY id DESC LIMIT 1`,
+      [reportType]
+    );
+
+    if (result.rows[0]?.amazon_report_id) {
+      const reportId = result.rows[0].amazon_report_id;
+      logger.info(`[AdsAPI] 425 recovery: polling existing report ${reportId} for ${reportType}`);
+      const downloadUrl = await waitForAdsReport(client, reportId);
+      return await downloadAdsReport<T>(downloadUrl);
+    }
+  } catch (err: any) {
+    logger.warn(`[AdsAPI] 425 recovery failed for ${reportType}: ${err.message}`);
+  }
+  return null;
+}
+
+/**
  * Full pipeline: create report → poll → download → return rows.
+ * On 425 (duplicate report), tries to recover by polling the existing report.
  */
 export async function fetchAdsReport<T = Record<string, any>>(
   client: AxiosInstance,
@@ -120,7 +151,33 @@ export async function fetchAdsReport<T = Record<string, any>>(
   startDate: string,
   endDate: string,
 ): Promise<T[]> {
-  const reportId = await createAdsReport(client, reportType, startDate, endDate);
+  let reportId: string;
+
+  try {
+    reportId = await createAdsReport(client, reportType, startDate, endDate);
+  } catch (err: any) {
+    if (err.response?.status === 425) {
+      logger.warn(`[AdsAPI] 425 for ${reportType} — attempting recovery from existing report`);
+      const recovered = await findAndDownloadPendingReport<T>(client, reportType);
+      if (recovered) {
+        logger.info(`[AdsAPI] 425 recovery succeeded for ${reportType}: ${recovered.length} rows`);
+        return recovered;
+      }
+      throw new Error(`425 Too Early for ${reportType} and no recoverable report found`);
+    }
+    throw err;
+  }
+
+  // Save reportId to current sync job for future 425 recovery
+  try {
+    const { pool } = await import('../../config/database');
+    await pool.query(
+      `UPDATE ads_sync_jobs SET amazon_report_id = $1
+       WHERE id = (SELECT id FROM ads_sync_jobs WHERE report_type = $2 AND status = 'running' AND amazon_report_id IS NULL ORDER BY id DESC LIMIT 1)`,
+      [reportId, reportType]
+    );
+  } catch { /* non-critical */ }
+
   const downloadUrl = await waitForAdsReport(client, reportId);
   const rows = await downloadAdsReport<T>(downloadUrl);
 
