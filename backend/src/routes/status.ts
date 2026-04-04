@@ -116,4 +116,42 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/v1/sync/health - Last run per job (for monitoring)
+router.get('/sync/health', async (_req: Request, res: Response) => {
+  try {
+    const jobs = await pool.query(`
+      SELECT DISTINCT ON (job_name)
+        job_name, status, started_at, finished_at, rows_processed, duration_ms, error_message
+      FROM sync_log
+      ORDER BY job_name, started_at DESC
+    `);
+
+    const expected = ['inventory', 'sales', 'transactions', 'nj-warehouse', 'wisersell', 'wayfair', 'ads', 'aging'];
+    const lastRuns = new Map(jobs.rows.map((r: any) => [r.job_name, r]));
+    const now = Date.now();
+
+    const results = expected.map(name => {
+      const last = lastRuns.get(name);
+      if (!last) return { job: name, status: 'never_ran', healthy: false };
+      const ageHours = (now - new Date(last.started_at).getTime()) / 3_600_000;
+      const maxAge = name === 'inventory' || name === 'nj-warehouse' ? 10 : 26; // 8h jobs get 10h window, daily get 26h
+      return {
+        job: name,
+        status: last.status,
+        healthy: last.status === 'success' && ageHours < maxAge,
+        lastRun: last.started_at,
+        ageHours: Math.round(ageHours * 10) / 10,
+        rows: last.rows_processed,
+        durationSec: last.duration_ms ? Math.round(last.duration_ms / 1000) : null,
+        error: last.error_message || null,
+      };
+    });
+
+    const allHealthy = results.every(r => r.healthy);
+    res.status(allHealthy ? 200 : 503).json({ healthy: allHealthy, jobs: results });
+  } catch (err: any) {
+    res.status(500).json({ healthy: false, error: err.message });
+  }
+});
+
 export default router;

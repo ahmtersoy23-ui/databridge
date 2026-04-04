@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
+import { pool } from './config/database';
 import { RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX_REQUESTS } from './config/constants';
 
 export function createApp(): Application {
@@ -33,8 +34,25 @@ export function createApp(): Application {
   }));
 
   // Health check
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', app: 'databridge', timestamp: new Date().toISOString() });
+  app.get('/health', async (_req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({
+        status: 'ok',
+        app: 'databridge',
+        database: 'connected',
+        uptime: process.uptime(),
+        memory: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      res.status(500).json({
+        status: 'error',
+        app: 'databridge',
+        database: 'disconnected',
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   // API routes

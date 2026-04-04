@@ -15,6 +15,7 @@ import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_W
 import { syncAllAdsProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { withRetry } from '../../utils/retry';
+import { withSyncLog } from '../../utils/syncLog';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
@@ -289,43 +290,43 @@ async function runAgingSyncJob(): Promise<void> {
 
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled inventory sync');
-    runInventorySync().catch(err => logger.error('[Scheduler] Inventory sync error:', err));
+    withSyncLog('inventory', () => runInventorySync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Inventory sync error:', err));
   });
 
   salesTask = cron.schedule(SYNC_SALES_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled sales sync');
-    runSalesSync().catch(err => logger.error('[Scheduler] Sales sync error:', err));
+    withSyncLog('sales', () => runSalesSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Sales sync error:', err));
   });
 
   njWarehouseTask = cron.schedule(SYNC_NJ_WAREHOUSE_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled NJ warehouse sync');
-    runNJWarehouseSync().catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
+    withSyncLog('nj-warehouse', () => runNJWarehouseSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
   });
 
   transactionTask = cron.schedule(SYNC_TRANSACTIONS_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled transaction sync');
-    runTransactionSync().catch(err => logger.error('[Scheduler] Transaction sync error:', err));
+    withSyncLog('transactions', () => runTransactionSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Transaction sync error:', err));
   });
 
   wisersellTask = cron.schedule(SYNC_WISERSELL_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled Wisersell catalog sync');
-    runWisersellSync().catch(err => logger.error('[Scheduler] Wisersell sync error:', err));
+    withSyncLog('wisersell', () => runWisersellSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Wisersell sync error:', err));
   });
 
   wayfairTask = cron.schedule(SYNC_WAYFAIR_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled Wayfair CastleGate sync');
-    runWayfairSync().catch(err => logger.error('[Scheduler] Wayfair sync error:', err));
+    withSyncLog('wayfair', () => runWayfairSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Wayfair sync error:', err));
   });
 
   adsTask = cron.schedule(SYNC_ADS_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled Ads sync');
-    runAdsSync().catch(err => logger.error('[Scheduler] Ads sync error:', err));
+    withSyncLog('ads', () => runAdsSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Ads sync error:', err));
   });
 
   agingTask = cron.schedule(SYNC_AGING_CRON, () => {
-    logger.info('[Scheduler] Starting scheduled aging report sync');
-    runAgingSyncJob().catch(err => logger.error('[Scheduler] Aging sync error:', err));
+    withSyncLog('aging', () => runAgingSyncJob().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Aging sync error:', err));
   });
 
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
