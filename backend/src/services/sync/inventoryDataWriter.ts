@@ -1,5 +1,6 @@
 import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
+import { notify } from '../../utils/notify';
 
 const WAREHOUSES = ['US', 'UK', 'EU', 'CA', 'AU', 'AE', 'SA'];
 
@@ -146,6 +147,14 @@ export async function writeInventoryData(): Promise<void> {
 
   for (const wh of activeWarehouses) {
     const result = await pool.query(INVENTORY_SQL, [wh]);
+    // Safety: don't wipe existing data if new query returns suspiciously few rows
+    const existing = await sharedPool.query('SELECT COUNT(*)::int as cnt FROM fba_inventory WHERE warehouse = $1', [wh]);
+    const existingCount = existing.rows[0].cnt;
+    if (existingCount > 10 && result.rows.length < existingCount * 0.2) {
+      logger.error(`[InventoryData] ${wh}: SKIPPED — new ${result.rows.length} vs existing ${existingCount} (safety threshold)`);
+      await notify(`⚠️ [InventoryData] ${wh} skipped: ${result.rows.length} rows vs ${existingCount} existing`);
+      continue;
+    }
     const count = await upsertInventoryData(wh, result.rows);
     totalRows += count;
     logger.info(`[InventoryData] ${wh}: ${count} rows`);

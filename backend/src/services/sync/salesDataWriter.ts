@@ -1,5 +1,6 @@
 import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
+import { notify } from '../../utils/notify';
 
 const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'others'];
 const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
@@ -184,9 +185,17 @@ export async function writeSalesData(): Promise<void> {
   const activeChannels = channelResult.rows.map((r: { channel: string }) => r.channel);
   logger.info(`[SalesData] Active channels: ${activeChannels.join(', ')}`);
 
-  // 2. Write individual channels
+  // 2. Write individual channels (with safety check)
   for (const ch of activeChannels) {
     const result = await pool.query(ROLLING_WINDOW_SQL, [ch]);
+    // Safety: don't wipe existing data if new query returns suspiciously few rows
+    const existing = await sharedPool.query('SELECT COUNT(*)::int as cnt FROM sales_data WHERE channel = $1', [ch]);
+    const existingCount = existing.rows[0].cnt;
+    if (existingCount > 10 && result.rows.length < existingCount * 0.2) {
+      logger.error(`[SalesData] ${ch}: SKIPPED — new ${result.rows.length} vs existing ${existingCount} (safety threshold)`);
+      await notify(`⚠️ [SalesData] ${ch} skipped: ${result.rows.length} rows vs ${existingCount} existing`);
+      continue;
+    }
     const count = await upsertSalesData(ch, result.rows);
     totalRows += count;
     logger.info(`[SalesData] ${ch}: ${count} rows`);
