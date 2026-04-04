@@ -26,6 +26,7 @@ const router = Router();
 router.use('/auth', authRouter);
 router.use('/amazonsales', salesRouter);   // StockPulse reads these
 router.use('/amazonfba', inventoryRouter); // StockPulse reads these
+router.use('/status', statusRouter);       // Monitoring (UptimeRobot)
 
 // Auth gate — everything below requires SSO session
 router.use(ssoAuthMiddleware);
@@ -45,7 +46,6 @@ router.use('/inventory-aging', inventoryAgingRouter);
 router.use('/ads', adsRouter);
 router.use('/ads-analysis', adsAnalysisRouter);
 router.use('/sync', syncRouter);
-router.use('/status', statusRouter);
 router.use('/credentials', credentialsRouter);
 
 export default router;
