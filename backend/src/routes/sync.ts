@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
 import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
@@ -11,7 +11,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -101,6 +101,9 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       }
       backfillTransactions(mp, months || 18).catch(err => logger.error('[Sync] Transaction backfill error:', err));
       res.json({ success: true, message: `Transaction backfill started for ${marketplace} (${months || 18} months)` });
+    } else if (type === 'aging') {
+      runAgingSyncJob().catch(err => logger.error('[Sync] Manual aging sync error:', err));
+      res.json({ success: true, message: 'Aging report sync started for all warehouses' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

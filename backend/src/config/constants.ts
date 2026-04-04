@@ -16,8 +16,8 @@ export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for ove
 export const SYNC_TRANSACTIONS_CRON = '0 5 * * *';  // Daily at 05:00 UTC
 export const TRANSACTION_OVERLAP_DAYS = 35;          // Fetch last 35 days (settlement delays)
 export const SYNC_ADS_CRON = '0 6 * * *';           // Daily at 06:00 UTC (after transactions)
+export const SYNC_AGING_CRON = '0 2 * * *';          // Daily at 02:00 UTC (once per 24h — Amazon limit)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
-// Inventory aging: manual CSV upload from Seller Central — no cron needed
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
 
