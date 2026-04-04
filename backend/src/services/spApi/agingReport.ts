@@ -53,7 +53,7 @@ interface AgingItem {
 }
 
 /**
- * Fetch GET_FBA_INVENTORY_AGED_DATA report for a credential/marketplace,
+ * Fetch GET_FBA_INVENTORY_PLANNING_DATA report for a credential/marketplace,
  * parse TSV rows, map SKUs, and upsert into fba_inventory_aging.
  *
  * Returns the number of rows written.
@@ -70,13 +70,13 @@ export async function fetchAndWriteAgingReport(
   const client = await getSpApiClient(credentialId);
 
   // Step 1: Create report request
-  logger.info(`[AgingReport] Requesting GET_FBA_INVENTORY_AGED_DATA for ${marketplace.country_code} (warehouse: ${warehouse})`);
+  logger.info(`[AgingReport] Requesting GET_FBA_INVENTORY_PLANNING_DATA for ${marketplace.country_code} (warehouse: ${warehouse})`);
 
   const reportResponse: any = await client.callAPI({
     operation: 'createReport',
     endpoint: 'reports',
     body: {
-      reportType: 'GET_FBA_INVENTORY_AGED_DATA' as any,
+      reportType: 'GET_FBA_INVENTORY_PLANNING_DATA',
       marketplaceIds: [marketplace.marketplace_id],
     },
   });
