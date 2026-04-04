@@ -25,6 +25,7 @@ export async function waitForReport(client: SellingPartner, reportId: string, ma
     }
 
     if (status === 'CANCELLED' || status === 'FATAL') {
+      logger.warn(`[SP-API] Report ${reportId} response: ${JSON.stringify(report)}`);
       throw new Error(`Report ${reportId} failed with status: ${status}`);
     }
 
