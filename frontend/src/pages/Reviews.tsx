@@ -36,6 +36,7 @@ interface TrackedRow {
   asin: string;
   country_code: string;
   label: string | null;
+  iwasku: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -105,7 +106,13 @@ export default function Reviews() {
   const [addAsin, setAddAsin] = useState('');
   const [addCountry, setAddCountry] = useState('US');
   const [addLabel, setAddLabel] = useState('');
+  const [addIwasku, setAddIwasku] = useState('');
   const [adding, setAdding] = useState(false);
+
+  // Inline edit iwasku
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editIwasku, setEditIwasku] = useState('');
+  const [savingIwasku, setSavingIwasku] = useState(false);
 
   // Excel import
   const [importing, setImporting] = useState(false);
@@ -229,9 +236,11 @@ export default function Reviews() {
         asin: addAsin.trim().toUpperCase(),
         country_code: addCountry,
         label: addLabel.trim() || undefined,
+        iwasku: addIwasku.trim() || undefined,
       });
       setAddAsin('');
       setAddLabel('');
+      setAddIwasku('');
       setMessage('ASIN added.');
       fetchTracked();
     } catch (err: any) {
@@ -266,16 +275,17 @@ export default function Reviews() {
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
 
-      const items: Array<{ asin: string; country_code: string; label?: string }> = [];
+      const items: Array<{ asin: string; country_code: string; label?: string; iwasku?: string }> = [];
       for (const row of rawRows) {
         const asin = String(row['asin'] ?? row['ASIN'] ?? '').trim().toUpperCase();
         const cc = String(row['country_code'] ?? row['marketplace'] ?? row['MARKETPLACE'] ?? 'US').trim().toUpperCase();
         const label = String(row['label'] ?? row['LABEL'] ?? '').trim();
-        if (asin) items.push({ asin, country_code: cc, ...(label ? { label } : {}) });
+        const iwasku = String(row['iwasku'] ?? row['IWASKU'] ?? '').trim();
+        if (asin) items.push({ asin, country_code: cc, ...(label ? { label } : {}), ...(iwasku ? { iwasku } : {}) });
       }
 
       if (items.length === 0) {
-        setMessage('No valid rows. Excel must have an "asin" column. Optional: "country_code", "label".');
+        setMessage('No valid rows. Excel must have an "asin" column. Optional: "country_code", "label", "iwasku".');
         return;
       }
 
@@ -600,6 +610,14 @@ export default function Reviews() {
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
               style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '160px' }}
             />
+            <input
+              type="text"
+              placeholder="IWASKU (optional)"
+              value={addIwasku}
+              onChange={e => setAddIwasku(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '140px', fontFamily: 'monospace' }}
+            />
             <button onClick={handleAdd} disabled={adding || !addAsin.trim()} style={btnStyle('#059669', adding || !addAsin.trim())}>
               {adding ? 'Adding...' : 'Add'}
             </button>
@@ -613,7 +631,7 @@ export default function Reviews() {
           </div>
 
           <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
-            Excel: <code>asin</code> (required), <code>country_code</code> (default: US), <code>label</code> (optional)
+            Excel: <code>asin</code> (required), <code>country_code</code> (default: US), <code>label</code>, <code>iwasku</code> (optional)
             {' · '}{trackedLoading ? 'Loading...' : `${tracked.length} tracked ASINs`}
           </div>
 
@@ -625,6 +643,7 @@ export default function Reviews() {
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>ASIN</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Label</th>
+                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
                   <th style={{ textAlign: 'left', padding: '0.5rem' }}>Added</th>
                   <th style={{ padding: '0.5rem', width: '80px' }}></th>
                 </tr>
@@ -641,6 +660,53 @@ export default function Reviews() {
                     <td style={{ padding: '0.5rem', color: t.label ? '#0f172a' : '#d1d5db', fontSize: '0.85rem' }}>
                       {t.label || '—'}
                     </td>
+                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                      {editingId === t.id ? (
+                        <span style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                          <input
+                            value={editIwasku}
+                            onChange={e => setEditIwasku(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                setSavingIwasku(true);
+                                axios.post('/api/v1/reviews/tracked', { asin: t.asin, country_code: t.country_code, iwasku: editIwasku.trim() })
+                                  .then(() => { setEditingId(null); fetchTracked(); })
+                                  .catch((err: any) => setMessage(err.response?.data?.error || 'Save failed'))
+                                  .finally(() => setSavingIwasku(false));
+                              }
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            autoFocus
+                            style={{ padding: '0.2rem 0.4rem', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '0.82rem', width: '120px', fontFamily: 'monospace' }}
+                          />
+                          <button
+                            disabled={savingIwasku}
+                            onClick={() => {
+                              setSavingIwasku(true);
+                              axios.post('/api/v1/reviews/tracked', { asin: t.asin, country_code: t.country_code, iwasku: editIwasku.trim() })
+                                .then(() => { setEditingId(null); fetchTracked(); })
+                                .catch((err: any) => setMessage(err.response?.data?.error || 'Save failed'))
+                                .finally(() => setSavingIwasku(false));
+                            }}
+                            style={{ padding: '0.15rem 0.4rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}
+                          >
+                            {savingIwasku ? '...' : '✓'}
+                          </button>
+                          <button
+                            onClick={() => setEditingId(null)}
+                            style={{ padding: '0.15rem 0.4rem', background: 'none', color: '#94a3b8', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}
+                          >✕</button>
+                        </span>
+                      ) : (
+                        <span
+                          onClick={() => { setEditingId(t.id); setEditIwasku(t.iwasku || ''); }}
+                          style={{ cursor: 'pointer', color: t.iwasku ? '#0f172a' : '#d1d5db', borderBottom: '1px dashed #d1d5db' }}
+                          title="Click to edit"
+                        >
+                          {t.iwasku || '—'}
+                        </span>
+                      )}
+                    </td>
                     <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
                       {fmtDate(t.created_at)}
                     </td>
@@ -656,7 +722,7 @@ export default function Reviews() {
                 ))}
                 {!trackedLoading && tracked.length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
                       No tracked ASINs. Add some above or import from Excel.
                     </td>
                   </tr>

@@ -18,7 +18,7 @@ router.get('/', async (req: Request, res: Response) => {
              pr.last_review_title, pr.last_review_text, pr.last_review_rating,
              pr.last_review_date, pr.last_review_author,
              pr.is_blocked, pr.checked_at, pr.updated_at,
-             rta.label,
+             rta.label, rta.iwasku AS rta_iwasku,
              prev.rating AS prev_rating,
              prev.review_count AS prev_review_count,
              h7.rating AS rating_7d, h7.review_count AS count_7d,
@@ -143,7 +143,7 @@ router.get('/:asin/items', async (req: Request, res: Response) => {
 router.get('/tracked', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(
-      'SELECT id, asin, country_code, label, is_active, created_at FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
+      'SELECT id, asin, country_code, label, iwasku, is_active, created_at FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
     );
     res.json({ success: true, data: result.rows });
   } catch (err: any) {
@@ -185,17 +185,21 @@ const addSchema = z.object({
   asin: z.string().min(5).max(20),
   country_code: z.string().min(2).max(5).default('US'),
   label: z.string().max(200).optional(),
+  iwasku: z.string().max(50).optional(),
 });
 
 router.post('/tracked', validateBody(addSchema), async (req: Request, res: Response) => {
   try {
-    const { asin, country_code, label } = req.body;
+    const { asin, country_code, label, iwasku } = req.body;
     const result = await pool.query(
-      `INSERT INTO review_tracked_asins (asin, country_code, label)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (asin, country_code) DO UPDATE SET label = COALESCE($3, review_tracked_asins.label), is_active = true
+      `INSERT INTO review_tracked_asins (asin, country_code, label, iwasku)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (asin, country_code) DO UPDATE SET
+         label = COALESCE($3, review_tracked_asins.label),
+         iwasku = COALESCE($4, review_tracked_asins.iwasku),
+         is_active = true
        RETURNING *`,
-      [asin.toUpperCase(), country_code.toUpperCase(), label || null]
+      [asin.toUpperCase(), country_code.toUpperCase(), label || null, iwasku || null]
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (err: any) {
@@ -209,6 +213,7 @@ const bulkSchema = z.object({
     asin: z.string().min(5).max(20),
     country_code: z.string().min(2).max(5).default('US'),
     label: z.string().max(200).optional(),
+    iwasku: z.string().max(50).optional(),
   })).min(1).max(500),
 });
 
@@ -219,10 +224,13 @@ router.post('/tracked/bulk', validateBody(bulkSchema), async (req: Request, res:
 
     for (const item of items) {
       await pool.query(
-        `INSERT INTO review_tracked_asins (asin, country_code, label)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (asin, country_code) DO UPDATE SET label = COALESCE($3, review_tracked_asins.label), is_active = true`,
-        [item.asin.toUpperCase(), item.country_code.toUpperCase(), item.label || null]
+        `INSERT INTO review_tracked_asins (asin, country_code, label, iwasku)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (asin, country_code) DO UPDATE SET
+           label = COALESCE($3, review_tracked_asins.label),
+           iwasku = COALESCE($4, review_tracked_asins.iwasku),
+           is_active = true`,
+        [item.asin.toUpperCase(), item.country_code.toUpperCase(), item.label || null, item.iwasku || null]
       );
       added++;
     }
