@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
@@ -13,7 +13,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -113,6 +113,18 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       withSyncLog('sku-master-update', () => applySkuMasterUpdate())
         .catch(err => logger.error('[Sync] SKU master update error:', err));
       res.json({ success: true, message: 'SKU master update started — check Slack for results' });
+    } else if (type === 'business_report') {
+      withSyncLog('business-report', () => runBusinessReportSyncJob())
+        .catch(err => logger.error('[Sync] Business report sync error:', err));
+      res.json({ success: true, message: 'Business report sync started' });
+    } else if (type === 'campaign_snapshot') {
+      withSyncLog('campaign-snapshot', () => runCampaignSnapshotJob().then(() => undefined))
+        .catch(err => logger.error('[Sync] Campaign snapshot error:', err));
+      res.json({ success: true, message: 'Campaign snapshot sync started' });
+    } else if (type === 'brand_analytics') {
+      withSyncLog('brand-analytics', () => runBrandAnalyticsSyncJob())
+        .catch(err => logger.error('[Sync] Brand analytics sync error:', err));
+      res.json({ success: true, message: 'Brand analytics sync started' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

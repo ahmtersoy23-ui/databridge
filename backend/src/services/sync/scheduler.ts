@@ -11,10 +11,13 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON } from '../../config/constants';
 import { syncAllAdsProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
+import { runBusinessReportSync } from './businessReportSync';
+import { syncAllCampaignSnapshots } from '../adsApi/campaignSnapshot';
+import { runBrandAnalyticsSync } from './brandAnalyticsSync';
 import { withRetry } from '../../utils/retry';
 import { withSyncLog } from '../../utils/syncLog';
 import type { MarketplaceConfig } from '../../types';
@@ -28,6 +31,9 @@ let wayfairTask: cron.ScheduledTask | null = null;
 let adsTask: cron.ScheduledTask | null = null;
 let agingTask: cron.ScheduledTask | null = null;
 let skuMasterDiffTask: cron.ScheduledTask | null = null;
+let businessReportTask: cron.ScheduledTask | null = null;
+let campaignSnapshotTask: cron.ScheduledTask | null = null;
+let brandAnalyticsTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isTransactionSyncing = false;
 let isNJSyncing = false;
@@ -37,6 +43,9 @@ let isReviewSyncing = false; // kept for manual trigger via /sync/trigger
 let isAdsSyncing = false;
 let isAgingSyncing = false;
 let isSkuMasterDiffRunning = false;
+let isBusinessReportSyncing = false;
+let isCampaignSnapshotSyncing = false;
+let isBrandAnalyticsSyncing = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -307,6 +316,51 @@ async function runSkuMasterDiffJob(): Promise<void> {
   }
 }
 
+async function runBusinessReportSyncJob(): Promise<number | void> {
+  if (isBusinessReportSyncing) {
+    logger.warn('[Scheduler] Skipping business report sync - already running');
+    return;
+  }
+  isBusinessReportSyncing = true;
+  try {
+    return await runBusinessReportSync();
+  } catch (err: any) {
+    logger.error('[Scheduler] Business report sync failed:', err.message);
+  } finally {
+    isBusinessReportSyncing = false;
+  }
+}
+
+async function runCampaignSnapshotJob(): Promise<void> {
+  if (isCampaignSnapshotSyncing) {
+    logger.warn('[Scheduler] Skipping campaign snapshot - already running');
+    return;
+  }
+  isCampaignSnapshotSyncing = true;
+  try {
+    await syncAllCampaignSnapshots();
+  } catch (err: any) {
+    logger.error('[Scheduler] Campaign snapshot failed:', err.message);
+  } finally {
+    isCampaignSnapshotSyncing = false;
+  }
+}
+
+async function runBrandAnalyticsSyncJob(): Promise<number | void> {
+  if (isBrandAnalyticsSyncing) {
+    logger.warn('[Scheduler] Skipping brand analytics sync - already running');
+    return;
+  }
+  isBrandAnalyticsSyncing = true;
+  try {
+    return await runBrandAnalyticsSync();
+  } catch (err: any) {
+    logger.error('[Scheduler] Brand analytics sync failed:', err.message);
+  } finally {
+    isBrandAnalyticsSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -353,6 +407,21 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] SKU master diff error:', err));
   });
 
+  businessReportTask = cron.schedule(SYNC_BUSINESS_REPORT_CRON, () => {
+    withSyncLog('business-report', () => runBusinessReportSyncJob())
+      .catch(err => logger.error('[Scheduler] Business report sync error:', err));
+  });
+
+  campaignSnapshotTask = cron.schedule(SYNC_CAMPAIGN_SNAPSHOT_CRON, () => {
+    withSyncLog('campaign-snapshot', () => runCampaignSnapshotJob().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Campaign snapshot error:', err));
+  });
+
+  brandAnalyticsTask = cron.schedule(SYNC_BRAND_ANALYTICS_CRON, () => {
+    withSyncLog('brand-analytics', () => runBrandAnalyticsSyncJob())
+      .catch(err => logger.error('[Scheduler] Brand analytics sync error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -364,6 +433,9 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Ads sync: ${SYNC_ADS_CRON}`);
   logger.info(`[Scheduler] Aging report sync: ${SYNC_AGING_CRON}`);
   logger.info(`[Scheduler] SKU master diff: ${SYNC_SKU_MASTER_DIFF_CRON}`);
+  logger.info(`[Scheduler] Business report sync: ${SYNC_BUSINESS_REPORT_CRON}`);
+  logger.info(`[Scheduler] Campaign snapshot: ${SYNC_CAMPAIGN_SNAPSHOT_CRON}`);
+  logger.info(`[Scheduler] Brand analytics sync: ${SYNC_BRAND_ANALYTICS_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -377,7 +449,10 @@ export function stopScheduler(): void {
   adsTask?.stop();
   agingTask?.stop();
   skuMasterDiffTask?.stop();
+  businessReportTask?.stop();
+  campaignSnapshotTask?.stop();
+  brandAnalyticsTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
