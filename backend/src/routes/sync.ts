@@ -1,17 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
 import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
 import { validateBody } from '../middleware/validate';
+import { withSyncLog } from '../utils/syncLog';
 import logger from '../config/logger';
 
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -104,6 +106,13 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     } else if (type === 'aging') {
       runAgingSyncJob().catch(err => logger.error('[Sync] Manual aging sync error:', err));
       res.json({ success: true, message: 'Aging report sync started for all warehouses' });
+    } else if (type === 'sku_master_diff') {
+      runSkuMasterDiffJob().catch(err => logger.error('[Sync] Manual sku-master-diff error:', err));
+      res.json({ success: true, message: 'SKU master diff started — check Slack for results' });
+    } else if (type === 'sku_master_update') {
+      withSyncLog('sku-master-update', () => applySkuMasterUpdate())
+        .catch(err => logger.error('[Sync] SKU master update error:', err));
+      res.json({ success: true, message: 'SKU master update started — check Slack for results' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

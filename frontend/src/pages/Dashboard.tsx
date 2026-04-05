@@ -296,6 +296,13 @@ export default function Dashboard() {
                   {btn('wisersell', 'Catalog', '#0891b2')}
                 </div>
               </div>
+              <div>
+                {groupLabel('Master Data')}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {btn('sku_master_diff', 'SKU Diff', '#475569')}
+                  {btn('sku_master_update', 'SKU Update', '#16a34a')}
+                </div>
+              </div>
             </div>
           );
         })()}

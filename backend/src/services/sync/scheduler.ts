@@ -11,9 +11,10 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON } from '../../config/constants';
 import { syncAllAdsProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
+import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
 import { withRetry } from '../../utils/retry';
 import { withSyncLog } from '../../utils/syncLog';
 import type { MarketplaceConfig } from '../../types';
@@ -26,6 +27,7 @@ let wisersellTask: cron.ScheduledTask | null = null;
 let wayfairTask: cron.ScheduledTask | null = null;
 let adsTask: cron.ScheduledTask | null = null;
 let agingTask: cron.ScheduledTask | null = null;
+let skuMasterDiffTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isTransactionSyncing = false;
 let isNJSyncing = false;
@@ -34,6 +36,7 @@ let isWayfairSyncing = false;
 let isReviewSyncing = false; // kept for manual trigger via /sync/trigger
 let isAdsSyncing = false;
 let isAgingSyncing = false;
+let isSkuMasterDiffRunning = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -288,6 +291,22 @@ async function runAgingSyncJob(): Promise<void> {
   }
 }
 
+async function runSkuMasterDiffJob(): Promise<void> {
+  if (isSkuMasterDiffRunning) {
+    logger.warn('[Scheduler] Skipping sku-master-diff - already running');
+    return;
+  }
+
+  isSkuMasterDiffRunning = true;
+  try {
+    await runSkuMasterDiff();
+  } catch (err: any) {
+    logger.error('[Scheduler] SKU master diff failed:', err.message);
+  } finally {
+    isSkuMasterDiffRunning = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -329,6 +348,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Aging sync error:', err));
   });
 
+  skuMasterDiffTask = cron.schedule(SYNC_SKU_MASTER_DIFF_CRON, () => {
+    withSyncLog('sku-master-diff', () => runSkuMasterDiffJob().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] SKU master diff error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -339,6 +363,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Wayfair CastleGate sync: ${SYNC_WAYFAIR_CRON}`);
   logger.info(`[Scheduler] Ads sync: ${SYNC_ADS_CRON}`);
   logger.info(`[Scheduler] Aging report sync: ${SYNC_AGING_CRON}`);
+  logger.info(`[Scheduler] SKU master diff: ${SYNC_SKU_MASTER_DIFF_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -351,7 +376,8 @@ export function stopScheduler(): void {
   wayfairTask?.stop();
   adsTask?.stop();
   agingTask?.stop();
+  skuMasterDiffTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
