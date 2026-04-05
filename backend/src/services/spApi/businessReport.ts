@@ -80,14 +80,19 @@ export async function fetchBusinessReport(
     return 0;
   }
 
-  // The report returns { salesAndTrafficByAsin: [...] }
+  // The report returns { reportSpecification, salesAndTrafficByDate, salesAndTrafficByAsin }
+  // salesAndTrafficByAsin does NOT have per-row date — it's an aggregate for the requested period.
+  // We use endDate as the report_date (period end).
   const asinRows = reportData?.salesAndTrafficByAsin || reportData;
   if (!Array.isArray(asinRows) || asinRows.length === 0) {
     logger.warn(`[BusinessReport] Empty asin data for ${marketplace.country_code}`);
     return 0;
   }
 
-  logger.info(`[BusinessReport] Downloaded ${asinRows.length} ASIN-day rows for ${marketplace.country_code}`);
+  logger.info(`[BusinessReport] Downloaded ${asinRows.length} ASIN rows for ${marketplace.country_code}`);
+
+  // Use endDate as report_date (aggregate period end)
+  const reportDateStr = endDate.toISOString().split('T')[0];
 
   // Step 4: Parse and write
   const items: BusinessReportRow[] = [];
@@ -96,16 +101,13 @@ export async function fetchBusinessReport(
     const childAsin = row.childAsin || row['(Child) ASIN'] || '';
     if (!childAsin) continue;
 
-    const date = row.date || '';
-    if (!date) continue;
-
     const traffic = row.trafficByAsin || {};
     const sales = row.salesByAsin || {};
 
     items.push({
       credential_id: credentialId,
       marketplace_id: marketplace.country_code,
-      report_date: date,
+      report_date: reportDateStr,
       parent_asin: row.parentAsin || null,
       child_asin: childAsin,
       title: row.title || null,

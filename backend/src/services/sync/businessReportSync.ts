@@ -38,11 +38,13 @@ export async function runBusinessReportSync(): Promise<number> {
 
   logger.info(`[BusinessReportSync] Starting sync for ${uniqueMarketplaces.length} marketplaces`);
 
-  // Date range: last 5 days (to account for 48-72h processing delay)
+  // Fetch yesterday's data (1-day window).
+  // Business Reports are ASIN aggregate per period — daily cron accumulates ASIN × day data.
+  // 48-72h lag is typical; missing data will be filled on next day's run via ON CONFLICT upsert.
   const endDate = new Date();
   endDate.setUTCDate(endDate.getUTCDate() - 1); // yesterday
   const startDate = new Date(endDate);
-  startDate.setUTCDate(startDate.getUTCDate() - 4); // 5 days back
+  // startDate = endDate (same day, 1-day window)
 
   let totalRows = 0;
   for (const mp of uniqueMarketplaces) {
