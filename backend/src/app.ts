@@ -35,24 +35,22 @@ export function createApp(): Application {
 
   // Health check
   app.get('/health', async (_req, res) => {
+    let dbStatus = 'unknown';
     try {
       await pool.query('SELECT 1');
-      res.json({
-        status: 'ok',
-        app: 'databridge',
-        database: 'connected',
-        uptime: process.uptime(),
-        memory: Math.round(process.memoryUsage().rss / 1024 / 1024),
-        timestamp: new Date().toISOString(),
-      });
+      dbStatus = 'connected';
     } catch {
-      res.status(500).json({
-        status: 'error',
-        app: 'databridge',
-        database: 'disconnected',
-        timestamp: new Date().toISOString(),
-      });
+      dbStatus = 'disconnected';
     }
+    res.json({
+      success: true,
+      message: 'DataBridge API is running',
+      app: 'databridge',
+      database: dbStatus,
+      uptime: process.uptime(),
+      memory: Math.round(process.memoryUsage().rss / 1024 / 1024),
+      timestamp: new Date().toISOString(),
+    });
   });
 
   // API routes
