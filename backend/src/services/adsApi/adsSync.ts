@@ -3,10 +3,12 @@ import logger from '../../config/logger';
 import { getAdsClient, getActiveProfiles } from './client';
 import { fetchAdsReport } from './reports';
 import { writeSearchTermData, writeTargetingData, writeAdvertisedProductData, writePurchasedProductData } from './adsDataWriter';
+import { writePlacementData, writeCampaignReportData, writeSbCampaignData, writeSbSearchTermData } from './adsDataWriterTier1';
 import { withRetry } from '../../utils/retry';
-import type { AdsReportType } from '../../types/ads';
+import type { AdsReportType, SbReportType } from '../../types/ads';
 
-const REPORT_TYPES: AdsReportType[] = ['search_term', 'targeting', 'advertised_product', 'purchased_product'];
+const REPORT_TYPES: AdsReportType[] = ['search_term', 'targeting', 'advertised_product', 'purchased_product', 'placement', 'campaign'];
+const SB_REPORT_TYPES: SbReportType[] = ['sb_campaign', 'sb_search_term'];
 
 // Default sync window: last 14 days (7-day attribution window)
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -14,7 +16,7 @@ const DEFAULT_LOOKBACK_DAYS = 14;
 /**
  * Create a sync job record in ads_sync_jobs.
  */
-async function createSyncJob(profileId: number, reportType: AdsReportType, startDate: string, endDate: string): Promise<number> {
+async function createSyncJob(profileId: number, reportType: AdsReportType | SbReportType, startDate: string, endDate: string): Promise<number> {
   const result = await pool.query(
     `INSERT INTO ads_sync_jobs (profile_id, report_type, date_start, date_end, status, started_at)
      VALUES ($1, $2, $3, $4, 'running', NOW())
@@ -62,12 +64,16 @@ function getDateRange(lookbackDays: number): { startDate: string; endDate: strin
 /**
  * Writer function selector based on report type.
  */
-function getWriter(reportType: AdsReportType) {
+function getWriter(reportType: AdsReportType | SbReportType) {
   switch (reportType) {
     case 'search_term': return writeSearchTermData;
     case 'targeting': return writeTargetingData;
     case 'advertised_product': return writeAdvertisedProductData;
     case 'purchased_product': return writePurchasedProductData;
+    case 'placement': return writePlacementData;
+    case 'campaign': return writeCampaignReportData;
+    case 'sb_campaign': return writeSbCampaignData;
+    case 'sb_search_term': return writeSbSearchTermData;
   }
 }
 
@@ -148,4 +154,81 @@ export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): 
   }
 
   logger.info('[AdsSync] Sync cycle complete');
+}
+
+/**
+ * Sync SB (Sponsored Brands) reports for a single profile.
+ */
+export async function syncSbForProfile(
+  credentialId: number,
+  profileId: number,
+  lookbackDays = DEFAULT_LOOKBACK_DAYS,
+): Promise<{ total: number; errors: string[] }> {
+  const { startDate, endDate } = getDateRange(lookbackDays);
+  const client = await getAdsClient(credentialId, profileId);
+  let total = 0;
+  const errors: string[] = [];
+
+  for (const reportType of SB_REPORT_TYPES) {
+    const jobId = await createSyncJob(profileId, reportType, startDate, endDate);
+
+    try {
+      const rows = await withRetry(
+        () => fetchAdsReport(client, reportType, startDate, endDate),
+        { label: `sb:${reportType}:${profileId}`, maxRetries: 2 }
+      );
+
+      const writer = getWriter(reportType);
+      const count = await writer(profileId, startDate, endDate, rows);
+
+      await completeSyncJob(jobId, count);
+      total += count;
+
+      logger.info(`[SbSync] ${reportType}: ${count} rows for profile ${profileId}`);
+    } catch (err: any) {
+      await failSyncJob(jobId, err.message);
+      errors.push(`${reportType}: ${err.message}`);
+      logger.error(`[SbSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2_000));
+  }
+
+  return { total, errors };
+}
+
+/**
+ * Sync all active profiles for SB reports (called by scheduler).
+ */
+export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): Promise<void> {
+  const profiles = await getActiveProfiles();
+
+  if (!profiles.length) {
+    logger.info('[SbSync] No active Ads profiles found');
+    return;
+  }
+
+  logger.info(`[SbSync] Starting SB sync for ${profiles.length} profiles (${lookbackDays} day lookback)`);
+
+  for (const profile of profiles) {
+    try {
+      const { total, errors } = await syncSbForProfile(
+        profile.credential_id,
+        profile.profile_id,
+        lookbackDays,
+      );
+
+      if (errors.length) {
+        logger.warn(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}): ${total} rows, ${errors.length} errors`);
+      } else {
+        logger.info(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}): ${total} rows synced`);
+      }
+    } catch (err: any) {
+      logger.error(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${err.message}`);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 5_000));
+  }
+
+  logger.info('[SbSync] SB sync cycle complete');
 }

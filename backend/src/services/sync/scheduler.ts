@@ -11,8 +11,8 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON } from '../../config/constants';
-import { syncAllAdsProfiles } from '../adsApi/adsSync';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON } from '../../config/constants';
+import { syncAllAdsProfiles, syncAllSbProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
 import { runBusinessReportSync } from './businessReportSync';
@@ -34,6 +34,7 @@ let skuMasterDiffTask: cron.ScheduledTask | null = null;
 let businessReportTask: cron.ScheduledTask | null = null;
 let campaignSnapshotTask: cron.ScheduledTask | null = null;
 let brandAnalyticsTask: cron.ScheduledTask | null = null;
+let sbAdsTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isTransactionSyncing = false;
 let isNJSyncing = false;
@@ -46,6 +47,7 @@ let isSkuMasterDiffRunning = false;
 let isBusinessReportSyncing = false;
 let isCampaignSnapshotSyncing = false;
 let isBrandAnalyticsSyncing = false;
+let isSbAdsSyncing = false;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -361,6 +363,21 @@ async function runBrandAnalyticsSyncJob(): Promise<number | void> {
   }
 }
 
+async function runSbAdsSync(): Promise<void> {
+  if (isSbAdsSyncing) {
+    logger.warn('[Scheduler] Skipping SB Ads sync - already running');
+    return;
+  }
+  isSbAdsSyncing = true;
+  try {
+    await syncAllSbProfiles();
+  } catch (err: any) {
+    logger.error('[Scheduler] SB Ads sync failed:', err.message);
+  } finally {
+    isSbAdsSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -422,6 +439,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Brand analytics sync error:', err));
   });
 
+  sbAdsTask = cron.schedule(SYNC_SB_ADS_CRON, () => {
+    withSyncLog('sb-ads', () => runSbAdsSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] SB Ads sync error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -436,6 +458,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Business report sync: ${SYNC_BUSINESS_REPORT_CRON}`);
   logger.info(`[Scheduler] Campaign snapshot: ${SYNC_CAMPAIGN_SNAPSHOT_CRON}`);
   logger.info(`[Scheduler] Brand analytics sync: ${SYNC_BRAND_ANALYTICS_CRON}`);
+  logger.info(`[Scheduler] SB Ads sync: ${SYNC_SB_ADS_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -452,7 +475,8 @@ export function stopScheduler(): void {
   businessReportTask?.stop();
   campaignSnapshotTask?.stop();
   brandAnalyticsTask?.stop();
+  sbAdsTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };

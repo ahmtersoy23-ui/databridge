@@ -3,8 +3,8 @@ import { createGunzip } from 'zlib';
 import { Readable } from 'stream';
 import axios from 'axios';
 import logger from '../../config/logger';
-import type { AdsReportType, AdsReportStatusResponse } from '../../types/ads';
-import { ADS_REPORT_TYPE_MAP, ADS_REPORT_COLUMNS, ADS_REPORT_GROUP_BY } from '../../types/ads';
+import type { AdsReportType, SbReportType, AdsReportStatusResponse } from '../../types/ads';
+import { ADS_REPORT_TYPE_MAP, SB_REPORT_TYPE_MAP, ADS_REPORT_COLUMNS, ADS_REPORT_GROUP_BY, ADS_REPORT_AD_PRODUCT } from '../../types/ads';
 
 /**
  * Create an Ads API V3 async report.
@@ -12,19 +12,20 @@ import { ADS_REPORT_TYPE_MAP, ADS_REPORT_COLUMNS, ADS_REPORT_GROUP_BY } from '..
  */
 export async function createAdsReport(
   client: AxiosInstance,
-  reportType: AdsReportType,
+  reportType: AdsReportType | SbReportType,
   startDate: string,
   endDate: string,
 ): Promise<string> {
+  const reportTypeId = (ADS_REPORT_TYPE_MAP as any)[reportType] || (SB_REPORT_TYPE_MAP as any)[reportType];
   const body = {
     name: `DataBridge ${reportType} ${startDate}`,
     startDate,
     endDate,
     configuration: {
-      adProduct: 'SPONSORED_PRODUCTS',
+      adProduct: ADS_REPORT_AD_PRODUCT[reportType],
       groupBy: ADS_REPORT_GROUP_BY[reportType],
       columns: ADS_REPORT_COLUMNS[reportType],
-      reportTypeId: ADS_REPORT_TYPE_MAP[reportType],
+      reportTypeId,
       timeUnit: 'DAILY',
       format: 'GZIP_JSON',
     },
@@ -117,7 +118,7 @@ export async function downloadAdsReport<T = Record<string, any>>(url: string): P
  */
 async function findAndDownloadPendingReport<T>(
   client: AxiosInstance,
-  reportType: AdsReportType,
+  reportType: AdsReportType | SbReportType,
 ): Promise<T[] | null> {
   try {
     // Query ads_sync_jobs for the most recent report ID of this type
@@ -147,7 +148,7 @@ async function findAndDownloadPendingReport<T>(
  */
 export async function fetchAdsReport<T = Record<string, any>>(
   client: AxiosInstance,
-  reportType: AdsReportType,
+  reportType: AdsReportType | SbReportType,
   startDate: string,
   endDate: string,
 ): Promise<T[]> {
