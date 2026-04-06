@@ -142,12 +142,12 @@ export async function writeSbCampaignData(profileId: number, startDate: string, 
         r.impressions || 0,
         r.clicks || 0,
         r.cost || 0,
-        r.sales14d || 0,
-        r.purchases14d || 0,
-        r.unitsSoldClicks14d || 0,
-        r.newToBrandPurchases14d || 0,
-        r.newToBrandSales14d || 0,
-        r.dpv14d || 0,
+        r.sales || r.sales14d || 0,
+        r.purchases || r.purchases14d || 0,
+        r.unitsSold || r.unitsSoldClicks14d || 0,
+        r.newToBrandPurchases || r.newToBrandPurchases14d || 0,
+        r.newToBrandSales || r.newToBrandSales14d || 0,
+        r.detailPageViews || r.dpv14d || 0,
       );
     }
 
@@ -207,7 +207,7 @@ export async function writeSbSearchTermData(profileId: number, startDate: string
         r.impressions || 0,
         r.clicks || 0,
         r.cost || 0,
-        r.sales14d || 0,
+        r.sales || r.sales14d || 0,
       );
     }
 

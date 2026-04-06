@@ -7,7 +7,8 @@ import { writePlacementData, writeCampaignReportData, writeSbCampaignData, write
 import { withRetry } from '../../utils/retry';
 import type { AdsReportType, SbReportType } from '../../types/ads';
 
-const REPORT_TYPES: AdsReportType[] = ['search_term', 'targeting', 'advertised_product', 'purchased_product', 'placement', 'campaign'];
+const REPORT_TYPES: AdsReportType[] = ['search_term', 'targeting', 'advertised_product', 'purchased_product', 'campaign'];
+// Note: 'placement' (spPlacement) does not exist in V3 API — removed
 const SB_REPORT_TYPES: SbReportType[] = ['sb_campaign', 'sb_search_term'];
 
 // Default sync window: last 14 days (7-day attribution window)

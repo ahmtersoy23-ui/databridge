@@ -246,13 +246,13 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType, string[]> 
     'impressions', 'clicks', 'cost', 'purchases7d', 'sales7d', 'unitsSoldClicks7d',
   ],
   sb_campaign: [
-    'date', 'campaignId', 'campaignName',
-    'impressions', 'clicks', 'cost', 'purchases14d', 'sales14d', 'unitsSoldClicks14d',
-    'newToBrandPurchases14d', 'newToBrandSales14d', 'dpv14d',
+    'date', 'campaignId', 'campaignName', 'campaignStatus',
+    'impressions', 'clicks', 'cost', 'purchases', 'sales',
+    'newToBrandPurchases', 'newToBrandSales', 'detailPageViews',
   ],
   sb_search_term: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
-    'searchTerm', 'impressions', 'clicks', 'cost', 'purchases14d', 'sales14d',
+    'searchTerm', 'impressions', 'clicks', 'cost', 'purchases', 'sales',
   ],
 };
 
