@@ -235,8 +235,9 @@ export async function listSbCampaigns(credentialId: number, profileId: number): 
     const body: any = { maxResults: 100 };
     if (nextToken) body.nextToken = nextToken;
 
+    const ct = 'application/vnd.sbcampaignresource.v4+json';
     const res = await client.post('/sb/v4/campaigns/list', body, {
-      headers: { 'Content-Type': 'application/vnd.sbcampaignresource.v4+json' },
+      headers: { 'Content-Type': ct, 'Accept': ct },
     });
 
     const campaigns = res.data?.campaigns || [];
@@ -245,6 +246,28 @@ export async function listSbCampaigns(credentialId: number, profileId: number): 
   } while (nextToken);
 
   logger.info(`[AdsAPI] Listed ${allCampaigns.length} SB campaigns for profile ${profileId}`);
+  return allCampaigns;
+}
+
+/**
+ * List all SD (Sponsored Display) campaigns via Campaign Management API.
+ */
+export async function listSdCampaigns(credentialId: number, profileId: number): Promise<any[]> {
+  const client = await getAdsClient(credentialId, profileId);
+  const allCampaigns: any[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    const body: any = { maxResults: 100 };
+    if (nextToken) body.nextToken = nextToken;
+
+    const res = await client.post('/sd/campaigns/list', body);
+    const campaigns = res.data?.campaigns || res.data || [];
+    allCampaigns.push(...(Array.isArray(campaigns) ? campaigns : []));
+    nextToken = res.data?.nextToken;
+  } while (nextToken);
+
+  logger.info(`[AdsAPI] Listed ${allCampaigns.length} SD campaigns for profile ${profileId}`);
   return allCampaigns;
 }
 
