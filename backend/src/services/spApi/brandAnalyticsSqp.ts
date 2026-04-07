@@ -8,9 +8,8 @@ import { createGunzip } from 'zlib';
 import { createWriteStream, createReadStream, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { parser } from 'stream-json';
-import { streamArray } from 'stream-json/streamers/StreamArray';
-import { pick } from 'stream-json/filters/Pick';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const JSONStream = require('JSONStream');
 import { pipeline as pipelineCallback } from 'stream';
 import { promisify } from 'util';
 
@@ -200,18 +199,17 @@ export async function fetchBrandAnalyticsSqp(
       let writing = false;
       const pendingWrites: SqpRow[][] = [];
 
+      // JSONStream.parse('dataByDepartmentAndSearchTerm.*') emits each array element
       const jsonPipeline = createReadStream(tmpFile)
         .pipe(createGunzip())
-        .pipe(parser())
-        .pipe(pick({ filter: 'dataByDepartmentAndSearchTerm' }))
-        .pipe(streamArray());
+        .pipe(JSONStream.parse('dataByDepartmentAndSearchTerm.*'));
 
       async function flushBatch(items: SqpRow[]) {
         if (items.length === 0) return;
         totalWritten += await writeBatch(items);
       }
 
-      jsonPipeline.on('data', ({ value }: { value: any }) => {
+      jsonPipeline.on('data', (value: any) => {
         rowsScanned++;
 
         const items = parseRow(value, credentialId, marketplace.country_code, reportDateStr, ourAsins);
