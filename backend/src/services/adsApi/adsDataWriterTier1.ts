@@ -260,10 +260,10 @@ export async function writeSdCampaignData(profileId: number, startDate: string, 
         r.impressions || 0,
         r.clicks || 0,
         r.cost || 0,
-        r.sales14d || 0,
-        r.purchases14d || 0,
-        r.unitsSoldClicks14d || 0,
-        r.dpv14d || 0,
+        r.salesClicks || r.sales14d || 0,
+        r.purchasesClicks || r.purchases14d || 0,
+        r.unitsSoldClicks || r.unitsSoldClicks14d || 0,
+        r.detailPageViewsClicks || r.dpv14d || 0,
       );
     }
 
@@ -307,8 +307,8 @@ export async function writeSdTargetingData(profileId: number, startDate: string,
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 12;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12})`);
+      const offset = j * 13;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -320,8 +320,9 @@ export async function writeSdTargetingData(profileId: number, startDate: string,
         r.impressions || 0,
         r.clicks || 0,
         r.cost || 0,
-        r.sales14d || 0,
-        r.purchases14d || 0,
+        r.salesClicks || r.sales14d || 0,
+        r.purchasesClicks || r.purchases14d || 0,
+        r.unitsSoldClicks || r.unitsSoldClicks14d || 0,
       );
     }
 
@@ -329,7 +330,7 @@ export async function writeSdTargetingData(profileId: number, startDate: string,
       `INSERT INTO ads_sd_targeting_report (
         profile_id, report_date, campaign_id, campaign_name,
         ad_group_id, ad_group_name, targeting,
-        impressions, clicks, spend, sales_14d, orders_14d
+        impressions, clicks, spend, sales_14d, orders_14d, units_14d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, targeting)
       DO UPDATE SET
@@ -340,6 +341,7 @@ export async function writeSdTargetingData(profileId: number, startDate: string,
         spend = EXCLUDED.spend,
         sales_14d = EXCLUDED.sales_14d,
         orders_14d = EXCLUDED.orders_14d,
+        units_14d = EXCLUDED.units_14d,
         synced_at = NOW()`,
       values
     );
@@ -365,8 +367,8 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 13;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`);
+      const offset = j * 14;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -379,8 +381,9 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
         r.impressions || 0,
         r.clicks || 0,
         r.cost || 0,
-        r.sales14d || 0,
-        r.purchases14d || 0,
+        r.salesClicks || r.sales14d || 0,
+        r.purchasesClicks || r.purchases14d || 0,
+        r.unitsSoldClicks || r.unitsSoldClicks14d || 0,
       );
     }
 
@@ -388,7 +391,7 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
       `INSERT INTO ads_sd_advertised_product_report (
         profile_id, report_date, campaign_id, campaign_name,
         ad_group_id, ad_group_name, advertised_asin, advertised_sku,
-        impressions, clicks, spend, sales_14d, orders_14d
+        impressions, clicks, spend, sales_14d, orders_14d, units_14d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, advertised_asin)
       DO UPDATE SET
@@ -400,6 +403,7 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
         spend = EXCLUDED.spend,
         sales_14d = EXCLUDED.sales_14d,
         orders_14d = EXCLUDED.orders_14d,
+        units_14d = EXCLUDED.units_14d,
         synced_at = NOW()`,
       values
     );

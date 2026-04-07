@@ -265,20 +265,20 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType | SdReportT
     'searchTerm', 'impressions', 'clicks', 'cost', 'purchases', 'sales',
   ],
   sd_campaign: [
-    'date', 'campaignId', 'campaignName',
-    'impressions', 'clicks', 'cost', 'purchases14d', 'sales14d',
-    'unitsSoldClicks14d', 'dpv14d',
+    'date', 'campaignId', 'campaignName', 'campaignStatus',
+    'impressions', 'clicks', 'cost',
+    'purchasesClicks', 'salesClicks', 'unitsSoldClicks', 'detailPageViewsClicks',
   ],
   sd_targeting: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
     'targeting', 'impressions', 'clicks', 'cost',
-    'purchases14d', 'sales14d', 'unitsSoldClicks14d',
+    'purchasesClicks', 'salesClicks', 'unitsSoldClicks',
   ],
   sd_advertised_product: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
-    'advertisedAsin', 'advertisedSku',
+    'advertisedAsin',
     'impressions', 'clicks', 'cost',
-    'purchases14d', 'sales14d', 'unitsSoldClicks14d',
+    'purchasesClicks', 'salesClicks', 'unitsSoldClicks',
   ],
 };
 
