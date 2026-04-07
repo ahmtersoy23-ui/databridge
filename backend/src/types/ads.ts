@@ -31,6 +31,7 @@ export interface AdsProfileResponse {
 // Report type enum
 export type AdsReportType = 'search_term' | 'targeting' | 'advertised_product' | 'purchased_product' | 'placement' | 'campaign';
 export type SbReportType = 'sb_campaign' | 'sb_search_term';
+export type SdReportType = 'sd_campaign' | 'sd_targeting' | 'sd_advertised_product';
 
 // Ads API V3 report request config
 export interface AdsReportConfig {
@@ -189,8 +190,14 @@ export const SB_REPORT_TYPE_MAP: Record<SbReportType, string> = {
   sb_search_term: 'sbSearchTerm',
 };
 
+export const SD_REPORT_TYPE_MAP: Record<SdReportType, string> = {
+  sd_campaign: 'sdCampaigns',
+  sd_targeting: 'sdTargeting',
+  sd_advertised_product: 'sdAdvertisedProduct',
+};
+
 // adProduct per report type
-export const ADS_REPORT_AD_PRODUCT: Record<AdsReportType | SbReportType, string> = {
+export const ADS_REPORT_AD_PRODUCT: Record<AdsReportType | SbReportType | SdReportType, string> = {
   search_term: 'SPONSORED_PRODUCTS',
   targeting: 'SPONSORED_PRODUCTS',
   advertised_product: 'SPONSORED_PRODUCTS',
@@ -199,10 +206,13 @@ export const ADS_REPORT_AD_PRODUCT: Record<AdsReportType | SbReportType, string>
   campaign: 'SPONSORED_PRODUCTS',
   sb_campaign: 'SPONSORED_BRANDS',
   sb_search_term: 'SPONSORED_BRANDS',
+  sd_campaign: 'SPONSORED_DISPLAY',
+  sd_targeting: 'SPONSORED_DISPLAY',
+  sd_advertised_product: 'SPONSORED_DISPLAY',
 };
 
 // Columns requested per report type (Ads API V3 — validated against API schema)
-export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType, string[]> = {
+export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType | SdReportType, string[]> = {
   search_term: [
     'date', 'portfolioId', 'campaignName', 'campaignId', 'campaignBudgetCurrencyCode',
     'adGroupName', 'adGroupId', 'targeting', 'matchType',
@@ -254,10 +264,26 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType, string[]> 
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
     'searchTerm', 'impressions', 'clicks', 'cost', 'purchases', 'sales',
   ],
+  sd_campaign: [
+    'date', 'campaignId', 'campaignName',
+    'impressions', 'clicks', 'cost', 'purchases14d', 'sales14d',
+    'unitsSoldClicks14d', 'dpv14d',
+  ],
+  sd_targeting: [
+    'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
+    'targeting', 'impressions', 'clicks', 'cost',
+    'purchases14d', 'sales14d', 'unitsSoldClicks14d',
+  ],
+  sd_advertised_product: [
+    'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
+    'advertisedAsin', 'advertisedSku',
+    'impressions', 'clicks', 'cost',
+    'purchases14d', 'sales14d', 'unitsSoldClicks14d',
+  ],
 };
 
 // GroupBy per report type
-export const ADS_REPORT_GROUP_BY: Record<AdsReportType | SbReportType, string[]> = {
+export const ADS_REPORT_GROUP_BY: Record<AdsReportType | SbReportType | SdReportType, string[]> = {
   search_term: ['searchTerm'],
   targeting: ['targeting'],
   advertised_product: ['advertiser'],
@@ -266,4 +292,7 @@ export const ADS_REPORT_GROUP_BY: Record<AdsReportType | SbReportType, string[]>
   campaign: ['campaign'],
   sb_campaign: ['campaign'],
   sb_search_term: ['searchTerm'],
+  sd_campaign: ['campaign'],
+  sd_targeting: ['targeting'],
+  sd_advertised_product: ['advertiser'],
 };

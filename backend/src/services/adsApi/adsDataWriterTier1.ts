@@ -235,3 +235,178 @@ export async function writeSbSearchTermData(profileId: number, startDate: string
   logger.info(`[AdsWriter] SB Search Term: ${total} rows for profile ${profileId}`);
   return total;
 }
+
+/**
+ * Batch upsert SD Campaign report rows (14d attribution).
+ */
+export async function writeSdCampaignData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
+  if (!rows.length) return 0;
+
+  let total = 0;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (let j = 0; j < batch.length; j++) {
+      const r = batch[j];
+      const offset = j * 11;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11})`);
+      values.push(
+        profileId,
+        r.date || startDate,
+        r.campaignId || null,
+        r.campaignName || null,
+        r.impressions || 0,
+        r.clicks || 0,
+        r.cost || 0,
+        r.sales14d || 0,
+        r.purchases14d || 0,
+        r.unitsSoldClicks14d || 0,
+        r.dpv14d || 0,
+      );
+    }
+
+    await pool.query(
+      `INSERT INTO ads_sd_campaign_report (
+        profile_id, report_date, campaign_id, campaign_name,
+        impressions, clicks, spend, sales_14d, orders_14d, units_14d, dpv_14d
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT (profile_id, report_date, campaign_id)
+      DO UPDATE SET
+        campaign_name = EXCLUDED.campaign_name,
+        impressions = EXCLUDED.impressions,
+        clicks = EXCLUDED.clicks,
+        spend = EXCLUDED.spend,
+        sales_14d = EXCLUDED.sales_14d,
+        orders_14d = EXCLUDED.orders_14d,
+        units_14d = EXCLUDED.units_14d,
+        dpv_14d = EXCLUDED.dpv_14d,
+        synced_at = NOW()`,
+      values
+    );
+
+    total += batch.length;
+  }
+
+  logger.info(`[AdsWriter] SD Campaign: ${total} rows for profile ${profileId}`);
+  return total;
+}
+
+/**
+ * Batch upsert SD Targeting report rows (14d attribution).
+ */
+export async function writeSdTargetingData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
+  if (!rows.length) return 0;
+
+  let total = 0;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (let j = 0; j < batch.length; j++) {
+      const r = batch[j];
+      const offset = j * 12;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12})`);
+      values.push(
+        profileId,
+        r.date || startDate,
+        r.campaignId || null,
+        r.campaignName || null,
+        r.adGroupId || null,
+        r.adGroupName || null,
+        r.targeting || null,
+        r.impressions || 0,
+        r.clicks || 0,
+        r.cost || 0,
+        r.sales14d || 0,
+        r.purchases14d || 0,
+      );
+    }
+
+    await pool.query(
+      `INSERT INTO ads_sd_targeting_report (
+        profile_id, report_date, campaign_id, campaign_name,
+        ad_group_id, ad_group_name, targeting,
+        impressions, clicks, spend, sales_14d, orders_14d
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, targeting)
+      DO UPDATE SET
+        campaign_name = EXCLUDED.campaign_name,
+        ad_group_name = EXCLUDED.ad_group_name,
+        impressions = EXCLUDED.impressions,
+        clicks = EXCLUDED.clicks,
+        spend = EXCLUDED.spend,
+        sales_14d = EXCLUDED.sales_14d,
+        orders_14d = EXCLUDED.orders_14d,
+        synced_at = NOW()`,
+      values
+    );
+
+    total += batch.length;
+  }
+
+  logger.info(`[AdsWriter] SD Targeting: ${total} rows for profile ${profileId}`);
+  return total;
+}
+
+/**
+ * Batch upsert SD Advertised Product report rows (14d attribution).
+ */
+export async function writeSdAdvertisedProductData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
+  if (!rows.length) return 0;
+
+  let total = 0;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (let j = 0; j < batch.length; j++) {
+      const r = batch[j];
+      const offset = j * 13;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`);
+      values.push(
+        profileId,
+        r.date || startDate,
+        r.campaignId || null,
+        r.campaignName || null,
+        r.adGroupId || null,
+        r.adGroupName || null,
+        r.advertisedAsin || null,
+        r.advertisedSku || null,
+        r.impressions || 0,
+        r.clicks || 0,
+        r.cost || 0,
+        r.sales14d || 0,
+        r.purchases14d || 0,
+      );
+    }
+
+    await pool.query(
+      `INSERT INTO ads_sd_advertised_product_report (
+        profile_id, report_date, campaign_id, campaign_name,
+        ad_group_id, ad_group_name, advertised_asin, advertised_sku,
+        impressions, clicks, spend, sales_14d, orders_14d
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, advertised_asin)
+      DO UPDATE SET
+        campaign_name = EXCLUDED.campaign_name,
+        ad_group_name = EXCLUDED.ad_group_name,
+        advertised_sku = EXCLUDED.advertised_sku,
+        impressions = EXCLUDED.impressions,
+        clicks = EXCLUDED.clicks,
+        spend = EXCLUDED.spend,
+        sales_14d = EXCLUDED.sales_14d,
+        orders_14d = EXCLUDED.orders_14d,
+        synced_at = NOW()`,
+      values
+    );
+
+    total += batch.length;
+  }
+
+  logger.info(`[AdsWriter] SD Advertised Product: ${total} rows for profile ${profileId}`);
+  return total;
+}

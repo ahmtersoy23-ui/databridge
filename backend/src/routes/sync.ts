@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
@@ -129,6 +129,10 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       withSyncLog('sb-ads', () => runSbAdsSync().then(() => undefined))
         .catch(err => logger.error('[Sync] SB Ads sync error:', err));
       res.json({ success: true, message: 'SB Ads sync started' });
+    } else if (type === 'sd_ads') {
+      withSyncLog('sd-ads', () => runSdAdsSync().then(() => undefined))
+        .catch(err => logger.error('[Sync] SD Ads sync error:', err));
+      res.json({ success: true, message: 'SD Ads sync started' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

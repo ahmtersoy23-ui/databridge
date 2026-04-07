@@ -222,6 +222,32 @@ export async function getActiveProfiles(countryCode?: string): Promise<Array<{ i
   return result.rows;
 }
 
+/**
+ * List all SB (Sponsored Brands) campaigns via Campaign Management API.
+ * Diagnostic: compare campaign count with V3 report to identify legacy gaps.
+ */
+export async function listSbCampaigns(credentialId: number, profileId: number): Promise<any[]> {
+  const client = await getAdsClient(credentialId, profileId);
+  const allCampaigns: any[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    const body: any = { maxResults: 100 };
+    if (nextToken) body.nextToken = nextToken;
+
+    const res = await client.post('/sb/v4/campaigns/list', body, {
+      headers: { 'Content-Type': 'application/vnd.sbcampaignresource.v4+json' },
+    });
+
+    const campaigns = res.data?.campaigns || [];
+    allCampaigns.push(...campaigns);
+    nextToken = res.data?.nextToken;
+  } while (nextToken);
+
+  logger.info(`[AdsAPI] Listed ${allCampaigns.length} SB campaigns for profile ${profileId}`);
+  return allCampaigns;
+}
+
 export function clearTokenCache(): void {
   tokenCache.clear();
 }
