@@ -50,8 +50,11 @@ async function loadOurAsins(): Promise<Set<string>> {
 }
 
 /**
- * Parse a single BA row into SqpRow items (up to 3 clicked ASINs per row).
- * Returns only items where clicked_asin is in our ASIN set.
+ * Parse a single BA row into an SqpRow (or null if not our ASIN).
+ *
+ * Report format: each row = one (searchTerm, clickedAsin) pair.
+ * Fields: departmentName, searchTerm, searchFrequencyRank,
+ *         clickedAsin, clickedItemName, clickShareRank, clickShare, conversionShare
  */
 function parseRow(
   row: any,
@@ -59,36 +62,23 @@ function parseRow(
   marketplaceCode: string,
   reportDateStr: string,
   ourAsins: Set<string>,
-): SqpRow[] {
+): SqpRow | null {
   const term = row.searchTerm || '';
-  if (!term) return [];
+  const asin = row.clickedAsin || '';
+  if (!term || !asin || !ourAsins.has(asin)) return null;
 
-  const sfRank = parseInt(row.searchFrequencyRank || '0') || null;
-  const department = row.departmentName || null;
-  const items: SqpRow[] = [];
-
-  for (let i = 1; i <= 3; i++) {
-    const asinObj = row[`clickedAsin${i}`] || row[`asin${i}`];
-    if (!asinObj) continue;
-
-    const asin = typeof asinObj === 'string' ? asinObj : (asinObj.asin || '');
-    if (!asin || !ourAsins.has(asin)) continue;
-
-    items.push({
-      credential_id: credentialId,
-      marketplace_id: marketplaceCode,
-      report_date: reportDateStr,
-      department,
-      search_term: term,
-      search_frequency_rank: sfRank,
-      click_share: parseFloat(asinObj.clickShare || row[`clickShare${i}`] || '0') || 0,
-      conversion_share: parseFloat(asinObj.conversionShare || row[`conversionShare${i}`] || '0') || 0,
-      clicked_asin: asin,
-      clicked_asin_product_name: asinObj.productName || asinObj.productTitle || null,
-    });
-  }
-
-  return items;
+  return {
+    credential_id: credentialId,
+    marketplace_id: marketplaceCode,
+    report_date: reportDateStr,
+    department: row.departmentName || null,
+    search_term: term,
+    search_frequency_rank: parseInt(row.searchFrequencyRank || '0') || null,
+    click_share: parseFloat(row.clickShare || '0') || 0,
+    conversion_share: parseFloat(row.conversionShare || '0') || 0,
+    clicked_asin: asin,
+    clicked_asin_product_name: row.clickedItemName || null,
+  };
 }
 
 /**
@@ -196,9 +186,6 @@ export async function fetchBrandAnalyticsSqp(
       let totalWritten = 0;
       let batch: SqpRow[] = [];
       let rowsScanned = 0;
-      let writing = false;
-      const pendingWrites: SqpRow[][] = [];
-
       // JSONStream.parse('dataByDepartmentAndSearchTerm.*') emits each array element
       const jsonPipeline = createReadStream(tmpFile)
         .pipe(createGunzip())
@@ -212,9 +199,9 @@ export async function fetchBrandAnalyticsSqp(
       jsonPipeline.on('data', (value: any) => {
         rowsScanned++;
 
-        const items = parseRow(value, credentialId, marketplace.country_code, reportDateStr, ourAsins);
-        if (items.length > 0) {
-          batch.push(...items);
+        const item = parseRow(value, credentialId, marketplace.country_code, reportDateStr, ourAsins);
+        if (item) {
+          batch.push(item);
         }
 
         if (batch.length >= BATCH_SIZE) {
