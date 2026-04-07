@@ -5,10 +5,16 @@ import logger from '../../config/logger';
 import type { MarketplaceConfig } from '../../types';
 import axios from 'axios';
 import { createGunzip } from 'zlib';
+import { createWriteStream, createReadStream, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { parser } from 'stream-json';
 import { streamArray } from 'stream-json/streamers/StreamArray';
 import { pick } from 'stream-json/filters/Pick';
-import { Readable } from 'stream';
+import { pipeline as pipelineCallback } from 'stream';
+import { promisify } from 'util';
+
+const pipelineAsync = promisify(pipelineCallback);
 
 const BATCH_SIZE = 500;
 
@@ -174,69 +180,79 @@ export async function fetchBrandAnalyticsSqp(
   const ourAsins = await loadOurAsins();
   logger.info(`[BrandAnalyticsSQP] Loaded ${ourAsins.size} ASINs for filtering`);
 
-  // Step 4: Stream download → gunzip → JSON stream parse → filter → batch write
-  logger.info(`[BrandAnalyticsSQP] Streaming download for ${marketplace.country_code}...`);
+  // Step 4: Download compressed file to disk (avoids holding 600MB+ in memory)
+  const tmpFile = join(tmpdir(), `ba-sqp-${marketplace.country_code}-${Date.now()}.json.gz`);
+  logger.info(`[BrandAnalyticsSQP] Downloading to ${tmpFile}...`);
 
   const response = await axios.get(document.url, {
     responseType: 'stream',
-    timeout: 600_000, // 10 min — large file
+    timeout: 600_000,
   });
+  await pipelineAsync(response.data, createWriteStream(tmpFile));
+  logger.info(`[BrandAnalyticsSQP] Download complete, starting stream parse...`);
 
-  return new Promise<number>((resolve, reject) => {
-    let totalWritten = 0;
-    let batch: SqpRow[] = [];
-    let rowsScanned = 0;
+  // Step 5: Stream parse from disk → gunzip → JSON → filter → batch write
+  try {
+    return await new Promise<number>((resolve, reject) => {
+      let totalWritten = 0;
+      let batch: SqpRow[] = [];
+      let rowsScanned = 0;
+      let writing = false;
+      const pendingWrites: SqpRow[][] = [];
 
-    const pipeline = response.data
-      .pipe(createGunzip())
-      .pipe(parser())
-      .pipe(pick({ filter: 'dataByDepartmentAndSearchTerm' }))
-      .pipe(streamArray());
+      const jsonPipeline = createReadStream(tmpFile)
+        .pipe(createGunzip())
+        .pipe(parser())
+        .pipe(pick({ filter: 'dataByDepartmentAndSearchTerm' }))
+        .pipe(streamArray());
 
-    pipeline.on('data', async ({ value }: { value: any }) => {
-      rowsScanned++;
-
-      const items = parseRow(value, credentialId, marketplace.country_code, reportDateStr, ourAsins);
-      if (items.length > 0) {
-        batch.push(...items);
+      async function flushBatch(items: SqpRow[]) {
+        if (items.length === 0) return;
+        totalWritten += await writeBatch(items);
       }
 
-      // Flush batch
-      if (batch.length >= BATCH_SIZE) {
-        pipeline.pause();
-        try {
-          totalWritten += await writeBatch(batch);
+      jsonPipeline.on('data', ({ value }: { value: any }) => {
+        rowsScanned++;
+
+        const items = parseRow(value, credentialId, marketplace.country_code, reportDateStr, ourAsins);
+        if (items.length > 0) {
+          batch.push(...items);
+        }
+
+        if (batch.length >= BATCH_SIZE) {
+          const toWrite = batch;
           batch = [];
+          jsonPipeline.pause();
+
+          flushBatch(toWrite)
+            .then(() => jsonPipeline.resume())
+            .catch(err => { jsonPipeline.destroy(); reject(err); });
+        }
+
+        if (rowsScanned % 500_000 === 0) {
+          logger.info(`[BrandAnalyticsSQP] ${marketplace.country_code}: scanned ${(rowsScanned / 1000).toFixed(0)}K rows, matched ${totalWritten}`);
+        }
+      });
+
+      jsonPipeline.on('end', async () => {
+        try {
+          if (batch.length > 0) {
+            totalWritten += await writeBatch(batch);
+          }
+          logger.info(`[BrandAnalyticsSQP] ${marketplace.country_code}: scanned ${rowsScanned} rows, wrote ${totalWritten} (our ASINs)`);
+          resolve(totalWritten);
         } catch (err) {
-          pipeline.destroy();
           reject(err);
-          return;
         }
-        pipeline.resume();
-      }
+      });
 
-      // Progress log every 500K rows
-      if (rowsScanned % 500_000 === 0) {
-        logger.info(`[BrandAnalyticsSQP] ${marketplace.country_code}: scanned ${(rowsScanned / 1000).toFixed(0)}K rows, matched ${totalWritten}`);
-      }
-    });
-
-    pipeline.on('end', async () => {
-      try {
-        // Flush remaining
-        if (batch.length > 0) {
-          totalWritten += await writeBatch(batch);
-        }
-        logger.info(`[BrandAnalyticsSQP] ${marketplace.country_code}: scanned ${rowsScanned} rows, wrote ${totalWritten} (our ASINs)`);
-        resolve(totalWritten);
-      } catch (err) {
+      jsonPipeline.on('error', (err: Error) => {
+        logger.error(`[BrandAnalyticsSQP] Stream error for ${marketplace.country_code}: ${err.message}`);
         reject(err);
-      }
+      });
     });
-
-    pipeline.on('error', (err: Error) => {
-      logger.error(`[BrandAnalyticsSQP] Stream error for ${marketplace.country_code}: ${err.message}`);
-      reject(err);
-    });
-  });
+  } finally {
+    // Cleanup temp file
+    try { unlinkSync(tmpFile); } catch {}
+  }
 }
