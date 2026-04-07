@@ -88,8 +88,12 @@ describe('dataQualityChecks', () => {
 
   describe('runGapDetection', () => {
     it('returns passed when no gaps', async () => {
-      // Gap queries return empty (no missing dates)
-      mockQuery.mockResolvedValue({ rows: [] });
+      mockQuery.mockImplementation((sql: string) => {
+        if (sql.includes('missing_date')) return { rows: [] }; // no gaps
+        if (sql.includes('COUNT(*)')) return { rows: [{ cnt: 100 }] }; // table not empty
+        if (sql.includes('child_asin')) return { rows: [] }; // business report asin
+        return { rows: [] };
+      });
 
       const results = await runGapDetection(30);
       expect(results.length).toBeGreaterThan(0);

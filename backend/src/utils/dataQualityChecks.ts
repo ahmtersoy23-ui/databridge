@@ -80,7 +80,9 @@ const BUSINESS_REPORT_TABLE = 'business_report';
 
 /** Run after each ads sync completes. Returns array of check results. */
 export async function runPostSyncChecks(reportDate?: string): Promise<CheckResult[]> {
-  const targetDate = reportDate || new Date().toISOString().slice(0, 10);
+  // Ads raporlari T-1 gecikmeli gelir — default yesterday
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const targetDate = reportDate || yesterday;
   const results: CheckResult[] = [];
 
   for (const cfg of ADS_TABLES) {
@@ -226,17 +228,22 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
 
   for (const table of allTables) {
     try {
+      // Only check gaps from the table's first data date (avoid false positives for new tables)
       const { rows } = await pool.query(`
-        WITH date_range AS (
+        WITH table_start AS (
+          SELECT GREATEST(MIN(report_date), CURRENT_DATE - $1::int) AS start_date
+          FROM ${table}
+        ),
+        date_range AS (
           SELECT generate_series(
-            CURRENT_DATE - $1::int,
+            (SELECT start_date FROM table_start),
             CURRENT_DATE - 1,
             '1 day'::interval
           )::date AS d
         ),
         actual AS (
           SELECT DISTINCT report_date FROM ${table}
-          WHERE report_date >= CURRENT_DATE - $1::int
+          WHERE report_date >= (SELECT start_date FROM table_start)
             AND report_date < CURRENT_DATE
         )
         SELECT d AS missing_date
@@ -246,7 +253,16 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
         ORDER BY d
       `, [lookbackDays]);
 
-      if (rows.length > 0) {
+      // Empty table — skip (no data yet, not a gap)
+      if (rows.length === 0) {
+        // Check if table is truly empty
+        const total = await pool.query(`SELECT COUNT(*)::int as cnt FROM ${table}`);
+        if (total.rows[0].cnt === 0) {
+          results.push({ check: `gap:${table}`, severity: 'INFO', message: 'Table empty — skipped', passed: true });
+        } else {
+          results.push({ check: `gap:${table}`, severity: 'INFO', message: `No gaps in last ${lookbackDays} days`, passed: true });
+        }
+      } else {
         const dates = rows.map(r => r.missing_date.toISOString().slice(0, 10));
         const severity: Severity = rows.length >= 4 ? 'CRITICAL' : 'WARNING';
         results.push({
@@ -255,8 +271,6 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
           message: `${rows.length} missing day(s): ${dates.slice(0, 5).join(', ')}${dates.length > 5 ? '...' : ''}`,
           passed: false,
         });
-      } else {
-        results.push({ check: `gap:${table}`, severity: 'INFO', message: `No gaps in last ${lookbackDays} days`, passed: true });
       }
     } catch (err: any) {
       results.push({ check: `gap:${table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
