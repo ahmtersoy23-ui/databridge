@@ -11,7 +11,7 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, DATA_QUALITY_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -20,6 +20,7 @@ import { syncAllCampaignSnapshots } from '../adsApi/campaignSnapshot';
 import { runBrandAnalyticsSync } from './brandAnalyticsSync';
 import { withRetry } from '../../utils/retry';
 import { withSyncLog } from '../../utils/syncLog';
+import { runDailyHealthCheck, runPostSyncChecksAndAlert } from '../../utils/dataQualityChecks';
 import type { MarketplaceConfig } from '../../types';
 
 let inventoryTask: cron.ScheduledTask | null = null;
@@ -35,6 +36,7 @@ let businessReportTask: cron.ScheduledTask | null = null;
 let campaignSnapshotTask: cron.ScheduledTask | null = null;
 let brandAnalyticsTask: cron.ScheduledTask | null = null;
 let sbAdsTask: cron.ScheduledTask | null = null;
+let dataQualityTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isTransactionSyncing = false;
 let isNJSyncing = false;
@@ -279,6 +281,7 @@ async function runAdsSync(): Promise<void> {
   isAdsSyncing = true;
   try {
     await syncAllAdsProfiles();
+    await runPostSyncChecksAndAlert();
   } catch (err: any) {
     logger.error('[Scheduler] Ads sync failed:', err.message);
   } finally {
@@ -444,6 +447,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] SB Ads sync error:', err));
   });
 
+  dataQualityTask = cron.schedule(DATA_QUALITY_CRON, () => {
+    withSyncLog('data-quality', () => runDailyHealthCheck().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Data quality check error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -459,6 +467,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Campaign snapshot: ${SYNC_CAMPAIGN_SNAPSHOT_CRON}`);
   logger.info(`[Scheduler] Brand analytics sync: ${SYNC_BRAND_ANALYTICS_CRON}`);
   logger.info(`[Scheduler] SB Ads sync: ${SYNC_SB_ADS_CRON}`);
+  logger.info(`[Scheduler] Data quality check: ${DATA_QUALITY_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -476,6 +485,7 @@ export function stopScheduler(): void {
   campaignSnapshotTask?.stop();
   brandAnalyticsTask?.stop();
   sbAdsTask?.stop();
+  dataQualityTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
