@@ -188,6 +188,7 @@ router.post('/sync/trigger', validateBody(triggerSchema), async (req: Request, r
 });
 
 // ── Excel/CSV Backfill Upload ─────────────────────────────────
+import XLSX from 'xlsx';
 
 type ReportType = 'sp_search_term' | 'sp_targeting' | 'sp_advertised_product' | 'sp_purchased_product' | 'sp_campaign'
   | 'sb_campaign' | 'sb_search_term'
@@ -206,11 +207,62 @@ const WRITER_MAP: Record<ReportType, (profileId: number, startDate: string, endD
   sd_advertised_product: writeSdAdvertisedProductData,
 };
 
+/** Column name mapping: Console export → V3 API field names */
+const COLUMN_MAP: Record<string, string> = {
+  // Date
+  'Date': 'date', 'Start Date': 'date',
+  // Campaign
+  'Campaign Name': 'campaignName', 'Campaign Id': 'campaignId', 'Campaign ID': 'campaignId',
+  'Campaign Status': 'campaignStatus', 'Budget': 'campaignBudgetAmount',
+  // Ad Group
+  'Ad Group Name': 'adGroupName', 'Ad Group Id': 'adGroupId', 'Ad Group ID': 'adGroupId',
+  // Targeting
+  'Targeting': 'targeting', 'Match Type': 'matchType',
+  'Customer Search Term': 'searchTerm', 'Search Term': 'searchTerm',
+  // ASIN
+  'Advertised ASIN': 'advertisedAsin', 'Advertised SKU': 'advertisedSku',
+  'Purchased ASIN': 'purchasedAsin',
+  // SD specific
+  'Promoted ASIN': 'promotedAsin', 'Promoted SKU': 'promotedSku',
+  'Targeting Text': 'targetingText',
+  // Metrics — SP (7d)
+  'Impressions': 'impressions', 'Clicks': 'clicks', 'Spend': 'spend', 'Cost': 'cost',
+  'Cost Per Click (CPC)': 'costPerClick',
+  '7 Day Total Sales ': 'sales7d', '7 Day Total Sales': 'sales7d',
+  '7 Day Total Orders (#)': 'purchases7d', '7 Day Total Units (#)': 'unitsSoldClicks7d',
+  '7 Day Advertised SKU Units (#)': 'unitsSoldSameSku7d',
+  '7 Day Other SKU Units (#)': 'unitsSoldOtherSku7d',
+  '7 Day Advertised SKU Sales ': 'attributedSalesSameSku7d', '7 Day Advertised SKU Sales': 'attributedSalesSameSku7d',
+  '7 Day Other SKU Sales ': 'salesOtherSku7d', '7 Day Other SKU Sales': 'salesOtherSku7d',
+  // Metrics — SB/SD (14d)
+  '14 Day Total Sales ': 'sales', '14 Day Total Sales': 'sales',
+  '14 Day Total Orders (#)': 'purchases', '14 Day Total Units (#)': 'unitsSold',
+  '14 Day New-to-brand Orders (#)': 'newToBrandPurchases',
+  '14 Day New-to-brand Sales': 'newToBrandSales',
+  '14 Day Detail Page Views (DPV)': 'detailPageViews',
+  '14 Day Branded Searches': 'brandedSearches',
+  // Top of Search
+  'Top-of-search Impression Share': 'topOfSearchImpressionShare',
+  'Top of Search Impression Share': 'topOfSearchImpressionShare',
+  // Portfolio
+  'Portfolio name': 'portfolioId', 'Portfolio Name': 'portfolioId',
+  'Currency': 'campaignBudgetCurrencyCode',
+};
+
 /**
- * Parse CSV/TSV content into array of objects.
- * Handles Excel-exported CSVs (comma or tab separated).
+ * Parse uploaded file (xlsx, csv, tsv) into array of objects.
  */
-function parseCsv(content: string): any[] {
+function parseFile(buffer: Buffer, originalName: string): any[] {
+  const ext = originalName.toLowerCase().split('.').pop();
+
+  if (ext === 'xlsx' || ext === 'xls') {
+    const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: '' });
+  }
+
+  // CSV/TSV
+  const content = buffer.toString('utf-8');
   const lines = content.trim().split(/\r?\n/);
   if (lines.length < 2) return [];
 
@@ -226,65 +278,73 @@ function parseCsv(content: string): any[] {
 }
 
 /**
- * Normalize Amazon Ads Console column names to V3 API field names.
- * Console exports use human-readable names like "7 Day Total Sales (#)"
+ * Normalize row: map column names, format dates, clean numbers.
  */
 function normalizeRow(row: any): any {
   const normalized: any = {};
-  const map: Record<string, string> = {
-    // Date
-    'Date': 'date', 'Start Date': 'date',
-    // Campaign
-    'Campaign Name': 'campaignName', 'Campaign Id': 'campaignId', 'Campaign ID': 'campaignId',
-    'Campaign Status': 'campaignStatus', 'Budget': 'campaignBudgetAmount',
-    // Ad Group
-    'Ad Group Name': 'adGroupName', 'Ad Group Id': 'adGroupId', 'Ad Group ID': 'adGroupId',
-    // Targeting
-    'Targeting': 'targeting', 'Match Type': 'matchType',
-    'Customer Search Term': 'searchTerm', 'Search Term': 'searchTerm',
-    // ASIN
-    'Advertised ASIN': 'advertisedAsin', 'Advertised SKU': 'advertisedSku',
-    'Purchased ASIN': 'purchasedAsin',
-    // SD specific
-    'Promoted ASIN': 'promotedAsin', 'Promoted SKU': 'promotedSku',
-    'Targeting Text': 'targetingText',
-    // Metrics — SP (7d)
-    'Impressions': 'impressions', 'Clicks': 'clicks', 'Spend': 'spend', 'Cost': 'cost',
-    'Cost Per Click (CPC)': 'costPerClick', 'CPC': 'costPerClick',
-    '7 Day Total Sales': 'sales7d', '7 Day Total Sales (#)': 'sales7d',
-    '7 Day Total Orders (#)': 'purchases7d', '7 Day Total Units (#)': 'unitsSoldClicks7d',
-    '7 Day Advertised SKU Units (#)': 'unitsSoldSameSku7d',
-    '7 Day Other SKU Units (#)': 'unitsSoldOtherSku7d',
-    '7 Day Advertised SKU Sales': 'attributedSalesSameSku7d',
-    '7 Day Other SKU Sales': 'salesOtherSku7d',
-    // Metrics — SB/SD (14d)
-    '14 Day Total Sales': 'sales', '14 Day Total Sales (#)': 'sales',
-    '14 Day Total Orders (#)': 'purchases', '14 Day Total Units (#)': 'unitsSold',
-    'New-to-brand Purchases': 'newToBrandPurchases', 'New-to-brand Sales': 'newToBrandSales',
-    'Detail Page Views (DPV)': 'detailPageViews', 'DPV': 'detailPageViews',
-    // SD clicks-based
-    'Purchases (Clicks)': 'purchasesClicks', 'Sales (Clicks)': 'salesClicks',
-    'Units Sold (Clicks)': 'unitsSoldClicks', 'Detail Page Views (Clicks)': 'detailPageViewsClicks',
-    // Top of Search
-    'Top of Search Impression Share': 'topOfSearchImpressionShare',
-    // Placement
-    'Placement': 'placementClassification',
-    // Portfolio
-    'Portfolio name': 'portfolioId', 'Portfolio Name': 'portfolioId',
-    'Currency': 'campaignBudgetCurrencyCode',
-  };
-
   for (const [key, value] of Object.entries(row)) {
-    const mapped = map[key] || key;
-    // Clean numeric values: remove $, %, commas
-    const cleaned = typeof value === 'string' ? value.replace(/[$%,]/g, '').trim() : value;
-    normalized[mapped] = cleaned;
-  }
+    const mappedKey = COLUMN_MAP[key] || COLUMN_MAP[key.trim()] || key;
 
+    // Date handling — Excel dates come as Date objects
+    if (mappedKey === 'date' && value instanceof Date) {
+      normalized[mappedKey] = value.toISOString().split('T')[0];
+      continue;
+    }
+
+    // Clean string numbers: remove $, %, commas
+    if (typeof value === 'string') {
+      normalized[mappedKey] = value.replace(/[$%,]/g, '').trim();
+    } else {
+      normalized[mappedKey] = value;
+    }
+  }
   return normalized;
 }
 
-// POST /api/v1/ads/backfill/upload — Upload CSV/Excel for backfill
+/**
+ * Load campaign name → ID mapping from ads_campaigns_snapshot.
+ * Console exports don't have campaign_id — we need to resolve it.
+ */
+async function loadCampaignNameMap(profileId: number): Promise<Map<string, string>> {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (campaign_name) campaign_name, campaign_id::text
+     FROM ads_campaigns_snapshot
+     WHERE profile_id = $1 AND campaign_name IS NOT NULL
+     ORDER BY campaign_name, snapshot_date DESC`,
+    [profileId],
+  );
+  const map = new Map<string, string>();
+  for (const r of result.rows) {
+    map.set(r.campaign_name, r.campaign_id);
+  }
+  return map;
+}
+
+/**
+ * Load ad group name → ID mapping from campaign snapshot (product ads have ad group info).
+ */
+async function loadAdGroupNameMap(profileId: number): Promise<Map<string, string>> {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (campaign_id, ad_group_name)
+       ad_group_name, ad_group_id::text, campaign_id::text
+     FROM (
+       SELECT campaign_id, ad_group_id, ad_group_name, report_date
+       FROM ads_targeting_report WHERE profile_id = $1 AND ad_group_name IS NOT NULL
+       UNION ALL
+       SELECT campaign_id, ad_group_id, ad_group_name, report_date
+       FROM ads_advertised_product_report WHERE profile_id = $1 AND ad_group_name IS NOT NULL
+     ) t
+     ORDER BY campaign_id, ad_group_name, report_date DESC`,
+    [profileId],
+  );
+  const map = new Map<string, string>(); // key: "campaignId|adGroupName"
+  for (const r of result.rows) {
+    map.set(`${r.campaign_id}|${r.ad_group_name}`, r.ad_group_id);
+  }
+  return map;
+}
+
+// POST /api/v1/ads/backfill/upload — Upload CSV/XLSX for backfill
 router.post('/backfill/upload', upload.single('file'), async (req: Request, res: Response) => {
   if (!req.file) {
     res.status(400).json({ success: false, error: 'No file uploaded' });
@@ -308,23 +368,57 @@ router.post('/backfill/upload', upload.single('file'), async (req: Request, res:
   }
 
   try {
-    const content = req.file.buffer.toString('utf-8');
-    const rawRows = parseCsv(content);
-
+    // Parse file (xlsx or csv)
+    const rawRows = parseFile(req.file.buffer, req.file.originalname);
     if (rawRows.length === 0) {
       res.status(400).json({ success: false, error: 'File is empty or invalid format' });
       return;
     }
 
-    // Normalize column names
+    // Normalize column names + clean values
     const rows = rawRows.map(normalizeRow);
 
-    // Determine date range from data
+    // Resolve campaign name → ID (Console exports lack IDs)
+    const needsCampaignId = !rows[0].campaignId && rows[0].campaignName;
+    const needsAdGroupId = !rows[0].adGroupId && rows[0].adGroupName;
+    let campaignMap: Map<string, string> | null = null;
+    let adGroupMap: Map<string, string> | null = null;
+    let unmappedCampaigns = 0;
+    let unmappedAdGroups = 0;
+
+    if (needsCampaignId) {
+      campaignMap = await loadCampaignNameMap(profileId);
+      logger.info(`[AdsBackfill] Loaded ${campaignMap.size} campaign name→ID mappings`);
+    }
+    if (needsAdGroupId) {
+      adGroupMap = await loadAdGroupNameMap(profileId);
+      logger.info(`[AdsBackfill] Loaded ${adGroupMap.size} ad group name→ID mappings`);
+    }
+
+    for (const row of rows) {
+      if (campaignMap && !row.campaignId && row.campaignName) {
+        const id = campaignMap.get(row.campaignName);
+        if (id) {
+          row.campaignId = id;
+        } else {
+          unmappedCampaigns++;
+        }
+      }
+      if (adGroupMap && !row.adGroupId && row.adGroupName && row.campaignId) {
+        const id = adGroupMap.get(`${row.campaignId}|${row.adGroupName}`);
+        if (id) row.adGroupId = id;
+        else unmappedAdGroups++;
+      }
+    }
+
+    // Date range from data
     const dates = rows.map(r => r.date).filter(Boolean).sort();
     const startDate = dates[0] || new Date().toISOString().split('T')[0];
     const endDate = dates[dates.length - 1] || startDate;
 
     logger.info(`[AdsBackfill] ${reportType}: ${rows.length} rows, ${startDate}—${endDate}, profile ${profileId}`);
+    if (unmappedCampaigns > 0) logger.warn(`[AdsBackfill] ${unmappedCampaigns} rows with unmapped campaign names (skipped by writer if campaign_id=null)`);
+    if (unmappedAdGroups > 0) logger.warn(`[AdsBackfill] ${unmappedAdGroups} rows with unmapped ad group names`);
 
     const writer = WRITER_MAP[reportType];
     const written = await writer(profileId, startDate, endDate, rows);
@@ -336,6 +430,8 @@ router.post('/backfill/upload', upload.single('file'), async (req: Request, res:
         rows_uploaded: rawRows.length,
         rows_written: written,
         date_range: { start: startDate, end: endDate },
+        unmapped_campaigns: unmappedCampaigns || undefined,
+        unmapped_ad_groups: unmappedAdGroups || undefined,
       },
     });
   } catch (err: any) {
