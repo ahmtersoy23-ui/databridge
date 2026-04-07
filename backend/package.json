@@ -24,6 +24,7 @@
     "multer": "^2.1.1",
     "node-cron": "^3.0.3",
     "pg": "^8.16.3",
+    "stream-json": "^2.1.0",
     "winston": "^3.18.3",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6"
@@ -36,6 +37,7 @@
     "@types/node": "^24.10.1",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.15.6",
+    "@types/stream-json": "^1.7.8",
     "nodemon": "^3.1.11",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
