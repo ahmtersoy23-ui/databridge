@@ -271,12 +271,12 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType | SdReportT
   ],
   sd_targeting: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
-    'targeting', 'impressions', 'clicks', 'cost',
+    'targetingText', 'impressions', 'clicks', 'cost',
     'purchasesClicks', 'salesClicks', 'unitsSoldClicks',
   ],
   sd_advertised_product: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
-    'advertisedAsin',
+    'promotedAsin', 'promotedSku',
     'impressions', 'clicks', 'cost',
     'purchasesClicks', 'salesClicks', 'unitsSoldClicks',
   ],
