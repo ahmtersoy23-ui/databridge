@@ -72,6 +72,13 @@ const ADS_TABLES = [
     spendCol: 'spend',
     salesCol: 'sales_14d',
   },
+  {
+    table: 'ads_sd_purchased_product_report',
+    dupeKeys: ['report_date', 'profile_id', 'campaign_id', 'ad_group_id', 'advertised_asin', 'purchased_asin'],
+    nullChecks: ['report_date', 'purchased_asin'],
+    spendCol: null,
+    salesCol: 'sales_14d',
+  },
 ] as const;
 
 const BUSINESS_REPORT_TABLE = 'business_report';

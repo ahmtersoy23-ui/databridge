@@ -3,14 +3,14 @@ import logger from '../../config/logger';
 import { getAdsClient, getActiveProfiles } from './client';
 import { fetchAdsReport } from './reports';
 import { writeSearchTermData, writeTargetingData, writeAdvertisedProductData, writePurchasedProductData } from './adsDataWriter';
-import { writePlacementData, writeCampaignReportData, writeSbCampaignData, writeSbSearchTermData, writeSdCampaignData, writeSdTargetingData, writeSdAdvertisedProductData } from './adsDataWriterTier1';
+import { writePlacementData, writeCampaignReportData, writeSbCampaignData, writeSbSearchTermData, writeSdCampaignData, writeSdTargetingData, writeSdAdvertisedProductData, writeSdPurchasedProductData } from './adsDataWriterTier1';
 import { withRetry } from '../../utils/retry';
 import type { AdsReportType, SbReportType, SdReportType } from '../../types/ads';
 
 const REPORT_TYPES: AdsReportType[] = ['search_term', 'targeting', 'advertised_product', 'purchased_product', 'campaign'];
 // Note: 'placement' (spPlacement) does not exist in V3 API — removed
 const SB_REPORT_TYPES: SbReportType[] = ['sb_campaign', 'sb_search_term'];
-const SD_REPORT_TYPES: SdReportType[] = ['sd_campaign', 'sd_targeting', 'sd_advertised_product'];
+const SD_REPORT_TYPES: SdReportType[] = ['sd_campaign', 'sd_targeting', 'sd_advertised_product', 'sd_purchased_product'];
 
 // Default sync window: last 14 days (7-day attribution window)
 const DEFAULT_LOOKBACK_DAYS = 14;
@@ -79,6 +79,7 @@ function getWriter(reportType: AdsReportType | SbReportType | SdReportType) {
     case 'sd_campaign': return writeSdCampaignData;
     case 'sd_targeting': return writeSdTargetingData;
     case 'sd_advertised_product': return writeSdAdvertisedProductData;
+    case 'sd_purchased_product': return writeSdPurchasedProductData;
   }
 }
 

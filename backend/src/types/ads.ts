@@ -31,7 +31,7 @@ export interface AdsProfileResponse {
 // Report type enum
 export type AdsReportType = 'search_term' | 'targeting' | 'advertised_product' | 'purchased_product' | 'placement' | 'campaign';
 export type SbReportType = 'sb_campaign' | 'sb_search_term';
-export type SdReportType = 'sd_campaign' | 'sd_targeting' | 'sd_advertised_product';
+export type SdReportType = 'sd_campaign' | 'sd_targeting' | 'sd_advertised_product' | 'sd_purchased_product';
 
 // Ads API V3 report request config
 export interface AdsReportConfig {
@@ -194,6 +194,7 @@ export const SD_REPORT_TYPE_MAP: Record<SdReportType, string> = {
   sd_campaign: 'sdCampaigns',
   sd_targeting: 'sdTargeting',
   sd_advertised_product: 'sdAdvertisedProduct',
+  sd_purchased_product: 'sdPurchasedProduct',
 };
 
 // adProduct per report type
@@ -209,6 +210,7 @@ export const ADS_REPORT_AD_PRODUCT: Record<AdsReportType | SbReportType | SdRepo
   sd_campaign: 'SPONSORED_DISPLAY',
   sd_targeting: 'SPONSORED_DISPLAY',
   sd_advertised_product: 'SPONSORED_DISPLAY',
+  sd_purchased_product: 'SPONSORED_DISPLAY',
 };
 
 // Columns requested per report type (Ads API V3 — validated against API schema)
@@ -280,6 +282,11 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType | SdReportT
     'impressions', 'clicks', 'cost',
     'purchasesClicks', 'salesClicks', 'unitsSoldClicks',
   ],
+  sd_purchased_product: [
+    'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
+    'promotedAsin', 'promotedSku', 'purchasedAsin',
+    'purchases', 'unitsSoldClicks', 'sales',
+  ],
 };
 
 // GroupBy per report type
@@ -295,4 +302,5 @@ export const ADS_REPORT_GROUP_BY: Record<AdsReportType | SbReportType | SdReport
   sd_campaign: ['campaign'],
   sd_targeting: ['targeting'],
   sd_advertised_product: ['advertiser'],
+  sd_purchased_product: ['asin'],
 };
