@@ -91,8 +91,8 @@ export async function fetchBusinessReport(
 
   logger.info(`[BusinessReport] Downloaded ${asinRows.length} ASIN rows for ${marketplace.country_code}`);
 
-  // Use endDate as report_date (aggregate period end)
-  const reportDateStr = endDate.toISOString().split('T')[0];
+  // Use startDate as report_date (endDate is exclusive in SP-API)
+  const reportDateStr = startDate.toISOString().split('T')[0];
 
   // Step 4: Parse and write
   const items: BusinessReportRow[] = [];

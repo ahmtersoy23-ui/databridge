@@ -41,10 +41,11 @@ export async function runBusinessReportSync(): Promise<number> {
   // Fetch yesterday's data (1-day window).
   // Business Reports are ASIN aggregate per period — daily cron accumulates ASIN × day data.
   // 48-72h lag is typical; missing data will be filled on next day's run via ON CONFLICT upsert.
-  const endDate = new Date();
-  endDate.setUTCDate(endDate.getUTCDate() - 1); // yesterday
-  const startDate = new Date(endDate);
-  // startDate = endDate (same day, 1-day window)
+  // NOTE: SP-API dataEndTime is EXCLUSIVE — for 1-day window, end must be start + 1 day.
+  const startDate = new Date();
+  startDate.setUTCDate(startDate.getUTCDate() - 1); // yesterday
+  const endDate = new Date(startDate);
+  endDate.setUTCDate(endDate.getUTCDate() + 1); // today (exclusive end)
 
   let totalRows = 0;
   for (const mp of uniqueMarketplaces) {

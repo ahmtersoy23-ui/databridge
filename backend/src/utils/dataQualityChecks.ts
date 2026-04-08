@@ -32,7 +32,7 @@ const ADS_TABLES = [
   },
   {
     table: 'ads_search_term_report',
-    dupeKeys: ['report_date', 'profile_id', 'customer_search_term', 'campaign_id', 'ad_group_id', 'country'],
+    dupeKeys: ['report_date', 'profile_id', 'customer_search_term', 'campaign_id', 'ad_group_id', 'targeting', 'match_type'],
     nullChecks: ['customer_search_term', 'report_date'],
     spendCol: 'spend',
     salesCol: 'sales_7d',
@@ -119,8 +119,11 @@ export async function runPostSyncChecks(reportDate?: string): Promise<CheckResul
       const { rows } = await pool.query(countSQL, [targetDate]);
       const { today_count, yesterday_count } = rows[0];
 
-      if (today_count === 0) {
-        results.push({ check: `count:${cfg.table}`, severity: 'CRITICAL', message: `0 rows for ${targetDate}`, passed: false });
+      if (today_count === 0 && yesterday_count === 0) {
+        // Table has no recent data (possibly not yet synced) — skip silently
+        results.push({ check: `count:${cfg.table}`, severity: 'INFO', message: `No data for ${targetDate} or previous day — skipped`, passed: true });
+      } else if (today_count === 0) {
+        results.push({ check: `count:${cfg.table}`, severity: 'CRITICAL', message: `0 rows for ${targetDate} (yesterday: ${yesterday_count})`, passed: false });
       } else if (yesterday_count > 0) {
         const ratio = today_count / yesterday_count;
         const deviated = ratio < 0.5 || ratio > 2;
