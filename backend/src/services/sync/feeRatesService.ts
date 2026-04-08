@@ -20,8 +20,8 @@ export async function calculateProductFeeRates(): Promise<number> {
 
   logger.info(`[FeeRates] Calculating L180 fee rates: ${startStr} → ${endStr}`);
 
-  // Step 1: Calculate global FBA overhead rate (non-name-specific costs)
-  logger.info('[FeeRates] Step 1: Calculating global FBA overhead...');
+  // Step 1: Calculate global overhead rates (FBA cost + FBM cost)
+  logger.info('[FeeRates] Step 1: Calculating global overhead rates...');
   const globalResult = await sharedPool.query(`
     SELECT
       ROUND(ABS(SUM(CASE WHEN t.type IN (
@@ -29,7 +29,10 @@ export async function calculateProductFeeRates(): Promise<number> {
         'SAFE-T reimbursement', 'Chargeback Refund', 'FBA Customer Return Fee'
       ) THEN t.total ELSE 0 END))
       / NULLIF(SUM(CASE WHEN t.type = 'Order' AND sm.fulfillment = 'FBA' THEN t.product_sales ELSE 0 END), 0)
-      * 100, 2) as fba_cost_pct
+      * 100, 2) as fba_cost_pct,
+      ROUND(ABS(SUM(CASE WHEN t.type = 'Shipping Services' THEN t.total ELSE 0 END))
+      / NULLIF(SUM(CASE WHEN t.type = 'Order' AND sm.fulfillment = 'FBM' THEN t.product_sales ELSE 0 END), 0)
+      * 100, 2) as fbm_cost_pct
     FROM amz_transactions t
     JOIN sku_master sm ON t.sku = sm.sku AND sm.country_code = 'US'
     WHERE t.marketplace_code = 'US'
@@ -37,7 +40,8 @@ export async function calculateProductFeeRates(): Promise<number> {
   `, [startStr, endStr]);
 
   const globalFbaCostPct = parseFloat(globalResult.rows[0]?.fba_cost_pct || '0');
-  logger.info(`[FeeRates] Global FBA cost: ${globalFbaCostPct}%`);
+  const globalFbmCostPct = parseFloat(globalResult.rows[0]?.fbm_cost_pct || '0');
+  logger.info(`[FeeRates] Global FBA cost: ${globalFbaCostPct}%, FBM cost: ${globalFbmCostPct}%`);
 
   // Step 2: Calculate name-level fee rates
   logger.info('[FeeRates] Step 2: Calculating name-level rates...');
@@ -82,7 +86,7 @@ export async function calculateProductFeeRates(): Promise<number> {
     await client.query('BEGIN');
     await client.query('DELETE FROM product_fee_rates WHERE marketplace_code = $1', ['US']);
 
-    const COLS = 13;
+    const COLS = 14;
     const BATCH = 50;
     for (let i = 0; i < result.rows.length; i += BATCH) {
       const batch = result.rows.slice(i, i + BATCH);
@@ -91,13 +95,18 @@ export async function calculateProductFeeRates(): Promise<number> {
 
       for (let j = 0; j < batch.length; j++) {
         const r = batch[j];
+        const ff = r.fulfillment;
+        // FBA cost only for FBA/Mixed, FBM cost only for FBM/Mixed
+        const fbaCost = (ff === 'FBA' || ff === 'Mixed') ? globalFbaCostPct : null;
+        const fbmCost = (ff === 'FBM' || ff === 'Mixed') ? globalFbmCostPct : null;
+
         const off = j * COLS;
         placeholders.push(`(${Array.from({ length: COLS }, (_, k) => `$${off + k + 1}`).join(', ')}, NOW())`);
         values.push(
-          r.product_name, 'US', r.fulfillment,
+          r.product_name, 'US', ff,
           r.sku_count, r.order_count, r.revenue,
           r.selling_fee_pct, r.fba_fee_pct, r.refund_loss_pct,
-          globalFbaCostPct, r.other_fee_pct,
+          fbaCost, r.other_fee_pct, fbmCost,
           startStr, endStr,
         );
       }
@@ -107,7 +116,7 @@ export async function calculateProductFeeRates(): Promise<number> {
           product_name, marketplace_code, fulfillment,
           sku_count, order_count, revenue,
           selling_fee_pct, fba_fee_pct, refund_loss_pct,
-          fba_cost_pct, other_fee_pct,
+          fba_cost_pct, other_fee_pct, fbm_cost_pct,
           period_start, period_end, calculated_at
         ) VALUES ${placeholders.join(', ')}
         ON CONFLICT (product_name, marketplace_code)
@@ -120,6 +129,7 @@ export async function calculateProductFeeRates(): Promise<number> {
           fba_fee_pct = EXCLUDED.fba_fee_pct,
           refund_loss_pct = EXCLUDED.refund_loss_pct,
           fba_cost_pct = EXCLUDED.fba_cost_pct,
+          fbm_cost_pct = EXCLUDED.fbm_cost_pct,
           other_fee_pct = EXCLUDED.other_fee_pct,
           period_start = EXCLUDED.period_start,
           period_end = EXCLUDED.period_end,

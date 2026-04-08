@@ -12,8 +12,9 @@ CREATE TABLE IF NOT EXISTS product_fee_rates (
   selling_fee_pct NUMERIC(6,2),            -- selling_fees / revenue * 100
   fba_fee_pct     NUMERIC(6,2),            -- fba_fees / fba_revenue * 100
   refund_loss_pct NUMERIC(6,2),            -- refund_total / revenue * 100
-  fba_cost_pct    NUMERIC(6,2),            -- global: FBA overhead / fba_revenue * 100
+  fba_cost_pct    NUMERIC(6,2),            -- global: FBA overhead / fba_revenue * 100 (FBA/Mixed only)
   other_fee_pct   NUMERIC(6,2),            -- other_transaction_fees / revenue * 100
+  fbm_cost_pct    NUMERIC(6,2),            -- global: Shipping Services / fbm_revenue * 100 (FBM/Mixed only)
   period_start    DATE NOT NULL,
   period_end      DATE NOT NULL,
   calculated_at   TIMESTAMPTZ DEFAULT NOW(),
