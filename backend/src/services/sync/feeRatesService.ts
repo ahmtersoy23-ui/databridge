@@ -22,7 +22,9 @@ export async function calculateProductFeeRates(): Promise<number> {
 
   // Step 1: Calculate global overhead rates (FBA cost + FBM cost)
   logger.info('[FeeRates] Step 1: Calculating global overhead rates...');
-  const globalResult = await sharedPool.query(`
+
+  // FBA cost: needs JOIN (SKU-linked transactions)
+  const fbaGlobalResult = await sharedPool.query(`
     SELECT
       ROUND(ABS(SUM(CASE WHEN t.type IN (
         'Adjustment', 'FBA Inventory Fee', 'FBA Transaction fees',
@@ -30,17 +32,24 @@ export async function calculateProductFeeRates(): Promise<number> {
       ) THEN t.total ELSE 0 END))
       / NULLIF(SUM(CASE WHEN t.type = 'Order' AND sm.fulfillment = 'FBA' THEN t.product_sales ELSE 0 END), 0)
       * 100, 2) as fba_cost_pct,
-      ROUND(ABS(SUM(CASE WHEN t.type = 'Shipping Services' THEN t.total ELSE 0 END))
-      / NULLIF(SUM(CASE WHEN t.type = 'Order' AND sm.fulfillment = 'FBM' THEN t.product_sales ELSE 0 END), 0)
-      * 100, 2) as fbm_cost_pct
+      SUM(CASE WHEN t.type = 'Order' AND sm.fulfillment = 'FBM' THEN t.product_sales ELSE 0 END) as fbm_revenue
     FROM amz_transactions t
     JOIN sku_master sm ON t.sku = sm.sku AND sm.country_code = 'US'
     WHERE t.marketplace_code = 'US'
       AND t.date_only >= $1 AND t.date_only <= $2
   `, [startStr, endStr]);
 
-  const globalFbaCostPct = parseFloat(globalResult.rows[0]?.fba_cost_pct || '0');
-  const globalFbmCostPct = parseFloat(globalResult.rows[0]?.fbm_cost_pct || '0');
+  // FBM cost: Shipping Services has empty SKU — no JOIN needed
+  const fbmGlobalResult = await sharedPool.query(`
+    SELECT ABS(SUM(CASE WHEN type = 'Shipping Services' THEN total ELSE 0 END)) as fbm_cost_total
+    FROM amz_transactions
+    WHERE marketplace_code = 'US' AND date_only >= $1 AND date_only <= $2
+  `, [startStr, endStr]);
+
+  const globalFbaCostPct = parseFloat(fbaGlobalResult.rows[0]?.fba_cost_pct || '0');
+  const fbmRevenue = parseFloat(fbaGlobalResult.rows[0]?.fbm_revenue || '0');
+  const fbmCostTotal = parseFloat(fbmGlobalResult.rows[0]?.fbm_cost_total || '0');
+  const globalFbmCostPct = fbmRevenue > 0 ? Math.round(fbmCostTotal / fbmRevenue * 10000) / 100 : 0;
   logger.info(`[FeeRates] Global FBA cost: ${globalFbaCostPct}%, FBM cost: ${globalFbmCostPct}%`);
 
   // Step 2: Calculate name-level fee rates
