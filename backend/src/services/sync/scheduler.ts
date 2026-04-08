@@ -371,16 +371,14 @@ async function runBrandAnalyticsSyncJob(): Promise<number | void> {
   }
 }
 
-async function runFeeRatesJob(): Promise<number | void> {
+async function runFeeRatesJob(): Promise<number> {
   if (isFeeRatesRunning) {
     logger.warn('[Scheduler] Skipping fee rates calc - already running');
-    return;
+    return 0;
   }
   isFeeRatesRunning = true;
   try {
     return await calculateProductFeeRates();
-  } catch (err: any) {
-    logger.error('[Scheduler] Fee rates calc failed:', err.message);
   } finally {
     isFeeRatesRunning = false;
   }

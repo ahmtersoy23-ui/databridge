@@ -21,6 +21,7 @@ export async function calculateProductFeeRates(): Promise<number> {
   logger.info(`[FeeRates] Calculating L180 fee rates: ${startStr} → ${endStr}`);
 
   // Step 1: Calculate global FBA overhead rate (non-name-specific costs)
+  logger.info('[FeeRates] Step 1: Calculating global FBA overhead...');
   const globalResult = await sharedPool.query(`
     SELECT
       ROUND(ABS(SUM(CASE WHEN t.type IN (
@@ -39,6 +40,7 @@ export async function calculateProductFeeRates(): Promise<number> {
   logger.info(`[FeeRates] Global FBA cost: ${globalFbaCostPct}%`);
 
   // Step 2: Calculate name-level fee rates
+  logger.info('[FeeRates] Step 2: Calculating name-level rates...');
   const result = await sharedPool.query(`
     SELECT
       sm.name as product_name,
