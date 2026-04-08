@@ -44,7 +44,10 @@ export async function calculateProductFeeRates(): Promise<number> {
   const result = await sharedPool.query(`
     SELECT
       sm.name as product_name,
-      sm.fulfillment,
+      CASE
+        WHEN COUNT(DISTINCT sm.fulfillment) > 1 THEN 'Mixed'
+        ELSE MAX(sm.fulfillment)
+      END as fulfillment,
       COUNT(DISTINCT t.sku) as sku_count,
       COUNT(CASE WHEN t.type = 'Order' THEN 1 END) as order_count,
       COALESCE(SUM(CASE WHEN t.type = 'Order' THEN t.product_sales ELSE 0 END), 0) as revenue,
@@ -61,7 +64,7 @@ export async function calculateProductFeeRates(): Promise<number> {
     WHERE t.marketplace_code = 'US'
       AND t.date_only >= $1 AND t.date_only <= $2
       AND sm.name IS NOT NULL AND sm.name != ''
-    GROUP BY sm.name, sm.fulfillment
+    GROUP BY sm.name
     HAVING SUM(CASE WHEN t.type = 'Order' THEN t.product_sales ELSE 0 END) > 0
     ORDER BY revenue DESC
   `, [startStr, endStr]);
