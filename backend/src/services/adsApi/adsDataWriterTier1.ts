@@ -414,3 +414,60 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
   logger.info(`[AdsWriter] SD Advertised Product: ${total} rows for profile ${profileId}`);
   return total;
 }
+
+/**
+ * Batch upsert SD Purchased Product report rows (Brand Halo — 14d attribution).
+ */
+export async function writeSdPurchasedProductData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
+  if (!rows.length) return 0;
+
+  let total = 0;
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const values: any[] = [];
+    const placeholders: string[] = [];
+
+    for (let j = 0; j < batch.length; j++) {
+      const r = batch[j];
+      const offset = j * 13;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`);
+      values.push(
+        profileId,
+        r.date || startDate,
+        r.campaignId || null,
+        r.campaignName || null,
+        r.adGroupId || null,
+        r.adGroupName || null,
+        r.promotedAsin || r.advertisedAsin || null,
+        r.promotedSku || r.advertisedSku || null,
+        r.purchasedAsin || null,
+        r.purchases || r.brandHaloOrders || 0,
+        r.unitsSold || r.brandHaloUnits || 0,
+        r.sales || r.brandHaloSales || 0,
+      );
+    }
+
+    await pool.query(
+      `INSERT INTO ads_sd_purchased_product_report (
+        profile_id, report_date, campaign_id, campaign_name,
+        ad_group_id, ad_group_name, advertised_asin, advertised_sku,
+        purchased_asin, orders_14d, units_14d, sales_14d
+      ) VALUES ${placeholders.join(', ')}
+      ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, advertised_asin, purchased_asin)
+      DO UPDATE SET
+        campaign_name = EXCLUDED.campaign_name,
+        ad_group_name = EXCLUDED.ad_group_name,
+        advertised_sku = EXCLUDED.advertised_sku,
+        orders_14d = EXCLUDED.orders_14d,
+        units_14d = EXCLUDED.units_14d,
+        sales_14d = EXCLUDED.sales_14d,
+        synced_at = NOW()`,
+      values
+    );
+
+    total += batch.length;
+  }
+
+  logger.info(`[AdsWriter] SD Purchased Product: ${total} rows for profile ${profileId}`);
+  return total;
+}

@@ -5,7 +5,7 @@ import { pool } from '../config/database';
 import { getActiveProfiles, discoverProfiles, getAdsCredentials } from '../services/adsApi/client';
 import { syncAdsForProfile, syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../services/adsApi/adsSync';
 import { writeSearchTermData, writeTargetingData, writeAdvertisedProductData, writePurchasedProductData } from '../services/adsApi/adsDataWriter';
-import { writeCampaignReportData, writeSbCampaignData, writeSbSearchTermData, writeSdCampaignData, writeSdTargetingData, writeSdAdvertisedProductData } from '../services/adsApi/adsDataWriterTier1';
+import { writeCampaignReportData, writeSbCampaignData, writeSbSearchTermData, writeSdCampaignData, writeSdTargetingData, writeSdAdvertisedProductData, writeSdPurchasedProductData } from '../services/adsApi/adsDataWriterTier1';
 import { encryptCredential } from '../utils/crypto';
 import { validateBody } from '../middleware/validate';
 import logger from '../config/logger';
@@ -192,7 +192,7 @@ import XLSX from 'xlsx';
 
 type ReportType = 'sp_search_term' | 'sp_targeting' | 'sp_advertised_product' | 'sp_purchased_product' | 'sp_campaign'
   | 'sb_campaign' | 'sb_search_term'
-  | 'sd_campaign' | 'sd_targeting' | 'sd_advertised_product';
+  | 'sd_campaign' | 'sd_targeting' | 'sd_advertised_product' | 'sd_purchased_product';
 
 const WRITER_MAP: Record<ReportType, (profileId: number, startDate: string, endDate: string, rows: any[]) => Promise<number>> = {
   sp_search_term: writeSearchTermData,
@@ -205,6 +205,7 @@ const WRITER_MAP: Record<ReportType, (profileId: number, startDate: string, endD
   sd_campaign: writeSdCampaignData,
   sd_targeting: writeSdTargetingData,
   sd_advertised_product: writeSdAdvertisedProductData,
+  sd_purchased_product: writeSdPurchasedProductData,
 };
 
 /** Column name mapping: Console export → V3 API field names */
@@ -241,6 +242,10 @@ const COLUMN_MAP: Record<string, string> = {
   '14 Day New-to-brand Sales': 'newToBrandSales',
   '14 Day Detail Page Views (DPV)': 'detailPageViews',
   '14 Day Branded Searches': 'brandedSearches',
+  // SD Brand Halo (Purchased Product)
+  '14 Day Brand Halo ASIN Orders (#)': 'brandHaloOrders',
+  '14 Day Brand Halo ASIN Units (#)': 'brandHaloUnits',
+  '14 Day Brand Halo ASIN Sales ': 'brandHaloSales', '14 Day Brand Halo ASIN Sales': 'brandHaloSales',
   // Top of Search
   'Top-of-search Impression Share': 'topOfSearchImpressionShare',
   'Top of Search Impression Share': 'topOfSearchImpressionShare',
