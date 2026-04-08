@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
@@ -13,7 +13,7 @@ import logger from '../config/logger';
 const router = Router();
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -133,6 +133,10 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       withSyncLog('sd-ads', () => runSdAdsSync().then(() => undefined))
         .catch(err => logger.error('[Sync] SD Ads sync error:', err));
       res.json({ success: true, message: 'SD Ads sync started' });
+    } else if (type === 'fee_rates') {
+      withSyncLog('fee-rates', () => runFeeRatesJob())
+        .catch(err => logger.error('[Sync] Fee rates calc error:', err));
+      res.json({ success: true, message: 'Product fee rates calculation started' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });

@@ -24,6 +24,7 @@ export const SYNC_BRAND_ANALYTICS_CRON = '0 8 * * 1'; // Weekly Monday 08:00 UTC
 export const SYNC_SB_ADS_CRON = '45 6 * * *';         // Daily at 06:45 UTC (after SP ads at 06:00) (previous week data)
 export const SYNC_SD_ADS_CRON = '15 7 * * *';         // Daily at 07:15 UTC (after SB at 06:45)
 export const DATA_QUALITY_CRON = '0 9 * * *';          // Daily at 09:00 UTC (after all syncs complete)
+export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:00 UTC
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';

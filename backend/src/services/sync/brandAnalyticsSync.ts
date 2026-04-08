@@ -9,7 +9,7 @@ import type { MarketplaceConfig } from '../../types';
  * Brand Analytics reports have 3-4 day lag and are weekly (week ending Sunday).
  * Only syncs major marketplaces (US, UK, DE) where Brand Registry is active.
  */
-const SQP_MARKETPLACE_CODES = ['US', 'UK', 'DE'];
+const SQP_MARKETPLACE_CODES = ['US'];
 
 export async function runBrandAnalyticsSync(): Promise<number> {
   const result = await pool.query(`
