@@ -180,8 +180,8 @@ export async function writeAdvertisedProductData(profileId: number, startDate: s
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 17;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17})`);
+      const offset = j * 21;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15}, $${offset + 16}, $${offset + 17}, $${offset + 18}, $${offset + 19}, $${offset + 20}, $${offset + 21})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -200,6 +200,10 @@ export async function writeAdvertisedProductData(profileId: number, startDate: s
         r.purchases7d || 0,
         r.unitsSoldClicks7d || 0,
         r.costPerClick || 0,
+        r.attributedSalesSameSku7d || 0,
+        r.salesOtherSku7d || 0,
+        r.unitsSoldSameSku7d || 0,
+        r.unitsSoldOtherSku7d || 0,
       );
     }
 
@@ -208,7 +212,8 @@ export async function writeAdvertisedProductData(profileId: number, startDate: s
         profile_id, report_date, portfolio_name, currency,
         campaign_name, campaign_id, ad_group_name, ad_group_id,
         advertised_sku, advertised_asin,
-        impressions, clicks, spend, sales_7d, orders_7d, units_7d, cpc
+        impressions, clicks, spend, sales_7d, orders_7d, units_7d, cpc,
+        adv_sku_sales_7d, other_sku_sales_7d, adv_sku_units_7d, other_sku_units_7d
       ) VALUES ${placeholders.join(', ')}
       ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, advertised_asin)
       DO UPDATE SET
@@ -220,6 +225,10 @@ export async function writeAdvertisedProductData(profileId: number, startDate: s
         orders_7d = EXCLUDED.orders_7d,
         units_7d = EXCLUDED.units_7d,
         cpc = EXCLUDED.cpc,
+        adv_sku_sales_7d = EXCLUDED.adv_sku_sales_7d,
+        other_sku_sales_7d = EXCLUDED.other_sku_sales_7d,
+        adv_sku_units_7d = EXCLUDED.adv_sku_units_7d,
+        other_sku_units_7d = EXCLUDED.other_sku_units_7d,
         synced_at = NOW()`,
       values
     );
@@ -278,7 +287,7 @@ export async function writePurchasedProductData(profileId: number, startDate: st
         targeting, match_type,
         other_sku_units_7d, other_sku_orders_7d, other_sku_sales_7d
       ) VALUES ${placeholders.join(', ')}
-      ON CONFLICT (profile_id, report_date, campaign_id, ad_group_id, advertised_asin, targeting, purchased_asin)
+      ON CONFLICT (profile_id, report_date, COALESCE(campaign_id, 0), COALESCE(ad_group_id, 0), advertised_asin, COALESCE(targeting, ''), purchased_asin)
       DO UPDATE SET
         advertised_sku = EXCLUDED.advertised_sku,
         other_sku_units_7d = EXCLUDED.other_sku_units_7d,
