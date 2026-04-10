@@ -4,6 +4,19 @@ import logger from '../../config/logger';
 const BATCH_SIZE = 500;
 
 /**
+ * Deduplicate rows by composite key (last occurrence wins).
+ * Prevents "ON CONFLICT DO UPDATE command cannot affect row a second time" error
+ * when Amazon returns duplicate rows in the same report.
+ */
+function deduplicateRows(rows: any[], keyFn: (r: any) => string): any[] {
+  const map = new Map<string, any>();
+  for (const r of rows) {
+    map.set(keyFn(r), r);
+  }
+  return Array.from(map.values());
+}
+
+/**
  * Batch upsert SP Placement report rows.
  */
 export async function writePlacementData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
@@ -186,9 +199,16 @@ export async function writeSbCampaignData(profileId: number, startDate: string, 
 export async function writeSbSearchTermData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
   if (!rows.length) return 0;
 
+  const deduped = deduplicateRows(rows, (r) =>
+    `${r.date}_${r.campaignId}_${r.adGroupId}_${r.searchTerm}`
+  );
+  if (deduped.length < rows.length) {
+    logger.info(`[AdsWriter] SB Search Term: deduplicated ${rows.length} → ${deduped.length} rows`);
+  }
+
   let total = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+    const batch = deduped.slice(i, i + BATCH_SIZE);
     const values: any[] = [];
     const placeholders: string[] = [];
 
@@ -359,9 +379,16 @@ export async function writeSdTargetingData(profileId: number, startDate: string,
 export async function writeSdAdvertisedProductData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
   if (!rows.length) return 0;
 
+  const deduped = deduplicateRows(rows, (r) =>
+    `${r.date}_${r.campaignId}_${r.adGroupId}_${r.promotedAsin || r.advertisedAsin}`
+  );
+  if (deduped.length < rows.length) {
+    logger.info(`[AdsWriter] SD Advertised Product: deduplicated ${rows.length} → ${deduped.length} rows`);
+  }
+
   let total = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+    const batch = deduped.slice(i, i + BATCH_SIZE);
     const values: any[] = [];
     const placeholders: string[] = [];
 
@@ -421,9 +448,16 @@ export async function writeSdAdvertisedProductData(profileId: number, startDate:
 export async function writeSdPurchasedProductData(profileId: number, startDate: string, endDate: string, rows: any[]): Promise<number> {
   if (!rows.length) return 0;
 
+  const deduped = deduplicateRows(rows, (r) =>
+    `${r.date}_${r.campaignId}_${r.adGroupId}_${r.promotedAsin || r.advertisedAsin}_${r.purchasedAsin}`
+  );
+  if (deduped.length < rows.length) {
+    logger.info(`[AdsWriter] SD Purchased Product: deduplicated ${rows.length} → ${deduped.length} rows`);
+  }
+
   let total = 0;
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
+    const batch = deduped.slice(i, i + BATCH_SIZE);
     const values: any[] = [];
     const placeholders: string[] = [];
 
@@ -441,9 +475,9 @@ export async function writeSdPurchasedProductData(profileId: number, startDate: 
         r.promotedAsin || r.advertisedAsin || null,
         r.promotedSku || r.advertisedSku || null,
         r.purchasedAsin || null,
-        r.purchases || r.brandHaloOrders || 0,
-        r.unitsSold || r.brandHaloUnits || 0,
-        r.sales || r.brandHaloSales || 0,
+        r.purchasesClicks || r.purchases || r.brandHaloOrders || 0,
+        r.unitsSoldClicks || r.unitsSold || r.brandHaloUnits || 0,
+        r.salesClicks || r.sales || r.brandHaloSales || 0,
       );
     }
 

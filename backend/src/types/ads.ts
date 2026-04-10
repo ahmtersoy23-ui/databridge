@@ -285,7 +285,7 @@ export const ADS_REPORT_COLUMNS: Record<AdsReportType | SbReportType | SdReportT
   sd_purchased_product: [
     'date', 'campaignId', 'campaignName', 'adGroupId', 'adGroupName',
     'promotedAsin', 'promotedSku', 'purchasedAsin',
-    'purchases', 'unitsSoldClicks', 'sales',
+    'purchasesClicks', 'unitsSoldClicks', 'salesClicks',
   ],
 };
 

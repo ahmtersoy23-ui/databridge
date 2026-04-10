@@ -166,6 +166,10 @@ export async function fetchAdsReport<T = Record<string, any>>(
       }
       throw new Error(`425 Too Early for ${reportType} and no recoverable report found`);
     }
+    if (err.response?.status) {
+      const body = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
+      logger.error(`[AdsAPI] ${err.response.status} for ${reportType}: ${body}`);
+    }
     throw err;
   }
 
