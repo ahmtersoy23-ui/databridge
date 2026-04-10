@@ -13,18 +13,11 @@ interface SyncJob {
   created_at: string;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-} as const;
-
 const statusColors: Record<string, string> = {
-  completed: '#059669',
-  failed: '#dc2626',
-  running: '#d97706',
-  pending: '#6b7280',
+  completed: 'text-emerald-600',
+  failed: 'text-red-600',
+  running: 'text-amber-600',
+  pending: 'text-gray-500',
 };
 
 const jobTypeLabels: Record<string, string> = {
@@ -62,14 +55,14 @@ export default function Logs() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Sync Logs</h1>
+      <h1 className="mb-6">Sync Logs</h1>
 
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
           <h2>Recent Jobs</h2>
           <button
             onClick={fetchJobs}
-            style={{ padding: '0.4rem 1rem', background: '#f1f5f9', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer' }}
+            className="px-4 py-1.5 bg-slate-100 border border-gray-300 rounded-md cursor-pointer"
           >
             Refresh
           </button>
@@ -78,46 +71,44 @@ export default function Logs() {
         {loading ? (
           <p>Loading...</p>
         ) : jobs.length === 0 ? (
-          <p style={{ color: '#64748b' }}>No sync jobs recorded yet.</p>
+          <p className="text-slate-500">No sync jobs recorded yet.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="w-full border-collapse">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>ID</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Market</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Records</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Duration</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Time</th>
-                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Error</th>
+              <tr className="border-b-2 border-slate-200">
+                <th className="text-left p-2">ID</th>
+                <th className="text-left p-2">Type</th>
+                <th className="text-left p-2">Market</th>
+                <th className="text-left p-2">Status</th>
+                <th className="text-left p-2">Records</th>
+                <th className="text-left p-2">Duration</th>
+                <th className="text-left p-2">Time</th>
+                <th className="text-left p-2">Error</th>
               </tr>
             </thead>
             <tbody>
               {jobs.map(job => (
-                <tr key={job.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '0.5rem' }}>{job.id}</td>
-                  <td style={{ padding: '0.5rem' }}>{jobTypeLabels[job.job_type] || job.job_type}</td>
-                  <td style={{ padding: '0.5rem' }}>{job.marketplace}</td>
-                  <td style={{ padding: '0.5rem' }}>
-                    <span style={{ color: statusColors[job.status] || '#6b7280', fontWeight: 500 }}>
+                <tr key={job.id} className="border-b border-slate-200">
+                  <td className="p-2">{job.id}</td>
+                  <td className="p-2">{jobTypeLabels[job.job_type] || job.job_type}</td>
+                  <td className="p-2">{job.marketplace}</td>
+                  <td className="p-2">
+                    <span className={`${statusColors[job.status] || 'text-gray-500'} font-medium`}>
                       {job.status}
                     </span>
                   </td>
-                  <td style={{ padding: '0.5rem' }}>{job.records_processed}</td>
-                  <td style={{ padding: '0.5rem' }}>{formatDuration(job.started_at, job.completed_at)}</td>
-                  <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{new Date(job.created_at).toLocaleString()}</td>
-                  <td style={{ padding: '0.5rem', fontSize: '0.85rem', maxWidth: '400px' }}>
+                  <td className="p-2">{job.records_processed}</td>
+                  <td className="p-2">{formatDuration(job.started_at, job.completed_at)}</td>
+                  <td className="p-2 whitespace-nowrap">{new Date(job.created_at).toLocaleString()}</td>
+                  <td className="p-2 text-sm max-w-[400px]">
                     {job.error_message ? (
                       <span
                         onClick={() => setExpandedError(expandedError === job.id ? null : job.id)}
-                        style={{
-                          color: '#dc2626', cursor: 'pointer',
-                          whiteSpace: expandedError === job.id ? 'normal' : 'nowrap',
-                          overflow: expandedError === job.id ? 'visible' : 'hidden',
-                          textOverflow: expandedError === job.id ? 'clip' : 'ellipsis',
-                          display: 'block', wordBreak: 'break-word',
-                        }}
+                        className={`text-red-600 cursor-pointer block break-words ${
+                          expandedError === job.id
+                            ? 'whitespace-normal overflow-visible'
+                            : 'whitespace-nowrap overflow-hidden text-ellipsis'
+                        }`}
                         title="Click to expand"
                       >
                         {job.error_message}

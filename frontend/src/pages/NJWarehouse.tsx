@@ -12,14 +12,6 @@ interface NJRow {
   count_in_ship: number;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
 type SortKey = keyof NJRow;
 
 export default function NJWarehouse() {
@@ -74,104 +66,87 @@ export default function NJWarehouse() {
     totalShip: rows.reduce((s, r) => s + (Number(r.count_in_ship) || 0), 0),
   }), [rows]);
 
-  const COL_GRAY = '#6b7280';
-  const COL_ZERO = '#d1d5db';
-  const COL_GREEN = '#059669';
-  const COL_BLUE = '#2563eb';
-  const COL_ORANGE = '#d97706';
-
-  const thStyle = (_key: SortKey, align: 'left' | 'right' = 'right') => ({
-    padding: '0.5rem',
-    textAlign: align as 'left' | 'right',
-    cursor: 'pointer' as const,
-    userSelect: 'none' as const,
-    whiteSpace: 'nowrap' as const,
-    color: '#475569',
-    fontSize: '0.8rem',
-    fontWeight: 600,
-  });
-
   const sortArrow = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>NJ Warehouse</h1>
+      <h1 className="mb-6">NJ Warehouse</h1>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+      <div className="grid grid-cols-5 gap-4 mb-4">
         {[
-          { label: 'Total SKUs', value: summary.total, color: '#334155' },
-          { label: 'Enriched (iwasku)', value: summary.enriched, color: COL_GREEN },
-          { label: 'Total Count', value: summary.totalCount, color: '#334155' },
-          { label: 'In Raf', value: summary.totalRaf, color: COL_BLUE },
-          { label: 'In Shipment', value: summary.totalShip, color: COL_ORANGE },
+          { label: 'Total SKUs', value: summary.total, color: 'text-slate-700' },
+          { label: 'Enriched (iwasku)', value: summary.enriched, color: 'text-emerald-600' },
+          { label: 'Total Count', value: summary.totalCount, color: 'text-slate-700' },
+          { label: 'In Raf', value: summary.totalRaf, color: 'text-blue-600' },
+          { label: 'In Shipment', value: summary.totalShip, color: 'text-amber-600' },
         ].map(c => (
-          <div key={c.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.75rem', color: COL_GRAY, marginBottom: '0.25rem' }}>{c.label}</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: c.color }}>{c.value.toLocaleString()}</div>
+          <div key={c.label} className="bg-white rounded-lg p-6 shadow-sm text-center">
+            <div className="text-xs text-gray-500 mb-1">{c.label}</div>
+            <div className={`text-2xl font-bold ${c.color}`}>{c.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
 
       {/* Search + count */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex gap-4 items-center">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search SKU / ASIN / FNSKU / Name / Category..."
-            style={{ padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', flex: 1 }}
+            className="px-2.5 py-1.5 border border-gray-300 rounded-md text-sm flex-1"
           />
-          <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>{filtered.length} items</span>
+          <span className="text-xs text-gray-500 whitespace-nowrap">{filtered.length} items</span>
         </div>
       </div>
 
       {/* Table */}
-      <div style={{ ...cardStyle, overflowX: 'auto', padding: 0 }}>
+      <div className="bg-white rounded-lg shadow-sm mb-4 overflow-x-auto">
         {loading ? (
-          <p style={{ padding: '1.5rem', color: COL_GRAY }}>Loading...</p>
+          <p className="p-6 text-gray-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ padding: '1.5rem', color: COL_GRAY }}>No data found.</p>
+          <p className="p-6 text-gray-500">No data found.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <table className="w-full border-collapse text-xs">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                <th onClick={() => handleSort('iwasku')} style={thStyle('iwasku', 'left')}>IWA SKU{sortArrow('iwasku')}</th>
-                <th onClick={() => handleSort('asin')} style={thStyle('asin', 'left')}>ASIN{sortArrow('asin')}</th>
-                <th onClick={() => handleSort('fnsku')} style={thStyle('fnsku', 'left')}>FNSKU{sortArrow('fnsku')}</th>
-                <th onClick={() => handleSort('name')} style={thStyle('name', 'left')}>Name{sortArrow('name')}</th>
-                <th onClick={() => handleSort('category')} style={thStyle('category', 'left')}>Category{sortArrow('category')}</th>
-                <th onClick={() => handleSort('total_count')} style={{ ...thStyle('total_count'), color: '#334155' }}>Total{sortArrow('total_count')}</th>
-                <th onClick={() => handleSort('count_in_raf')} style={{ ...thStyle('count_in_raf'), color: COL_BLUE }}>In Raf{sortArrow('count_in_raf')}</th>
-                <th onClick={() => handleSort('count_in_ship')} style={{ ...thStyle('count_in_ship'), color: COL_ORANGE }}>In Ship{sortArrow('count_in_ship')}</th>
+              <tr className="border-b-2 border-slate-200 bg-slate-50">
+                <th onClick={() => handleSort('iwasku')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">IWA SKU{sortArrow('iwasku')}</th>
+                <th onClick={() => handleSort('asin')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">ASIN{sortArrow('asin')}</th>
+                <th onClick={() => handleSort('fnsku')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">FNSKU{sortArrow('fnsku')}</th>
+                <th onClick={() => handleSort('name')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Name{sortArrow('name')}</th>
+                <th onClick={() => handleSort('category')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Category{sortArrow('category')}</th>
+                <th onClick={() => handleSort('total_count')} className="p-2 text-right cursor-pointer select-none whitespace-nowrap text-slate-700 text-xs font-semibold">Total{sortArrow('total_count')}</th>
+                <th onClick={() => handleSort('count_in_raf')} className="p-2 text-right cursor-pointer select-none whitespace-nowrap text-blue-600 text-xs font-semibold">In Raf{sortArrow('count_in_raf')}</th>
+                <th onClick={() => handleSort('count_in_ship')} className="p-2 text-right cursor-pointer select-none whitespace-nowrap text-amber-600 text-xs font-semibold">In Ship{sortArrow('count_in_ship')}</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.iwasku ? '#1e293b' : COL_ZERO }}>
+                <tr key={i} className="border-b border-slate-100">
+                  <td className={`px-2 py-1.5 font-mono text-xs ${r.iwasku ? 'text-slate-800' : 'text-gray-300'}`}>
                     {r.iwasku || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.asin ? '#1e293b' : COL_ZERO }}>
+                  <td className={`px-2 py-1.5 font-mono text-xs ${r.asin ? 'text-slate-800' : 'text-gray-300'}`}>
                     {r.asin || '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: COL_GRAY }}>
+                  <td className="px-2 py-1.5 font-mono text-xs text-gray-500">
                     {r.fnsku}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.name}>
+                  <td className="px-2 py-1.5 max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap" title={r.name}>
                     {r.name}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', color: COL_GRAY, fontSize: '0.78rem' }}>
+                  <td className="px-2 py-1.5 text-gray-500 text-xs">
                     {r.category}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', color: Number(r.total_count) > 0 ? '#1e293b' : COL_ZERO }}>
+                  <td className={`px-2 py-1.5 text-right font-semibold tabular-nums font-mono ${Number(r.total_count) > 0 ? 'text-slate-800' : 'text-gray-300'}`}>
                     {Number(r.total_count) > 0 ? r.total_count.toLocaleString() : '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', color: Number(r.count_in_raf) > 0 ? COL_BLUE : COL_ZERO }}>
+                  <td className={`px-2 py-1.5 text-right tabular-nums font-mono ${Number(r.count_in_raf) > 0 ? 'text-blue-600' : 'text-gray-300'}`}>
                     {Number(r.count_in_raf) > 0 ? r.count_in_raf.toLocaleString() : '—'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', color: Number(r.count_in_ship) > 0 ? COL_ORANGE : COL_ZERO }}>
+                  <td className={`px-2 py-1.5 text-right tabular-nums font-mono ${Number(r.count_in_ship) > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
                     {Number(r.count_in_ship) > 0 ? r.count_in_ship.toLocaleString() : '—'}
                   </td>
                 </tr>

@@ -22,25 +22,6 @@ interface AgingRow {
 
 const WAREHOUSES = ['US', 'AU', 'AE', 'SA', 'UK', 'EU'];
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const tabStyle = (active: boolean) => ({
-  padding: '0.5rem 1.2rem',
-  background: active ? '#334155' : '#f1f5f9',
-  color: active ? '#fff' : '#475569',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  cursor: 'pointer' as const,
-  fontSize: '0.9rem',
-  fontWeight: active ? 600 : 400,
-});
-
 const COL_GREEN = '#059669';
 const COL_YELLOW = '#ca8a04';
 const COL_AMBER = '#ea580c';
@@ -178,39 +159,45 @@ export default function InventoryAging() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Inventory Aging</h1>
+      <h1 className="mb-6">Inventory Aging</h1>
 
       {/* Warehouse tabs + search + upload */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <div className="flex gap-2">
             {WAREHOUSES.map(wh => (
-              <button key={wh} onClick={() => setWarehouse(wh)} style={tabStyle(warehouse === wh)}>
+              <button
+                key={wh}
+                onClick={() => setWarehouse(wh)}
+                className={`px-4 py-2 border border-gray-300 rounded-md cursor-pointer text-sm ${
+                  warehouse === wh ? 'bg-slate-700 text-white font-semibold' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
                 {wh}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             <input
               type="text" value={search} onChange={e => setSearch(e.target.value)}
               placeholder="Search SKU / ASIN / Name..."
-              style={{ padding: '0.4rem 0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', minWidth: '200px' }}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm min-w-[200px]"
             />
-            <input ref={fileRef} type="file" accept=".txt,.csv,.tsv" style={{ display: 'none' }}
+            <input ref={fileRef} type="file" accept=".txt,.csv,.tsv" className="hidden"
               onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
             />
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
-              style={{ padding: '0.4rem 1rem', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', opacity: uploading ? 0.7 : 1 }}
+              className={`px-4 py-1.5 bg-[#6366f1] text-white border-none rounded-md cursor-pointer text-sm ${uploading ? 'opacity-70' : ''}`}
             >
               {uploading ? 'Uploading...' : 'Upload CSV'}
             </button>
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{filtered.length} items</span>
+            <span className="text-xs text-slate-500">{filtered.length} items</span>
           </div>
         </div>
         {uploadMsg && (
-          <div style={{ marginTop: '0.5rem', fontSize: '0.82rem', color: uploadMsg.startsWith('Upload failed') ? COL_RED : COL_GREEN }}>
+          <div className={`mt-2 text-sm ${uploadMsg.startsWith('Upload failed') ? 'text-red-600' : 'text-emerald-600'}`}>
             {uploadMsg}
           </div>
         )}
@@ -218,11 +205,11 @@ export default function InventoryAging() {
 
       {/* Summary cards */}
       {!loading && rows.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-6 gap-4 mb-4">
           {summaryCards.map(card => (
-            <div key={card.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.3rem' }}>{card.label}</div>
-              <div style={{ fontSize: '1.3rem', fontWeight: 700, color: card.color }}>
+            <div key={card.label} className="bg-white rounded-lg p-6 shadow-sm text-center">
+              <div className="text-xs text-slate-500 mb-1">{card.label}</div>
+              <div className="text-xl font-bold" style={{ color: card.color }}>
                 {card.fmt === 'usd' ? fmtUsd(card.value) : card.value.toLocaleString()}
               </div>
             </div>
@@ -232,32 +219,29 @@ export default function InventoryAging() {
 
       {/* 270+ Warning */}
       {!loading && age270plus > 0 && (
-        <div style={{
-          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
-          padding: '0.75rem 1rem', marginBottom: '1rem', color: COL_RED, fontSize: '0.85rem', fontWeight: 500,
-        }}>
+        <div className="bg-red-50 border border-[#fecaca] rounded-lg px-4 py-3 mb-4 text-red-600 text-sm font-medium">
           {skus270plus} SKU has inventory aged 270+ days ({age270plus.toLocaleString()} units). Est. next month storage: {fmtUsd(summary.storage_cost)}
         </div>
       )}
 
       {/* Table */}
-      <div style={{ ...cardStyle, overflowX: 'auto', padding: '0' }}>
+      <div className="bg-white rounded-lg shadow-sm overflow-x-auto p-0 mb-4">
         {loading ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>Loading...</p>
+          <p className="p-6 text-slate-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>No data. Upload a Seller Central inventory aging CSV to get started.</p>
+          <p className="p-6 text-slate-500">No data. Upload a Seller Central inventory aging CSV to get started.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              <tr className="border-b-2 border-slate-200">
                 {columns.map(col => (
                   <th key={col.key} onClick={() => handleSort(col.key)}
+                    className={`p-2 cursor-pointer select-none whitespace-nowrap text-[0.78rem] ${
+                      col.sticky ? 'text-left sticky bg-white z-[2]' : 'text-right'
+                    }`}
                     style={{
-                      padding: '0.5rem', textAlign: col.sticky ? 'left' : 'right', cursor: 'pointer',
-                      userSelect: 'none', whiteSpace: 'nowrap', color: col.color || '#475569', fontSize: '0.78rem',
-                      position: col.sticky ? 'sticky' as const : undefined,
-                      left: col.key === 'iwasku' ? 0 : col.key === 'asin' ? '130px' : undefined,
-                      background: col.sticky ? '#fff' : undefined, zIndex: col.sticky ? 2 : undefined,
+                      color: col.color || '#475569',
+                      left: col.sticky ? (col.key === 'iwasku' ? 0 : '130px') : undefined,
                       minWidth: col.sticky ? '130px' : col.key === 'recommended_action' ? '120px' : '55px',
                     }}>
                     {col.label} {sortKey === col.key ? (sortAsc ? '\u2191' : '\u2193') : ''}
@@ -267,39 +251,54 @@ export default function InventoryAging() {
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr key={i} className="border-b border-slate-100">
                   {columns.map(col => {
                     if (col.sticky) {
                       return (
-                        <td key={col.key} style={{
-                          padding: '0.4rem 0.5rem', whiteSpace: 'nowrap', fontFamily: 'monospace', fontSize: '0.78rem',
-                          position: 'sticky', left: col.key === 'iwasku' ? 0 : '130px', background: '#fff', zIndex: 1,
-                          maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }} title={String(r[col.key] ?? '')}>
+                        <td key={col.key}
+                          className="px-2 py-1.5 whitespace-nowrap font-mono text-[0.78rem] sticky bg-white z-[1] max-w-[130px] overflow-hidden text-ellipsis"
+                          style={{ left: col.key === 'iwasku' ? 0 : '130px' }}
+                          title={String(r[col.key] ?? '')}>
                           {r[col.key]}
                         </td>
                       );
                     }
                     if (col.key === 'estimated_storage_cost') {
                       const n = Number(r[col.key]) || 0;
-                      return (<td key={col.key} style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: n > 0 ? COL_RED : COL_ZERO, fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', fontSize: '0.78rem' }}>{n === 0 ? '-' : `$${n.toFixed(2)}`}</td>);
+                      return (
+                        <td key={col.key} className="px-2 py-1.5 text-right font-mono text-[0.78rem]" style={{ color: n > 0 ? COL_RED : COL_ZERO, fontVariantNumeric: 'tabular-nums' }}>
+                          {n === 0 ? '-' : `$${n.toFixed(2)}`}
+                        </td>
+                      );
                     }
                     if (col.key === 'sell_through') {
                       const n = Number(r[col.key]) || 0;
-                      return (<td key={col.key} style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: n > 0 ? COL_GRAY : COL_ZERO, fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', fontSize: '0.78rem' }}>{n === 0 ? '-' : n.toFixed(2)}</td>);
+                      return (
+                        <td key={col.key} className="px-2 py-1.5 text-right font-mono text-[0.78rem]" style={{ color: n > 0 ? COL_GRAY : COL_ZERO, fontVariantNumeric: 'tabular-nums' }}>
+                          {n === 0 ? '-' : n.toFixed(2)}
+                        </td>
+                      );
                     }
                     if (col.key === 'recommended_action') {
                       const val = r[col.key] || '';
-                      return (<td key={col.key} style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: val ? COL_AMBER : COL_ZERO, fontSize: '0.75rem', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={val}>{val || '-'}</td>);
+                      return (
+                        <td key={col.key} className="px-2 py-1.5 text-right text-xs max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap" style={{ color: val ? COL_AMBER : COL_ZERO }} title={val}>
+                          {val || '-'}
+                        </td>
+                      );
                     }
                     const { text, color } = fmtNum(r[col.key] as number, col.color);
                     const is270plus = col.key === 'inv_age_271_to_365_days' || col.key === 'inv_age_366_to_455_days' || col.key === 'inv_age_456_plus_days';
                     return (
-                      <td key={col.key} style={{
-                        padding: '0.4rem 0.5rem', textAlign: 'right', color,
-                        fontVariantNumeric: 'tabular-nums', fontFamily: 'monospace', fontSize: '0.78rem',
-                        fontWeight: is270plus && Number(r[col.key]) > 0 ? 700 : 400,
-                      }}>{text}</td>
+                      <td key={col.key}
+                        className="px-2 py-1.5 text-right font-mono text-[0.78rem]"
+                        style={{
+                          color,
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: is270plus && Number(r[col.key]) > 0 ? 700 : 400,
+                        }}>
+                        {text}
+                      </td>
                     );
                   })}
                 </tr>

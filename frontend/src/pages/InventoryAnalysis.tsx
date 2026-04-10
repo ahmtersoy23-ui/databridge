@@ -33,25 +33,6 @@ interface InvRow {
 
 const WAREHOUSES = ['US', 'AU', 'AE', 'SA', 'UK', 'EU'];
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const tabStyle = (active: boolean) => ({
-  padding: '0.5rem 1.2rem',
-  background: active ? '#334155' : '#f1f5f9',
-  color: active ? '#fff' : '#475569',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  cursor: 'pointer' as const,
-  fontSize: '0.9rem',
-  fontWeight: active ? 600 : 400,
-});
-
 const COL_GREEN = '#059669';
 const COL_ORANGE = '#d97706';
 const COL_RED = '#dc2626';
@@ -176,38 +157,44 @@ export default function InventoryAnalysis() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Inventory Analysis</h1>
+      <h1 className="mb-6">Inventory Analysis</h1>
 
       {/* Warehouse tabs + search */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <div className="flex gap-2">
             {WAREHOUSES.map(wh => (
-              <button key={wh} onClick={() => setWarehouse(wh)} style={tabStyle(warehouse === wh)}>
+              <button
+                key={wh}
+                onClick={() => setWarehouse(wh)}
+                className={`px-4 py-2 border border-gray-300 rounded-md cursor-pointer text-sm ${
+                  warehouse === wh ? 'bg-slate-700 text-white font-semibold' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
                 {wh}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search SKU / ASIN..."
-              style={{ padding: '0.4rem 0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', minWidth: '200px' }}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm min-w-[200px]"
             />
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{filtered.length} items</span>
+            <span className="text-xs text-slate-500">{filtered.length} items</span>
           </div>
         </div>
       </div>
 
       {/* Summary cards */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-4 gap-4 mb-4">
           {summaryCards.map(card => (
-            <div key={card.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.3rem' }}>{card.label}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: card.color }}>{card.value.toLocaleString()}</div>
+            <div key={card.label} className="bg-white rounded-lg p-6 shadow-sm text-center">
+              <div className="text-xs text-slate-500 mb-1">{card.label}</div>
+              <div className="text-2xl font-bold" style={{ color: card.color }}>{card.value.toLocaleString()}</div>
             </div>
           ))}
         </div>
@@ -216,9 +203,9 @@ export default function InventoryAnalysis() {
       {/* Aging Summary */}
       {!loading && agingSummary && (
         <>
-          <div style={{ ...cardStyle, padding: '1rem 1.5rem', marginBottom: '0.5rem' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: '0.75rem' }}>Inventory Aging</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.75rem' }}>
+          <div className="bg-white rounded-lg px-6 py-4 shadow-sm mb-2">
+            <div className="text-sm font-semibold text-slate-700 mb-3">Inventory Aging</div>
+            <div className="grid grid-cols-6 gap-3">
               {[
                 { label: '0-90d', value: agingSummary.age_0_90, color: COL_GREEN },
                 { label: '91-180d', value: agingSummary.age_91_180, color: COL_ORANGE },
@@ -227,9 +214,9 @@ export default function InventoryAnalysis() {
                 { label: '366-455d', value: agingSummary.age_366_455, color: '#991b1b' },
                 { label: '456+d', value: agingSummary.age_456_plus, color: '#991b1b' },
               ].map(item => (
-                <div key={item.label} style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#64748b' }}>{item.label}</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 700, color: item.color, fontVariantNumeric: 'tabular-nums' }}>
+                <div key={item.label} className="text-center">
+                  <div className="text-[0.72rem] text-slate-500">{item.label}</div>
+                  <div className="text-xl font-bold" style={{ color: item.color, fontVariantNumeric: 'tabular-nums' }}>
                     {(item.value || 0).toLocaleString()}
                   </div>
                 </div>
@@ -237,10 +224,7 @@ export default function InventoryAnalysis() {
             </div>
           </div>
           {((agingSummary.age_271_365 || 0) + (agingSummary.age_366_455 || 0) + (agingSummary.age_456_plus || 0)) > 0 && (
-            <div style={{
-              background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px',
-              padding: '0.6rem 1rem', marginBottom: '1rem', color: COL_RED, fontSize: '0.82rem', fontWeight: 500,
-            }}>
+            <div className="bg-red-50 border border-[#fecaca] rounded-lg px-4 py-2 mb-4 text-red-600 text-sm font-medium">
               {agingSummary.skus_270_plus} SKU has 270+ day inventory ({((agingSummary.age_271_365 || 0) + (agingSummary.age_366_455 || 0) + (agingSummary.age_456_plus || 0)).toLocaleString()} units). Est. storage: ${Number(agingSummary.total_storage_cost || 0).toFixed(2)}
             </div>
           )}
@@ -248,52 +232,39 @@ export default function InventoryAnalysis() {
       )}
 
       {/* Table */}
-      <div style={{ ...cardStyle, overflowX: 'auto', padding: '0' }}>
+      <div className="bg-white rounded-lg shadow-sm overflow-x-auto p-0 mb-4">
         {loading ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>Loading...</p>
+          <p className="p-6 text-slate-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>No inventory data found.</p>
+          <p className="p-6 text-slate-500">No inventory data found.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <table className="w-full border-collapse text-sm">
             {/* Group headers */}
             <thead>
-              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <tr className="border-b border-slate-200">
                 {groupHeaders.map((g, i) => (
                   <th
                     key={i}
                     colSpan={g.span}
-                    style={{
-                      padding: '0.4rem 0.5rem',
-                      textAlign: 'center',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      color: g.color || '#64748b',
-                      letterSpacing: '0.05em',
-                      textTransform: 'uppercase',
-                    }}
+                    className="px-2 py-1.5 text-center text-[0.72rem] font-semibold tracking-wide uppercase"
+                    style={{ color: g.color || '#64748b' }}
                   >
                     {g.label}
                   </th>
                 ))}
               </tr>
               {/* Column headers */}
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              <tr className="border-b-2 border-slate-200">
                 {columns.map(col => (
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
+                    className={`p-2 cursor-pointer select-none whitespace-nowrap text-[0.78rem] ${
+                      col.group === 'id' ? 'text-left sticky bg-white z-[2]' : 'text-right'
+                    }`}
                     style={{
-                      padding: '0.5rem',
-                      textAlign: col.group === 'id' ? 'left' : 'right',
-                      cursor: 'pointer',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
                       color: col.color || '#475569',
-                      fontSize: '0.78rem',
-                      position: col.group === 'id' ? 'sticky' as const : undefined,
-                      left: col.key === 'iwasku' ? 0 : col.key === 'asin' ? '130px' : undefined,
-                      background: col.group === 'id' ? '#fff' : undefined,
-                      zIndex: col.group === 'id' ? 2 : undefined,
+                      left: col.group === 'id' ? (col.key === 'iwasku' ? 0 : '130px') : undefined,
                       minWidth: col.group === 'id' ? '130px' : '65px',
                     }}
                   >
@@ -304,25 +275,14 @@ export default function InventoryAnalysis() {
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr key={i} className="border-b border-slate-100">
                   {columns.map(col => {
                     if (col.group === 'id') {
                       return (
                         <td
                           key={col.key}
-                          style={{
-                            padding: '0.4rem 0.5rem',
-                            whiteSpace: 'nowrap',
-                            fontFamily: 'monospace',
-                            fontSize: '0.78rem',
-                            position: 'sticky',
-                            left: col.key === 'iwasku' ? 0 : '130px',
-                            background: '#fff',
-                            zIndex: 1,
-                            maxWidth: '130px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
+                          className="px-2 py-1.5 whitespace-nowrap font-mono text-[0.78rem] sticky bg-white z-[1] max-w-[130px] overflow-hidden text-ellipsis"
+                          style={{ left: col.key === 'iwasku' ? 0 : '130px' }}
                           title={String(r[col.key])}
                         >
                           {r[col.key]}
@@ -333,14 +293,8 @@ export default function InventoryAnalysis() {
                     return (
                       <td
                         key={col.key}
-                        style={{
-                          padding: '0.4rem 0.5rem',
-                          textAlign: 'right',
-                          color,
-                          fontVariantNumeric: 'tabular-nums',
-                          fontFamily: 'monospace',
-                          fontSize: '0.78rem',
-                        }}
+                        className="px-2 py-1.5 text-right font-mono text-[0.78rem]"
+                        style={{ color, fontVariantNumeric: 'tabular-nums' }}
                       >
                         {text}
                       </td>

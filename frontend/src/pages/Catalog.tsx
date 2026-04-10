@@ -20,16 +20,6 @@ interface WisersellProduct {
   product_name?: string | null;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const COL_GRAY = '#6b7280';
-const COL_ZERO = '#d1d5db';
 const PAGE_SIZE = 200;
 
 type SortKey = 'id' | 'name' | 'code' | 'deci' | 'category_name' | 'size' | 'color' | 'weight' | 'identifier' | 'parent_name';
@@ -58,7 +48,7 @@ export default function Catalog() {
     else { setSortKey(key); setSortAsc(true); }
   };
 
-  const sortArrow = (key: SortKey) => sortKey === key ? (sortAsc ? ' ↑' : ' ↓') : '';
+  const sortArrow = (key: SortKey) => sortKey === key ? (sortAsc ? ' \u2191' : ' \u2193') : '';
 
   const summary = useMemo(() => ({
     total: rows.length,
@@ -99,142 +89,123 @@ export default function Catalog() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageRows = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const thStyle = (_key: SortKey, align: 'left' | 'right' = 'left') => ({
-    padding: '0.5rem',
-    textAlign: align as 'left' | 'right',
-    cursor: 'pointer' as const,
-    userSelect: 'none' as const,
-    whiteSpace: 'nowrap' as const,
-    color: '#475569',
-    fontSize: '0.8rem',
-    fontWeight: 600,
-  });
-
-  const thStylePlain = (align: 'left' | 'right' = 'left') => ({
-    padding: '0.5rem',
-    textAlign: align as 'left' | 'right',
-    cursor: 'default' as const,
-    whiteSpace: 'nowrap' as const,
-    color: '#475569',
-    fontSize: '0.8rem',
-    fontWeight: 600,
-  });
+  const summaryData: { label: string; value: number; colorClass: string }[] = [
+    { label: 'Total Products', value: summary.total, colorClass: 'text-slate-700' },
+    { label: 'With Code', value: summary.withCode, colorClass: 'text-emerald-600' },
+    { label: 'With SKUs', value: summary.withSkus, colorClass: 'text-blue-600' },
+  ];
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Catalog</h1>
+      <h1 className="mb-6">Catalog</h1>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
-        {[
-          { label: 'Total Products', value: summary.total, color: '#334155' },
-          { label: 'With Code', value: summary.withCode, color: '#059669' },
-          { label: 'With SKUs', value: summary.withSkus, color: '#2563eb' },
-        ].map(c => (
-          <div key={c.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
-            <div style={{ fontSize: '0.75rem', color: COL_GRAY, marginBottom: '0.25rem' }}>{c.label}</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: c.color }}>{c.value.toLocaleString()}</div>
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        {summaryData.map(c => (
+          <div key={c.label} className="bg-white rounded-lg p-6 shadow-sm text-center">
+            <div className="text-xs text-gray-500 mb-1">{c.label}</div>
+            <div className={`text-2xl font-bold ${c.colorClass}`}>{c.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
 
       {/* Search + pagination info */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex gap-4 items-center">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search name / code / SKU / category / size / color..."
-            style={{ padding: '0.4rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', flex: 1 }}
+            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm flex-1"
           />
-          <span style={{ fontSize: '0.8rem', color: COL_GRAY, whiteSpace: 'nowrap' }}>
+          <span className="text-xs text-gray-500 whitespace-nowrap">
             {filtered.length.toLocaleString()} items
           </span>
           {totalPages > 1 && (
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', whiteSpace: 'nowrap' }}>
+            <div className="flex gap-1.5 items-center whitespace-nowrap">
               <button
                 onClick={() => setPage(p => Math.max(0, p - 1))}
                 disabled={page === 0}
-                style={{ padding: '0.25rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '4px', cursor: page === 0 ? 'default' : 'pointer', background: '#fff', color: page === 0 ? COL_ZERO : '#334155', fontSize: '0.8rem' }}
-              >‹</button>
-              <span style={{ fontSize: '0.8rem', color: COL_GRAY }}>
+                className={`px-2 py-1 border border-gray-300 rounded text-xs bg-white ${page === 0 ? 'cursor-default text-gray-300' : 'cursor-pointer text-slate-700'}`}
+              >{'\u2039'}</button>
+              <span className="text-xs text-gray-500">
                 {page + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
                 disabled={page >= totalPages - 1}
-                style={{ padding: '0.25rem 0.6rem', border: '1px solid #d1d5db', borderRadius: '4px', cursor: page >= totalPages - 1 ? 'default' : 'pointer', background: '#fff', color: page >= totalPages - 1 ? COL_ZERO : '#334155', fontSize: '0.8rem' }}
-              >›</button>
+                className={`px-2 py-1 border border-gray-300 rounded text-xs bg-white ${page >= totalPages - 1 ? 'cursor-default text-gray-300' : 'cursor-pointer text-slate-700'}`}
+              >{'\u203A'}</button>
             </div>
           )}
         </div>
       </div>
 
       {/* Table */}
-      <div style={{ ...cardStyle, overflowX: 'auto', padding: 0 }}>
+      <div className="bg-white rounded-lg shadow-sm mb-4 overflow-x-auto p-0">
         {loading ? (
-          <p style={{ padding: '1.5rem', color: COL_GRAY }}>Loading...</p>
+          <p className="p-6 text-gray-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ padding: '1.5rem', color: COL_GRAY }}>No data found.</p>
+          <p className="p-6 text-gray-500">No data found.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0', background: '#f8fafc' }}>
-                <th onClick={() => handleSort('identifier')} style={thStyle('identifier')}>Identifier{sortArrow('identifier')}</th>
-                <th onClick={() => handleSort('parent_name')} style={thStyle('parent_name')}>Parent Name{sortArrow('parent_name')}</th>
-                <th onClick={() => handleSort('name')} style={thStyle('name')}>Name{sortArrow('name')}</th>
-                <th onClick={() => handleSort('code')} style={thStyle('code')}>SKU{sortArrow('code')}</th>
-                <th onClick={() => handleSort('category_name')} style={thStyle('category_name')}>Category{sortArrow('category_name')}</th>
-                <th onClick={() => handleSort('size')} style={thStyle('size')}>Size{sortArrow('size')}</th>
-                <th onClick={() => handleSort('color')} style={thStyle('color')}>Color{sortArrow('color')}</th>
-                <th onClick={() => handleSort('weight')} style={thStyle('weight', 'right')}>Weight{sortArrow('weight')}</th>
-                <th onClick={() => handleSort('deci')} style={thStyle('deci', 'right')}>Deci{sortArrow('deci')}</th>
-                <th style={thStylePlain('right')}>Width</th>
-                <th style={thStylePlain('right')}>Length</th>
-                <th style={thStylePlain('right')}>Height</th>
+              <tr className="border-b-2 border-slate-200 bg-slate-50">
+                <th onClick={() => handleSort('identifier')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Identifier{sortArrow('identifier')}</th>
+                <th onClick={() => handleSort('parent_name')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Parent Name{sortArrow('parent_name')}</th>
+                <th onClick={() => handleSort('name')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Name{sortArrow('name')}</th>
+                <th onClick={() => handleSort('code')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">SKU{sortArrow('code')}</th>
+                <th onClick={() => handleSort('category_name')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Category{sortArrow('category_name')}</th>
+                <th onClick={() => handleSort('size')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Size{sortArrow('size')}</th>
+                <th onClick={() => handleSort('color')} className="p-2 text-left cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Color{sortArrow('color')}</th>
+                <th onClick={() => handleSort('weight')} className="p-2 text-right cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Weight{sortArrow('weight')}</th>
+                <th onClick={() => handleSort('deci')} className="p-2 text-right cursor-pointer select-none whitespace-nowrap text-slate-600 text-xs font-semibold">Deci{sortArrow('deci')}</th>
+                <th className="p-2 text-right cursor-default whitespace-nowrap text-slate-600 text-xs font-semibold">Width</th>
+                <th className="p-2 text-right cursor-default whitespace-nowrap text-slate-600 text-xs font-semibold">Length</th>
+                <th className="p-2 text-right cursor-default whitespace-nowrap text-slate-600 text-xs font-semibold">Height</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.map(r => {
                 const row = r as any;
                 return (
-                <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: row.identifier ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
-                    {row.identifier || '—'}
+                <tr key={r.id} className="border-b border-slate-100">
+                  <td className={`px-2 py-1.5 font-mono text-[0.78rem] whitespace-nowrap ${row.identifier ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {row.identifier || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', minWidth: '160px' }}>
-                    {row.parent_name || '—'}
+                  <td className="px-2 py-1.5 min-w-[160px]">
+                    {row.parent_name || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', minWidth: '160px' }}>
-                    {r.name || '—'}
+                  <td className="px-2 py-1.5 min-w-[160px]">
+                    {r.name || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', fontFamily: 'monospace', fontSize: '0.78rem', color: r.code ? '#1e293b' : COL_ZERO }}>
-                    {r.code || '—'}
+                  <td className={`px-2 py-1.5 font-mono text-[0.78rem] ${r.code ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {r.code || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', color: r.category_name ? '#1e293b' : COL_ZERO, whiteSpace: 'nowrap' }}>
-                    {r.category_name || '—'}
+                  <td className={`px-2 py-1.5 whitespace-nowrap ${r.category_name ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {r.category_name || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', color: r.size ? '#1e293b' : COL_ZERO }}>
-                    {r.size || '—'}
+                  <td className={`px-2 py-1.5 ${r.size ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {r.size || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', color: r.color ? '#1e293b' : COL_ZERO }}>
-                    {r.color || '—'}
+                  <td className={`px-2 py-1.5 ${r.color ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {r.color || '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.weight ? '#334155' : COL_ZERO }}>
-                    {r.weight != null ? `${Number(r.weight).toFixed(1)} kg` : '—'}
+                  <td className={`px-2 py-1.5 text-right font-mono text-xs ${r.weight ? 'text-slate-700' : 'text-gray-300'}`}>
+                    {r.weight != null ? `${Number(r.weight).toFixed(1)} kg` : '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', color: r.deci ? '#1e293b' : COL_ZERO }}>
-                    {r.deci ?? '—'}
+                  <td className={`px-2 py-1.5 text-right font-mono ${r.deci ? 'text-slate-800' : 'text-gray-300'}`}>
+                    {r.deci ?? '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.width ? '#334155' : COL_ZERO }}>
-                    {r.width != null ? Number(r.width).toFixed(1) : '—'}
+                  <td className={`px-2 py-1.5 text-right font-mono text-xs ${r.width ? 'text-slate-700' : 'text-gray-300'}`}>
+                    {r.width != null ? Number(r.width).toFixed(1) : '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.length ? '#334155' : COL_ZERO }}>
-                    {r.length != null ? Number(r.length).toFixed(1) : '—'}
+                  <td className={`px-2 py-1.5 text-right font-mono text-xs ${r.length ? 'text-slate-700' : 'text-gray-300'}`}>
+                    {r.length != null ? Number(r.length).toFixed(1) : '\u2014'}
                   </td>
-                  <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontFamily: 'monospace', fontSize: '0.75rem', color: r.height ? '#334155' : COL_ZERO }}>
-                    {r.height != null ? Number(r.height).toFixed(1) : '—'}
+                  <td className={`px-2 py-1.5 text-right font-mono text-xs ${r.height ? 'text-slate-700' : 'text-gray-300'}`}>
+                    {r.height != null ? Number(r.height).toFixed(1) : '\u2014'}
                   </td>
 
                 </tr>

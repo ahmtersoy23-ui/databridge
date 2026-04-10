@@ -37,41 +37,6 @@ interface CampaignRow {
   orders: number;
 }
 
-/* ---------- styles ---------- */
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-} as const;
-
-const btnGroup = (active: boolean) => ({
-  padding: '0.5rem 1.2rem',
-  background: active ? '#334155' : '#f1f5f9',
-  color: active ? '#fff' : '#475569',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  cursor: 'pointer' as const,
-  fontSize: '0.9rem',
-  fontWeight: active ? 600 : 400,
-});
-
-const thStyle = {
-  textAlign: 'left' as const,
-  padding: '0.6rem 0.75rem',
-  fontSize: '0.82rem',
-  color: '#475569',
-  cursor: 'pointer' as const,
-  userSelect: 'none' as const,
-  whiteSpace: 'nowrap' as const,
-};
-
-const tdStyle = {
-  padding: '0.5rem 0.75rem',
-  fontSize: '0.85rem',
-  borderBottom: '1px solid #f1f5f9',
-};
-
 /* ---------- helpers ---------- */
 const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtInt = (n: number) => n.toLocaleString('en-US');
@@ -84,10 +49,10 @@ function acosColor(acos: number): string {
 }
 
 function acosBg(acos: number): string {
-  if (acos >= 999) return '#fef2f2';
-  if (acos > 40) return '#fef2f2';
-  if (acos < 20) return '#f0fdf4';
-  return 'transparent';
+  if (acos >= 999) return 'bg-red-50';
+  if (acos > 40) return 'bg-red-50';
+  if (acos < 20) return 'bg-[#f0fdf4]';
+  return 'bg-transparent';
 }
 
 const DAY_OPTIONS = [14, 30, 60, 90] as const;
@@ -194,7 +159,7 @@ export default function Ads() {
 
   if (loading && !summary) {
     return (
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+      <div className="text-center p-16 text-slate-400">
         Loading ads data...
       </div>
     );
@@ -202,7 +167,7 @@ export default function Ads() {
 
   if (!summary || (summary.impressions === 0 && summary.spend === 0)) {
     return (
-      <div style={{ textAlign: 'center', padding: '4rem', color: '#94a3b8' }}>
+      <div className="text-center p-16 text-slate-400">
         No ads data available.
       </div>
     );
@@ -210,68 +175,74 @@ export default function Ads() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '1rem' }}>Ads Dashboard</h1>
+      <h1 className="text-xl font-bold mb-4">Ads Dashboard</h1>
 
       {/* Day filter */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem' }}>
+      <div className="flex gap-2 mb-6">
         {DAY_OPTIONS.map(d => (
-          <button key={d} style={btnGroup(days === d)} onClick={() => setDays(d)}>
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={`px-4 py-2 border border-gray-300 rounded-md cursor-pointer text-sm ${
+              days === d ? 'bg-slate-700 text-white font-semibold' : 'bg-slate-100 text-slate-600'
+            }`}
+          >
             {d} days
           </button>
         ))}
         {summary.period.from && summary.period.to && (
-          <span style={{ marginLeft: '1rem', color: '#94a3b8', fontSize: '0.85rem', alignSelf: 'center' }}>
+          <span className="ml-4 text-slate-400 text-sm self-center">
             {summary.period.from} &mdash; {summary.period.to}
           </span>
         )}
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="grid grid-cols-4 gap-4 mb-8">
         {/* Spend */}
-        <div style={{ ...cardStyle, borderTop: '3px solid #0891b2' }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>Total Spend</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0891b2' }}>${fmt(summary.spend)}</div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+        <div className="bg-white rounded-lg p-6 shadow-sm border-t-3 border-[#0891b2]">
+          <div className="text-xs text-slate-500 mb-1">Total Spend</div>
+          <div className="text-2xl font-bold text-[#0891b2]">${fmt(summary.spend)}</div>
+          <div className="text-xs text-slate-400 mt-1">
             {fmtInt(summary.clicks)} clicks &middot; CPC ${fmt(summary.cpc)}
           </div>
         </div>
 
         {/* Sales */}
-        <div style={{ ...cardStyle, borderTop: '3px solid #059669' }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>Total Sales</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669' }}>${fmt(summary.sales)}</div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+        <div className="bg-white rounded-lg p-6 shadow-sm border-t-3 border-emerald-600">
+          <div className="text-xs text-slate-500 mb-1">Total Sales</div>
+          <div className="text-2xl font-bold text-emerald-600">${fmt(summary.sales)}</div>
+          <div className="text-xs text-slate-400 mt-1">
             {fmtInt(summary.orders)} orders &middot; {fmtInt(summary.impressions)} impr.
           </div>
         </div>
 
         {/* ACOS */}
-        <div style={{ ...cardStyle, borderTop: `3px solid ${acosColor(summary.acos)}` }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>ACOS</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: acosColor(summary.acos) }}>
+        <div className="bg-white rounded-lg p-6 shadow-sm" style={{ borderTop: `3px solid ${acosColor(summary.acos)}` }}>
+          <div className="text-xs text-slate-500 mb-1">ACOS</div>
+          <div className="text-2xl font-bold" style={{ color: acosColor(summary.acos) }}>
             {summary.acos >= 999 ? 'N/A' : `${fmt(summary.acos)}%`}
           </div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+          <div className="text-xs text-slate-400 mt-1">
             CTR {fmt(summary.ctr)}%
           </div>
         </div>
 
         {/* ROAS */}
-        <div style={{ ...cardStyle, borderTop: '3px solid #059669' }}>
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.25rem' }}>ROAS</div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#059669' }}>{fmt(summary.roas)}x</div>
-          <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+        <div className="bg-white rounded-lg p-6 shadow-sm border-t-3 border-emerald-600">
+          <div className="text-xs text-slate-500 mb-1">ROAS</div>
+          <div className="text-2xl font-bold text-emerald-600">{fmt(summary.roas)}x</div>
+          <div className="text-xs text-slate-400 mt-1">
             return on ad spend
           </div>
         </div>
       </div>
 
       {/* Search Terms Table */}
-      <div style={{ ...cardStyle, marginBottom: '2rem', padding: '1rem 1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 600, margin: 0 }}>Search Terms</h2>
-          <label style={{ fontSize: '0.85rem', color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <div className="bg-white rounded-lg shadow-sm mb-8 px-6 py-4">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold m-0">Search Terms</h2>
+          <label className="text-sm text-slate-500 cursor-pointer flex items-center gap-1.5">
             <input
               type="checkbox"
               checked={wastedFilter}
@@ -282,15 +253,15 @@ export default function Ads() {
         </div>
 
         {displayStRows.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+          <div className="p-8 text-center text-slate-400">
             {wastedFilter ? 'No wasted spend terms found.' : 'No search term data.'}
           </div>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                  <tr className="border-b-2 border-slate-200">
                     {[
                       { key: 'customer_search_term', label: 'Search Term' },
                       { key: 'impressions', label: 'Impressions' },
@@ -302,7 +273,7 @@ export default function Ads() {
                       { key: 'acos', label: 'ACOS%' },
                       { key: 'orders', label: 'Orders' },
                     ].map(c => (
-                      <th key={c.key} style={thStyle} onClick={() => handleStSort(c.key)}>
+                      <th key={c.key} className="text-left px-3 py-2 text-sm text-slate-600 cursor-pointer select-none whitespace-nowrap" onClick={() => handleStSort(c.key)}>
                         {c.label}{sortArrow(stSort, c.key)}
                       </th>
                     ))}
@@ -310,26 +281,20 @@ export default function Ads() {
                 </thead>
                 <tbody>
                   {displayStRows.map((r, i) => (
-                    <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                      <td style={{ ...tdStyle, maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#fafbfc]'}>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 max-w-[300px] overflow-hidden text-ellipsis whitespace-nowrap">
                         {r.searchTerm}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.impressions))}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.clicks))}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(Number(r.ctr))}%</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>${fmt(Number(r.cpc))}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>${fmt(Number(r.spend))}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>${fmt(Number(r.sales))}</td>
-                      <td style={{
-                        ...tdStyle,
-                        textAlign: 'right',
-                        color: acosColor(Number(r.acos)),
-                        background: acosBg(Number(r.acos)),
-                        fontWeight: 600,
-                      }}>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.impressions))}</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.clicks))}</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmt(Number(r.ctr))}%</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">${fmt(Number(r.cpc))}</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">${fmt(Number(r.spend))}</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">${fmt(Number(r.sales))}</td>
+                      <td className={`px-3 py-2 text-sm border-b border-slate-100 text-right font-semibold ${acosBg(Number(r.acos))}`} style={{ color: acosColor(Number(r.acos)) }}>
                         {Number(r.acos) >= 999 ? 'N/A' : `${fmt(Number(r.acos))}%`}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.orders))}</td>
+                      <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.orders))}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -338,29 +303,25 @@ export default function Ads() {
 
             {/* Pagination */}
             {!wastedFilter && totalPages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+              <div className="flex justify-center items-center gap-4 mt-4">
                 <button
                   disabled={currentPage <= 1}
                   onClick={() => setStOffset(prev => Math.max(0, prev - PAGE_SIZE))}
-                  style={{
-                    padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '4px',
-                    background: currentPage <= 1 ? '#f1f5f9' : '#fff', cursor: currentPage <= 1 ? 'default' : 'pointer',
-                    color: currentPage <= 1 ? '#cbd5e1' : '#475569', fontSize: '0.85rem',
-                  }}
+                  className={`px-3 py-1.5 border border-gray-300 rounded text-sm ${
+                    currentPage <= 1 ? 'bg-slate-100 cursor-default text-slate-300' : 'bg-white cursor-pointer text-slate-600'
+                  }`}
                 >
                   Previous
                 </button>
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <span className="text-sm text-slate-500">
                   Page {currentPage} of {totalPages} ({fmtInt(stTotal)} terms)
                 </span>
                 <button
                   disabled={currentPage >= totalPages}
                   onClick={() => setStOffset(prev => prev + PAGE_SIZE)}
-                  style={{
-                    padding: '0.4rem 0.8rem', border: '1px solid #d1d5db', borderRadius: '4px',
-                    background: currentPage >= totalPages ? '#f1f5f9' : '#fff', cursor: currentPage >= totalPages ? 'default' : 'pointer',
-                    color: currentPage >= totalPages ? '#cbd5e1' : '#475569', fontSize: '0.85rem',
-                  }}
+                  className={`px-3 py-1.5 border border-gray-300 rounded text-sm ${
+                    currentPage >= totalPages ? 'bg-slate-100 cursor-default text-slate-300' : 'bg-white cursor-pointer text-slate-600'
+                  }`}
                 >
                   Next
                 </button>
@@ -371,18 +332,18 @@ export default function Ads() {
       </div>
 
       {/* Campaign Performance Table */}
-      <div style={{ ...cardStyle, padding: '1rem 1.5rem' }}>
-        <h2 style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '0.75rem' }}>Campaign Performance</h2>
+      <div className="bg-white rounded-lg shadow-sm px-6 py-4">
+        <h2 className="text-lg font-semibold mb-3">Campaign Performance</h2>
 
         {campRows.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+          <div className="p-8 text-center text-slate-400">
             No campaign data.
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <tr className="border-b-2 border-slate-200">
                   {[
                     { key: 'campaign_name', label: 'Campaign' },
                     { key: 'impressions', label: 'Impressions' },
@@ -392,7 +353,7 @@ export default function Ads() {
                     { key: 'acos', label: 'ACOS%' },
                     { key: 'orders', label: 'Orders' },
                   ].map(c => (
-                    <th key={c.key} style={thStyle} onClick={() => handleCampSort(c.key)}>
+                    <th key={c.key} className="text-left px-3 py-2 text-sm text-slate-600 cursor-pointer select-none whitespace-nowrap" onClick={() => handleCampSort(c.key)}>
                       {c.label}{sortArrow(campSort, c.key)}
                     </th>
                   ))}
@@ -400,24 +361,18 @@ export default function Ads() {
               </thead>
               <tbody>
                 {campRows.map((r, i) => (
-                  <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafbfc' }}>
-                    <td style={{ ...tdStyle, maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-[#fafbfc]'}>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 max-w-[350px] overflow-hidden text-ellipsis whitespace-nowrap">
                       {r.campaignName}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.impressions))}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.clicks))}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>${fmt(Number(r.spend))}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>${fmt(Number(r.sales))}</td>
-                    <td style={{
-                      ...tdStyle,
-                      textAlign: 'right',
-                      color: acosColor(Number(r.acos)),
-                      background: acosBg(Number(r.acos)),
-                      fontWeight: 600,
-                    }}>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.impressions))}</td>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.clicks))}</td>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">${fmt(Number(r.spend))}</td>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">${fmt(Number(r.sales))}</td>
+                    <td className={`px-3 py-2 text-sm border-b border-slate-100 text-right font-semibold ${acosBg(Number(r.acos))}`} style={{ color: acosColor(Number(r.acos)) }}>
                       {Number(r.acos) >= 999 ? 'N/A' : `${fmt(Number(r.acos))}%`}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtInt(Number(r.orders))}</td>
+                    <td className="px-3 py-2 text-sm border-b border-slate-100 text-right">{fmtInt(Number(r.orders))}</td>
                   </tr>
                 ))}
               </tbody>

@@ -44,15 +44,11 @@ function UserMenu() {
   if (!user) return null;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>{user.name}</span>
+    <div className="flex items-center gap-2">
+      <span className="text-slate-400 text-sm">{user.name}</span>
       <button
         onClick={logout}
-        style={{
-          color: '#94a3b8', background: 'none', border: '1px solid #334155',
-          padding: '0.3rem 0.7rem', borderRadius: '4px', fontSize: '0.8rem',
-          cursor: 'pointer',
-        }}
+        className="text-slate-400 bg-transparent border border-slate-700 px-3 py-1 rounded text-xs cursor-pointer hover:text-white hover:border-slate-500"
       >
         Logout
       </button>
@@ -65,7 +61,7 @@ function AuthGate({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: '#94a3b8' }}>
+      <div className="flex justify-center items-center h-screen text-slate-400">
         Loading...
       </div>
     );
@@ -85,57 +81,43 @@ function Nav() {
   const isAmazon = AMAZON_PATHS.some(p => location.pathname.startsWith(p));
   const isWayfair = WAYFAIR_PATHS.some(p => location.pathname.startsWith(p));
 
-  const topLink = (active: boolean) => ({
-    color: active ? '#fff' : '#94a3b8',
-    textDecoration: 'none' as const,
-    padding: '0.5rem 1rem',
-    borderRadius: '6px',
-    fontSize: '0.9rem',
-    background: active ? '#334155' : 'none',
-    cursor: 'pointer' as const,
-    border: 'none' as const,
-  });
+  const topCls = (active: boolean) =>
+    `px-4 py-2 rounded-md text-sm no-underline ${active ? 'text-white bg-slate-700' : 'text-slate-400'}`;
 
-  const subLink = ({ isActive }: { isActive: boolean }) => ({
-    color: isActive ? '#fff' : '#94a3b8',
-    textDecoration: 'none' as const,
-    padding: '0.35rem 0.9rem',
-    borderRadius: '4px',
-    fontSize: '0.85rem',
-    background: isActive ? '#1e3a5f' : 'none',
-  });
+  const subCls = ({ isActive }: { isActive: boolean }) =>
+    `px-3.5 py-1 rounded text-sm no-underline ${isActive ? 'text-white bg-[#1e3a5f]' : 'text-slate-400'}`;
 
   return (
     <>
       {/* Top nav */}
-      <nav style={{ display: 'flex', gap: '0.5rem', padding: '0.85rem 2rem', background: '#1a1a2e', alignItems: 'center' }}>
-        <strong style={{ marginRight: '1.5rem', fontSize: '1.1rem', color: '#fff' }}>DataBridge</strong>
+      <nav className="flex gap-2 px-8 py-3 bg-[#1a1a2e] items-center">
+        <strong className="mr-6 text-lg text-white">DataBridge</strong>
 
-        <NavLink to="/" end style={({ isActive }) => topLink(isActive)}>
+        <NavLink to="/" end className={({ isActive }) => topCls(isActive)}>
           Dashboard
         </NavLink>
 
-        <NavLink to="/orders" style={topLink(isAmazon)}>
+        <NavLink to="/orders" className={topCls(isAmazon)}>
           Amazon
         </NavLink>
 
-        <NavLink to="/wayfair/orders" style={topLink(isWayfair)}>
+        <NavLink to="/wayfair/orders" className={topCls(isWayfair)}>
           Wayfair
         </NavLink>
 
-        <NavLink to="/nj-warehouse" style={({ isActive }) => topLink(isActive)}>
+        <NavLink to="/nj-warehouse" className={({ isActive }) => topCls(isActive)}>
           NJ Warehouse
         </NavLink>
 
-        <NavLink to="/catalog" style={({ isActive }) => topLink(isActive)}>
+        <NavLink to="/catalog" className={({ isActive }) => topCls(isActive)}>
           Catalog
         </NavLink>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <NavLink to="/settings" style={({ isActive }) => topLink(isActive)}>
+        <div className="ml-auto flex gap-2 items-center">
+          <NavLink to="/settings" className={({ isActive }) => topCls(isActive)}>
             Settings
           </NavLink>
-          <NavLink to="/logs" style={({ isActive }) => topLink(isActive)}>
+          <NavLink to="/logs" className={({ isActive }) => topCls(isActive)}>
             Logs
           </NavLink>
           <UserMenu />
@@ -144,25 +126,25 @@ function Nav() {
 
       {/* Amazon sub-nav */}
       {isAmazon && (
-        <nav style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 2rem', background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
-          <NavLink to="/orders" style={subLink}>Orders</NavLink>
-          <NavLink to="/inventory" style={subLink}>Inventory</NavLink>
-          <NavLink to="/inventory-aging" style={subLink}>Inv. Aging</NavLink>
-          <NavLink to="/sales-analysis" style={subLink}>Sales Analysis</NavLink>
-          <NavLink to="/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
-          <NavLink to="/reviews" style={subLink}>Reviews</NavLink>
-          <NavLink to="/ads" style={subLink}>Ads</NavLink>
+        <nav className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+          <NavLink to="/orders" className={subCls}>Orders</NavLink>
+          <NavLink to="/inventory" className={subCls}>Inventory</NavLink>
+          <NavLink to="/inventory-aging" className={subCls}>Inv. Aging</NavLink>
+          <NavLink to="/sales-analysis" className={subCls}>Sales Analysis</NavLink>
+          <NavLink to="/inventory-analysis" className={subCls}>Inv. Analysis</NavLink>
+          <NavLink to="/reviews" className={subCls}>Reviews</NavLink>
+          <NavLink to="/ads" className={subCls}>Ads</NavLink>
         </nav>
       )}
 
       {/* Wayfair sub-nav */}
       {isWayfair && (
-        <nav style={{ display: 'flex', gap: '0.25rem', padding: '0.5rem 2rem', background: '#0f172a', borderBottom: '1px solid #1e293b' }}>
-          <NavLink to="/wayfair/orders" style={subLink}>Orders</NavLink>
-          <NavLink to="/wayfair/inventory" style={subLink}>Inventory</NavLink>
-          <NavLink to="/wayfair/orders-analysis" style={subLink}>Orders Analysis</NavLink>
-          <NavLink to="/wayfair/inventory-analysis" style={subLink}>Inv. Analysis</NavLink>
-          <NavLink to="/wayfair/mappings" style={subLink}>Mappings</NavLink>
+        <nav className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+          <NavLink to="/wayfair/orders" className={subCls}>Orders</NavLink>
+          <NavLink to="/wayfair/inventory" className={subCls}>Inventory</NavLink>
+          <NavLink to="/wayfair/orders-analysis" className={subCls}>Orders Analysis</NavLink>
+          <NavLink to="/wayfair/inventory-analysis" className={subCls}>Inv. Analysis</NavLink>
+          <NavLink to="/wayfair/mappings" className={subCls}>Mappings</NavLink>
         </nav>
       )}
     </>
@@ -175,7 +157,7 @@ export default function App() {
       <BrowserRouter>
         <AuthGate>
           <Nav />
-          <main style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
+          <main className="p-8 max-w-[1200px] mx-auto">
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/settings" element={<Settings />} />

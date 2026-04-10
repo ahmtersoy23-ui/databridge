@@ -16,41 +16,6 @@ interface OrderRow {
   fulfillment_channel: string;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const inputStyle = {
-  padding: '0.4rem 0.5rem',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  fontSize: '0.85rem',
-} as const;
-
-const btnStyle = (bg: string, disabled?: boolean) => ({
-  padding: '0.4rem 1rem',
-  background: disabled ? '#9ca3af' : bg,
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: disabled ? 'default' as const : 'pointer' as const,
-  fontSize: '0.85rem',
-});
-
-const toggleBtn = (active: boolean) => ({
-  padding: '0.35rem 0.7rem',
-  background: active ? '#334155' : '#f1f5f9',
-  color: active ? '#fff' : '#475569',
-  border: '1px solid #d1d5db',
-  borderRadius: '4px',
-  cursor: 'pointer' as const,
-  fontSize: '0.8rem',
-});
-
 export default function Orders() {
   const [rows, setRows] = useState<OrderRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -139,125 +104,125 @@ export default function Orders() {
 
   const statusColor = (status: string) => {
     const s = status?.toLowerCase() || '';
-    if (s.includes('ship')) return '#059669';
-    if (s.includes('cancel')) return '#dc2626';
-    if (s.includes('pending')) return '#d97706';
-    return '#475569';
+    if (s.includes('ship')) return 'text-emerald-600';
+    if (s.includes('cancel')) return 'text-red-600';
+    if (s.includes('pending')) return 'text-amber-600';
+    return 'text-slate-600';
   };
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Orders</h1>
+      <h1 className="mb-6">Orders</h1>
 
       {/* Filters */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex gap-3 items-end flex-wrap">
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Channel</div>
-            <select value={channel} onChange={e => setChannel(e.target.value)} style={{ ...inputStyle, minWidth: '80px' }}>
+            <div className="text-xs text-slate-500 mb-1">Channel</div>
+            <select value={channel} onChange={e => setChannel(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-md text-sm min-w-[80px]">
               <option value="">All</option>
               {channels.map(c => <option key={c} value={c}>{c.toUpperCase()}</option>)}
             </select>
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>From</div>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={inputStyle} />
+            <div className="text-xs text-slate-500 mb-1">From</div>
+            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-md text-sm" />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>To</div>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={inputStyle} />
+            <div className="text-xs text-slate-500 mb-1">To</div>
+            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-md text-sm" />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Search (SKU/ASIN/IWASKU)</div>
+            <div className="text-xs text-slate-500 mb-1">Search (SKU/ASIN/IWASKU)</div>
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
               placeholder="Search..."
-              style={{ ...inputStyle, minWidth: '180px' }}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm min-w-[180px]"
             />
           </div>
           <div>
-            <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Match</div>
-            <div style={{ display: 'flex', gap: '2px' }}>
-              <button onClick={() => setMatched('')} style={toggleBtn(matched === '')}>All</button>
-              <button onClick={() => setMatched('matched')} style={toggleBtn(matched === 'matched')}>Matched</button>
-              <button onClick={() => setMatched('unmatched')} style={toggleBtn(matched === 'unmatched')}>Unmatched</button>
+            <div className="text-xs text-slate-500 mb-1">Match</div>
+            <div className="flex gap-0.5">
+              <button onClick={() => setMatched('')} className={`px-3 py-1 rounded text-xs cursor-pointer border border-gray-300 ${matched === '' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>All</button>
+              <button onClick={() => setMatched('matched')} className={`px-3 py-1 rounded text-xs cursor-pointer border border-gray-300 ${matched === 'matched' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>Matched</button>
+              <button onClick={() => setMatched('unmatched')} className={`px-3 py-1 rounded text-xs cursor-pointer border border-gray-300 ${matched === 'unmatched' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>Unmatched</button>
             </div>
           </div>
-          <button onClick={handleSearch} style={btnStyle('#2563eb')}>Search</button>
+          <button onClick={handleSearch} className="px-4 py-1.5 bg-blue-600 text-white border-none rounded-md cursor-pointer text-sm">Search</button>
         </div>
       </div>
 
       {/* Results */}
-      <div style={{ ...cardStyle, overflowX: 'auto' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4 overflow-x-auto">
         {loading ? (
-          <p style={{ color: '#64748b' }}>Loading...</p>
+          <p className="text-slate-500">Loading...</p>
         ) : rows.length === 0 ? (
-          <p style={{ color: '#64748b' }}>No orders found.</p>
+          <p className="text-slate-500">No orders found.</p>
         ) : (
           <>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <tr className="border-b-2 border-slate-200">
                   <th
-                    style={{ textAlign: 'left', padding: '0.5rem', cursor: 'pointer', userSelect: 'none' }}
+                    className="text-left p-2 cursor-pointer select-none"
                     onClick={handleSort}
                   >
                     Date {sortDir === 'desc' ? '\u2193' : '\u2191'}
                   </th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>CH</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Order ID</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>SKU</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>ASIN</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWA SKU</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Price</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Cur</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
+                  <th className="text-left p-2">CH</th>
+                  <th className="text-left p-2">Order ID</th>
+                  <th className="text-left p-2">SKU</th>
+                  <th className="text-left p-2">ASIN</th>
+                  <th className="text-left p-2">IWA SKU</th>
+                  <th className="text-right p-2">Qty</th>
+                  <th className="text-right p-2">Price</th>
+                  <th className="text-left p-2">Cur</th>
+                  <th className="text-left p-2">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                    <td style={{ padding: '0.5rem', whiteSpace: 'nowrap' }}>{r.purchase_date_local}</td>
-                    <td style={{ padding: '0.5rem' }}>{r.channel?.toUpperCase()}</td>
-                    <td style={{ padding: '0.5rem', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.amazon_order_id}>
+                  <tr key={r.id} className="border-b border-slate-200">
+                    <td className="p-2 whitespace-nowrap">{r.purchase_date_local}</td>
+                    <td className="p-2">{r.channel?.toUpperCase()}</td>
+                    <td className="p-2 max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap" title={r.amazon_order_id}>
                       {r.amazon_order_id}
                     </td>
-                    <td style={{ padding: '0.5rem', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.sku}>
+                    <td className="p-2 max-w-[130px] overflow-hidden text-ellipsis whitespace-nowrap" title={r.sku}>
                       {r.sku}
                     </td>
-                    <td style={{ padding: '0.5rem' }}>{r.asin}</td>
-                    <td style={{ padding: '0.5rem', color: r.iwasku ? '#059669' : '#d97706', fontWeight: 500 }}>
+                    <td className="p-2">{r.asin}</td>
+                    <td className={`p-2 font-medium ${r.iwasku ? 'text-emerald-600' : 'text-amber-600'}`}>
                       {r.iwasku || '-'}
                     </td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.quantity}</td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{Number(r.item_price).toFixed(2)}</td>
-                    <td style={{ padding: '0.5rem' }}>{r.currency}</td>
-                    <td style={{ padding: '0.5rem', color: statusColor(r.order_status) }}>{r.order_status}</td>
+                    <td className="p-2 text-right">{r.quantity}</td>
+                    <td className="p-2 text-right">{Number(r.item_price).toFixed(2)}</td>
+                    <td className="p-2">{r.currency}</td>
+                    <td className={`p-2 ${statusColor(r.order_status)}`}>{r.order_status}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {/* Pagination */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
+            <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-200">
               <button
                 onClick={() => handlePageChange(page - 1)}
                 disabled={page <= 1}
-                style={btnStyle('#475569', page <= 1)}
+                className={`px-4 py-1.5 text-white border-none rounded-md text-sm ${page <= 1 ? 'bg-gray-400 cursor-default' : 'bg-slate-600 cursor-pointer'}`}
               >
                 Previous
               </button>
-              <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+              <span className="text-sm text-slate-500">
                 Page {page} of {totalPages} ({total.toLocaleString()} total)
               </span>
               <button
                 onClick={() => handlePageChange(page + 1)}
                 disabled={page >= totalPages}
-                style={btnStyle('#475569', page >= totalPages)}
+                className={`px-4 py-1.5 text-white border-none rounded-md text-sm ${page >= totalPages ? 'bg-gray-400 cursor-default' : 'bg-slate-600 cursor-pointer'}`}
               >
                 Next
               </button>

@@ -25,14 +25,6 @@ interface WfAccount {
   is_active: boolean;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
 const ACCOUNT_LABELS: Record<string, string> = {
   shukran: 'Shukran',
   mdn: 'MDN',
@@ -71,67 +63,67 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
 
   return (
     <>
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="flex gap-3 items-center mb-4">
         <input type="text" placeholder="Search PO / part number / iwasku..."
           value={searchInput} onChange={e => setSearchInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleSearch()}
-          style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '280px' }} />
+          className="py-1 px-3 border border-gray-300 rounded-md text-sm w-70" />
         <button onClick={handleSearch}
-          style={{ padding: '0.35rem 0.9rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          className="py-1 px-3.5 bg-blue-600 text-white border-none rounded-md cursor-pointer text-sm">
           Search
         </button>
-        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+        <span className="text-sm text-slate-500">
           {loading ? 'Loading...' : `${pagination.total} rows`}
         </span>
       </div>
 
-      <div style={cardStyle}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
+          <div className="p-12 text-center text-slate-400">Loading...</div>
         ) : rows.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+          <div className="p-12 text-center text-slate-400">
             No orders found.
           </div>
         ) : (
           <>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>PO Number</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>PO Date</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Part Number</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Price</th>
-                  {isCG && <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total</th>}
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">PO Number</th>
+                  <th className="text-left p-2">PO Date</th>
+                  <th className="text-left p-2">Part Number</th>
+                  <th className="text-left p-2">IWASKU</th>
+                  <th className="text-right p-2">Qty</th>
+                  <th className="text-right p-2">Price</th>
+                  {isCG && <th className="text-right p-2">Total</th>}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.po_number}</td>
-                    <td style={{ padding: '0.5rem', color: '#475569' }}>{r.po_date ? new Date(r.po_date).toLocaleDateString() : '—'}</td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.part_number}</td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem', color: r.iwasku ? '#0f172a' : '#94a3b8' }}>{r.iwasku || '—'}</td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.quantity}</td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.price != null ? `$${Number(r.price).toFixed(2)}` : '—'}</td>
-                    {isCG && <td style={{ padding: '0.5rem', textAlign: 'right' }}>{r.total_cost != null ? `$${Number(r.total_cost).toFixed(2)}` : '—'}</td>}
+                  <tr key={i} className="border-b border-slate-100">
+                    <td className="p-2 font-mono text-xs">{r.po_number}</td>
+                    <td className="p-2 text-slate-600">{r.po_date ? new Date(r.po_date).toLocaleDateString() : '—'}</td>
+                    <td className="p-2 font-mono text-xs">{r.part_number}</td>
+                    <td className={`p-2 font-mono text-xs ${r.iwasku ? 'text-slate-900' : 'text-slate-400'}`}>{r.iwasku || '—'}</td>
+                    <td className="p-2 text-right">{r.quantity}</td>
+                    <td className="p-2 text-right">{r.price != null ? `$${Number(r.price).toFixed(2)}` : '—'}</td>
+                    {isCG && <td className="p-2 text-right">{r.total_cost != null ? `$${Number(r.total_cost).toFixed(2)}` : '—'}</td>}
                   </tr>
                 ))}
               </tbody>
             </table>
 
             {pagination.pages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0' }}>
+              <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-200">
                 <button onClick={() => fetchData(pagination.page - 1)} disabled={pagination.page <= 1}
-                  style={{ padding: '0.35rem 0.9rem', border: '1px solid #d1d5db', borderRadius: '6px', cursor: pagination.page <= 1 ? 'default' : 'pointer', background: '#fff', fontSize: '0.85rem' }}>
+                  className={`py-1 px-3.5 border border-gray-300 rounded-md bg-white text-sm ${pagination.page <= 1 ? 'cursor-default' : 'cursor-pointer'}`}>
                   ‹ Prev
                 </button>
-                <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                <span className="text-sm text-slate-500">
                   Page {pagination.page} / {pagination.pages} ({pagination.total} total)
                 </span>
                 <button onClick={() => fetchData(pagination.page + 1)} disabled={pagination.page >= pagination.pages}
-                  style={{ padding: '0.35rem 0.9rem', border: '1px solid #d1d5db', borderRadius: '6px', cursor: pagination.page >= pagination.pages ? 'default' : 'pointer', background: '#fff', fontSize: '0.85rem' }}>
+                  className={`py-1 px-3.5 border border-gray-300 rounded-md bg-white text-sm ${pagination.page >= pagination.pages ? 'cursor-default' : 'cursor-pointer'}`}>
                   Next ›
                 </button>
               </div>
@@ -160,20 +152,18 @@ export default function WayfairOrders() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1rem' }}>Wayfair Orders</h1>
+      <h1 className="mb-4">Wayfair Orders</h1>
 
       {/* Account selector */}
       {accounts.length > 1 && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="flex gap-2 mb-4">
           {accounts.map(a => (
             <button key={a.label} onClick={() => setSelectedAccount(a.label)}
-              style={{
-                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
-                background: selectedAccount === a.label ? '#0891b2' : '#fff',
-                color: selectedAccount === a.label ? '#fff' : '#334155',
-                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
-              }}>
+              className={`px-4 py-1.5 rounded-md cursor-pointer text-sm font-semibold border-2 ${
+                selectedAccount === a.label
+                  ? 'bg-cyan-600 text-white border-cyan-600'
+                  : 'bg-white text-slate-700 border-gray-300'
+              }`}>
               {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
             </button>
           ))}
@@ -181,16 +171,14 @@ export default function WayfairOrders() {
       )}
 
       {/* CastleGate / Dropship sub-tabs */}
-      <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '2px solid #e2e8f0' }}>
+      <div className="flex gap-1 mb-5 border-b-2 border-slate-200">
         {(['castlegate', 'dropship'] as const).map(t => (
           <button key={t} onClick={() => setOrderSubTab(t)}
-            style={{
-              padding: '0.4rem 1.1rem', border: 'none', background: 'none', cursor: 'pointer',
-              fontSize: '0.875rem', fontWeight: 500,
-              color: orderSubTab === t ? '#0891b2' : '#64748b',
-              borderBottom: orderSubTab === t ? '2px solid #0891b2' : '2px solid transparent',
-              marginBottom: '-2px',
-            }}>
+            className={`px-4 py-1.5 border-none bg-transparent cursor-pointer text-sm font-medium -mb-0.5 ${
+              orderSubTab === t
+                ? 'text-cyan-600 border-b-2 border-b-cyan-600'
+                : 'text-slate-500 border-b-2 border-b-transparent'
+            }`}>
             {t === 'castlegate' ? 'CastleGate' : 'Dropship'}
           </button>
         ))}

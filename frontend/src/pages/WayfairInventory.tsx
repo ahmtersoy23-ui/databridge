@@ -48,69 +48,66 @@ export default function WayfairInventory() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1rem' }}>Wayfair Inventory</h1>
+      <h1 className="mb-4">Wayfair Inventory</h1>
 
       {accounts.length > 1 && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="flex gap-2 mb-4">
           {accounts.map(a => (
             <button key={a.label} onClick={() => setSelectedAccount(a.label)}
-              style={{
-                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
-                background: selectedAccount === a.label ? '#0891b2' : '#fff',
-                color: selectedAccount === a.label ? '#fff' : '#334155',
-                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
-              }}>
+              className={`px-4 py-1.5 rounded-md cursor-pointer text-sm font-semibold border-2 ${
+                selectedAccount === a.label
+                  ? 'bg-cyan-600 text-white border-cyan-600'
+                  : 'bg-white text-slate-700 border-gray-300'
+              }`}>
               {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
             </button>
           ))}
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '1rem' }}>
+      <div className="flex gap-3 items-center mb-4">
         <input
           type="text" placeholder="Search part number or iwasku..."
           value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '240px' }}
+          className="py-1 px-3 border border-gray-300 rounded-md text-sm w-60"
         />
-        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+        <span className="text-sm text-slate-500">
           {loading ? 'Loading...' : `${pagination.total} items`}
         </span>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+      <div className="bg-white rounded-lg shadow-sm">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ textAlign: 'left', padding: '0.75rem 1rem' }}>Part Number</th>
-              <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>IWASKU</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem 1rem' }}>On Hand</th>
-              <th style={{ textAlign: 'right', padding: '0.75rem 1rem' }}>Available</th>
-              <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem' }}>Last Sync</th>
+            <tr className="border-b-2 border-slate-200">
+              <th className="text-left py-3 px-4">Part Number</th>
+              <th className="text-left py-3 px-2">IWASKU</th>
+              <th className="text-right py-3 px-4">On Hand</th>
+              <th className="text-right py-3 px-4">Available</th>
+              <th className="text-left py-3 px-2">Last Sync</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(row => (
-              <tr key={row.part_number} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '0.5rem 1rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{row.part_number}</td>
-                <td style={{ padding: '0.5rem 0.5rem', fontFamily: 'monospace', fontSize: '0.82rem', color: row.iwasku ? '#0f172a' : '#94a3b8' }}>
+              <tr key={row.part_number} className="border-b border-slate-100">
+                <td className="p-2 px-4 font-mono text-xs">{row.part_number}</td>
+                <td className={`p-2 font-mono text-xs ${row.iwasku ? 'text-slate-900' : 'text-slate-400'}`}>
                   {row.iwasku || '—'}
                 </td>
-                <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: 500 }}>
+                <td className="p-2 px-4 text-right font-medium">
                   {row.on_hand_qty ?? 0}
                 </td>
-                <td style={{ padding: '0.5rem 1rem', textAlign: 'right', fontWeight: 600,
-                  color: (row.available_qty ?? 0) > 0 ? '#059669' : '#94a3b8' }}>
+                <td className={`p-2 px-4 text-right font-semibold ${(row.available_qty ?? 0) > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {row.available_qty ?? 0}
                 </td>
-                <td style={{ padding: '0.5rem 0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                <td className="p-2 text-xs text-slate-500">
                   {row.last_synced_at ? new Date(row.last_synced_at).toLocaleDateString() : '—'}
                 </td>
               </tr>
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={5} className="p-12 text-center text-slate-400">
                   No inventory data. Run a Wayfair sync first.
                 </td>
               </tr>
@@ -119,12 +116,12 @@ export default function WayfairInventory() {
         </table>
 
         {pagination.pages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderTop: '1px solid #e2e8f0' }}>
+          <div className="flex justify-between items-center py-3 px-4 border-t border-slate-200">
             <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
-              style={{ padding: '0.35rem 0.9rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', fontSize: '0.85rem' }}>‹ Prev</button>
-            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{pagination.page} / {pagination.pages}</span>
+              className="py-1 px-3.5 cursor-pointer border border-gray-300 rounded-md bg-white text-sm">‹ Prev</button>
+            <span className="text-sm text-slate-500">{pagination.page} / {pagination.pages}</span>
             <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
-              style={{ padding: '0.35rem 0.9rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', fontSize: '0.85rem' }}>Next ›</button>
+              className="py-1 px-3.5 cursor-pointer border border-gray-300 rounded-md bg-white text-sm">Next ›</button>
           </div>
         )}
       </div>

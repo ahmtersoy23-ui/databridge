@@ -58,35 +58,6 @@ interface ReviewItem {
   fetched_at: string;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const tabBtn = (active: boolean) => ({
-  padding: '0.5rem 1.25rem',
-  background: 'none',
-  border: 'none',
-  borderBottom: active ? '2px solid #0891b2' : '2px solid transparent',
-  color: active ? '#0891b2' : '#64748b',
-  fontWeight: active ? 600 : 400,
-  cursor: 'pointer' as const,
-  fontSize: '0.9rem',
-});
-
-const btnStyle = (bg: string, disabled?: boolean) => ({
-  padding: '0.4rem 1rem',
-  background: disabled ? '#9ca3af' : bg,
-  color: '#fff',
-  border: 'none',
-  borderRadius: '6px',
-  cursor: disabled ? 'default' : 'pointer' as const,
-  fontSize: '0.85rem',
-});
-
 const COUNTRY_OPTIONS = ['US', 'UK', 'DE', 'FR', 'IT', 'ES', 'CA', 'AU', 'AE', 'SA'];
 
 export default function Reviews() {
@@ -322,7 +293,7 @@ export default function Reviews() {
 
   // --- Format helpers ---
   const fmtDate = (d: string | null) => {
-    if (!d) return '—';
+    if (!d) return '\u2014';
     return new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
@@ -364,30 +335,37 @@ export default function Reviews() {
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1rem' }}>Reviews</h1>
+      <h1 className="mb-4">Reviews</h1>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '2px solid #e2e8f0', marginBottom: '1rem' }}>
-        <button style={tabBtn(tab === 'reviews')} onClick={() => setTab('reviews')}>
+      <div className="flex gap-1 border-b-2 border-slate-200 mb-4">
+        <button
+          className={`px-4 py-2 bg-transparent border-none cursor-pointer text-sm -mb-[2px] ${
+            tab === 'reviews' ? 'font-semibold text-[#0891b2] border-b-2 border-[#0891b2]' : 'text-slate-500 border-b-2 border-transparent'
+          }`}
+          onClick={() => setTab('reviews')}
+        >
           Review Data
         </button>
-        <button style={tabBtn(tab === 'tracked')} onClick={() => setTab('tracked')}>
+        <button
+          className={`px-4 py-2 bg-transparent border-none cursor-pointer text-sm -mb-[2px] ${
+            tab === 'tracked' ? 'font-semibold text-[#0891b2] border-b-2 border-[#0891b2]' : 'text-slate-500 border-b-2 border-transparent'
+          }`}
+          onClick={() => setTab('tracked')}
+        >
           Tracked ASINs
         </button>
       </div>
 
       {/* Message */}
       {message && (
-        <div style={{
-          padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem',
-          background: message.toLowerCase().includes('fail') || message.toLowerCase().includes('error') ? '#fef2f2' : '#f0fdf4',
-          color: message.toLowerCase().includes('fail') || message.toLowerCase().includes('error') ? '#dc2626' : '#059669',
-          border: '1px solid',
-          borderColor: message.toLowerCase().includes('fail') || message.toLowerCase().includes('error') ? '#fecaca' : '#bbf7d0',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
+        <div className={`px-4 py-3 rounded-md mb-4 border flex justify-between items-center ${
+          message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
+            ? 'bg-red-50 text-red-600 border-[#fecaca]'
+            : 'bg-[#f0fdf4] text-emerald-600 border-[#bbf7d0]'
+        }`}>
           <span>{message}</span>
-          <button onClick={() => setMessage('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '1rem' }}>✕</button>
+          <button onClick={() => setMessage('')} className="bg-transparent border-none cursor-pointer text-slate-400 text-base">{'\u2715'}</button>
         </div>
       )}
 
@@ -395,11 +373,11 @@ export default function Reviews() {
       {tab === 'reviews' && (
         <>
           {/* Filters */}
-          <div style={{ ...cardStyle, display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="bg-white rounded-lg p-6 shadow-sm mb-4 flex gap-3 items-center flex-wrap">
             <select
               value={countryFilter}
               onChange={e => setCountryFilter(e.target.value)}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             >
               <option value="">All Countries</option>
               {COUNTRY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -410,32 +388,36 @@ export default function Reviews() {
               placeholder="Search ASIN or label..."
               value={searchFilter}
               onChange={e => setSearchFilter(e.target.value)}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '200px' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[200px]"
             />
 
-            <button onClick={() => fetchReviews()} style={btnStyle('#2563eb')}>
+            <button onClick={() => fetchReviews()} className="px-4 py-1.5 bg-blue-600 text-white border-none rounded-md cursor-pointer text-sm">
               Refresh
             </button>
 
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-              <button onClick={handleResetBlocks} style={btnStyle('#d97706')}>
+            <div className="ml-auto flex gap-3 items-center">
+              <button onClick={handleResetBlocks} className="px-4 py-1.5 bg-amber-600 text-white border-none rounded-md cursor-pointer text-sm">
                 Reset Blocks
               </button>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem' }}>
+              <div className="flex flex-col items-center gap-0.5">
                 <button
                   onClick={handleFetch}
                   disabled={fetching || (fetchStatus?.nextAvailableAt ? new Date(fetchStatus.nextAvailableAt) > new Date() : false)}
-                  style={btnStyle('#7c3aed', fetching || (fetchStatus?.nextAvailableAt ? new Date(fetchStatus.nextAvailableAt) > new Date() : false))}
+                  className={`px-4 py-1.5 text-white border-none rounded-md text-sm ${
+                    fetching || (fetchStatus?.nextAvailableAt ? new Date(fetchStatus.nextAvailableAt) > new Date() : false)
+                      ? 'bg-gray-400 cursor-default'
+                      : 'bg-[#7c3aed] cursor-pointer'
+                  }`}
                 >
                   {fetching ? 'Fetching...' : 'Fetch Reviews'}
                 </button>
                 {fetchStatus?.nextAvailableAt && new Date(fetchStatus.nextAvailableAt) > new Date() && (
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                  <span className="text-[0.7rem] text-slate-400">
                     Next: {new Date(fetchStatus.nextAvailableAt).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </span>
                 )}
                 {fetchStatus?.lastJob && (
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                  <span className="text-[0.7rem] text-slate-400">
                     Last: {new Date(fetchStatus.lastJob.started_at).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' })} ({fetchStatus.lastJob.records_processed} processed)
                   </span>
                 )}
@@ -444,70 +426,63 @@ export default function Reviews() {
           </div>
 
           {/* Summary */}
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+          <div className="text-xs text-slate-500 mb-3">
             {reviewsLoading ? 'Loading...' : `${filteredReviews.length} products`}
             {reviews.some(r => r.is_blocked) && (
-              <span style={{ color: '#dc2626', marginLeft: '0.75rem' }}>
+              <span className="text-red-600 ml-3">
                 ({reviews.filter(r => r.is_blocked).length} blocked)
               </span>
             )}
           </div>
 
           {/* Reviews table */}
-          <div style={{ ...cardStyle, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <div className="bg-white rounded-lg p-6 shadow-sm mb-4 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '90px' }}>Status</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>ASIN</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
-                  <th style={{ textAlign: 'right', padding: '0.5rem' }}>Reviews</th>
-                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>7d</th>
-                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>30d</th>
-                  <th style={{ textAlign: 'center', padding: '0.5rem', width: '60px' }}>90d</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Fetched Review</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Checked</th>
-                  <th style={{ padding: '0.5rem', width: '70px' }}></th>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-center p-2 w-[90px]">Status</th>
+                  <th className="text-left p-2">ASIN</th>
+                  <th className="text-left p-2">Country</th>
+                  <th className="text-right p-2">Rating</th>
+                  <th className="text-right p-2">Reviews</th>
+                  <th className="text-center p-2 w-[60px]">7d</th>
+                  <th className="text-center p-2 w-[60px]">30d</th>
+                  <th className="text-center p-2 w-[60px]">90d</th>
+                  <th className="text-left p-2">Fetched Review</th>
+                  <th className="text-left p-2">Checked</th>
+                  <th className="p-2 w-[70px]"></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredReviews.map(r => (
-                  <tr key={`${r.asin}-${r.country_code}`} style={{
-                    borderBottom: '1px solid #f1f5f9',
-                    opacity: r.is_blocked ? 0.5 : 1,
-                  }}>
-                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                  <tr key={`${r.asin}-${r.country_code}`} className={`border-b border-slate-100 ${r.is_blocked ? 'opacity-50' : ''}`}>
+                    <td className="p-2 text-center">
                       {(() => {
                         const status = getStatus(r);
-                        if (!status) return <span style={{ color: '#d1d5db', fontSize: '0.75rem' }}>—</span>;
+                        if (!status) return <span className="text-slate-300 text-xs">{'\u2014'}</span>;
                         return (
-                          <span style={{
-                            fontSize: '0.72rem', fontWeight: 600, padding: '0.15rem 0.5rem',
-                            borderRadius: '4px', background: status.bg, color: status.color,
-                            whiteSpace: 'nowrap',
-                          }}>
+                          <span
+                            className="text-[0.72rem] font-semibold px-2 py-0.5 rounded whitespace-nowrap"
+                            style={{ background: status.bg, color: status.color }}
+                          >
                             {status.label}
                           </span>
                         );
                       })()}
                     </td>
-                    <td style={{ padding: '0.5rem' }}>
-                      <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.asin}</div>
-                      {r.label && <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{r.label}</div>}
+                    <td className="p-2">
+                      <div className="font-mono text-sm">{r.asin}</div>
+                      {r.label && <div className="text-xs text-slate-400">{r.label}</div>}
                     </td>
-                    <td style={{ padding: '0.5rem' }}>
-                      <span style={{
-                        background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px',
-                        fontSize: '0.8rem', fontWeight: 500,
-                      }}>
+                    <td className="p-2">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-medium">
                         {r.country_code}
                       </span>
                     </td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: ratingColor(r.rating), fontSize: '0.95rem' }}>
-                      {r.rating ? `${Number(r.rating).toFixed(1)}` : '—'}
+                    <td className="p-2 text-right font-semibold text-base" style={{ color: ratingColor(r.rating) }}>
+                      {r.rating ? `${Number(r.rating).toFixed(1)}` : '\u2014'}
                     </td>
-                    <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                    <td className="p-2 text-right font-mono">
                       {r.review_count.toLocaleString()}
                     </td>
                     {/* 7d / 30d / 90d diff columns */}
@@ -522,47 +497,47 @@ export default function Reviews() {
                       const ratingUp = currRating != null && periodRating != null && currRating > periodRating;
                       const ratingDown = currRating != null && periodRating != null && currRating < periodRating;
                       return (
-                        <td key={idx} style={{ padding: '0.5rem', textAlign: 'center', fontFamily: 'monospace', fontSize: '0.8rem', width: '60px' }}>
+                        <td key={idx} className="p-2 text-center font-mono text-xs w-[60px]">
                           {diff == null ? (
-                            <span style={{ color: '#d1d5db' }}>—</span>
+                            <span className="text-slate-300">{'\u2014'}</span>
                           ) : (
                             <span>
-                              <span style={{ color: diff > 0 ? '#059669' : '#64748b' }}>
+                              <span className={diff > 0 ? 'text-emerald-600' : 'text-slate-500'}>
                                 {diff > 0 ? `+${diff}` : diff === 0 ? '0' : String(diff)}
                               </span>
-                              {ratingUp && <span style={{ color: '#059669', fontSize: '0.7rem', marginLeft: '2px' }}>▲</span>}
-                              {ratingDown && <span style={{ color: '#dc2626', fontSize: '0.7rem', marginLeft: '2px' }}>▼</span>}
+                              {ratingUp && <span className="text-emerald-600 text-[0.7rem] ml-0.5">{'\u25B2'}</span>}
+                              {ratingDown && <span className="text-red-600 text-[0.7rem] ml-0.5">{'\u25BC'}</span>}
                             </span>
                           )}
                         </td>
                       );
                     })}
-                    <td style={{ padding: '0.5rem', maxWidth: '250px' }}>
+                    <td className="p-2 max-w-[250px]">
                       {r.last_review_title ? (
                         <div title={r.last_review_text || ''}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap">
                             {r.last_review_rating != null && (
-                              <span style={{ color: ratingColor(String(r.last_review_rating)), marginRight: '0.35rem' }}>
-                                {'★'.repeat(r.last_review_rating)}
+                              <span className="mr-1.5" style={{ color: ratingColor(String(r.last_review_rating)) }}>
+                                {'\u2605'.repeat(r.last_review_rating)}
                               </span>
                             )}
                             {r.last_review_title}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                            {r.last_review_author} · {r.last_review_date}
+                          <div className="text-xs text-slate-400">
+                            {r.last_review_author} {'\u00B7'} {r.last_review_date}
                           </div>
                         </div>
                       ) : (
-                        <span style={{ color: '#d1d5db', fontSize: '0.8rem' }}>—</span>
+                        <span className="text-slate-300 text-xs">{'\u2014'}</span>
                       )}
                     </td>
-                    <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                    <td className="p-2 text-xs text-slate-500">
                       {fmtDate(r.checked_at)}
                     </td>
-                    <td style={{ padding: '0.5rem' }}>
+                    <td className="p-2">
                       <button
                         onClick={() => openHistory(r.asin, r.country_code)}
-                        style={{ padding: '0.2rem 0.5rem', background: 'none', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', color: '#64748b' }}
+                        className="px-2 py-0.5 bg-transparent border border-gray-300 rounded cursor-pointer text-xs text-slate-500"
                       >
                         History
                       </button>
@@ -571,7 +546,7 @@ export default function Reviews() {
                 ))}
                 {!reviewsLoading && filteredReviews.length === 0 && (
                   <tr>
-                    <td colSpan={11} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={11} className="p-8 text-center text-slate-400">
                       No review data yet. Add ASINs and run the fetcher.
                     </td>
                   </tr>
@@ -586,19 +561,19 @@ export default function Reviews() {
       {tab === 'tracked' && (
         <>
           {/* Add form + Import */}
-          <div style={{ ...cardStyle, display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="bg-white rounded-lg p-6 shadow-sm mb-4 flex gap-3 items-center flex-wrap">
             <input
               type="text"
               placeholder="ASIN"
               value={addAsin}
               onChange={e => setAddAsin(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '130px', fontFamily: 'monospace' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[130px] font-mono"
             />
             <select
               value={addCountry}
               onChange={e => setAddCountry(e.target.value)}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             >
               {COUNTRY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -608,7 +583,7 @@ export default function Reviews() {
               value={addLabel}
               onChange={e => setAddLabel(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '160px' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[160px]"
             />
             <input
               type="text"
@@ -616,53 +591,59 @@ export default function Reviews() {
               value={addIwasku}
               onChange={e => setAddIwasku(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
-              style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '140px', fontFamily: 'monospace' }}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[140px] font-mono"
             />
-            <button onClick={handleAdd} disabled={adding || !addAsin.trim()} style={btnStyle('#059669', adding || !addAsin.trim())}>
+            <button
+              onClick={handleAdd}
+              disabled={adding || !addAsin.trim()}
+              className={`px-4 py-1.5 text-white border-none rounded-md text-sm ${
+                adding || !addAsin.trim() ? 'bg-gray-400 cursor-default' : 'bg-emerald-600 cursor-pointer'
+              }`}
+            >
               {adding ? 'Adding...' : 'Add'}
             </button>
 
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
-              <label style={{ ...btnStyle('#7c3aed'), display: 'inline-block' }}>
+            <div className="ml-auto flex gap-2">
+              <label className="px-4 py-1.5 bg-[#7c3aed] text-white border-none rounded-md cursor-pointer text-sm inline-block">
                 {importing ? 'Importing...' : 'Import Excel'}
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
               </label>
             </div>
           </div>
 
-          <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
+          <div className="text-xs text-slate-500 mb-3">
             Excel: <code>asin</code> (required), <code>country_code</code> (default: US), <code>label</code>, <code>iwasku</code> (optional)
-            {' · '}{trackedLoading ? 'Loading...' : `${tracked.length} tracked ASINs`}
+            {' \u00B7 '}{trackedLoading ? 'Loading...' : `${tracked.length} tracked ASINs`}
           </div>
 
           {/* Tracked table */}
-          <div style={cardStyle}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>ASIN</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Country</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Label</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
-                  <th style={{ textAlign: 'left', padding: '0.5rem' }}>Added</th>
-                  <th style={{ padding: '0.5rem', width: '80px' }}></th>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">ASIN</th>
+                  <th className="text-left p-2">Country</th>
+                  <th className="text-left p-2">Label</th>
+                  <th className="text-left p-2">IWASKU</th>
+                  <th className="text-left p-2">Added</th>
+                  <th className="p-2 w-[80px]"></th>
                 </tr>
               </thead>
               <tbody>
                 {tracked.map(t => (
-                  <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{t.asin}</td>
-                    <td style={{ padding: '0.5rem' }}>
-                      <span style={{ background: '#f1f5f9', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 500 }}>
+                  <tr key={t.id} className="border-b border-slate-100">
+                    <td className="p-2 font-mono text-sm">{t.asin}</td>
+                    <td className="p-2">
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-xs font-medium">
                         {t.country_code}
                       </span>
                     </td>
-                    <td style={{ padding: '0.5rem', color: t.label ? '#0f172a' : '#d1d5db', fontSize: '0.85rem' }}>
-                      {t.label || '—'}
+                    <td className={`p-2 text-sm ${t.label ? 'text-slate-900' : 'text-slate-300'}`}>
+                      {t.label || '\u2014'}
                     </td>
-                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>
+                    <td className="p-2 font-mono text-sm">
                       {editingId === t.id ? (
-                        <span style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                        <span className="flex gap-1 items-center">
                           <input
                             value={editIwasku}
                             onChange={e => setEditIwasku(e.target.value)}
@@ -677,7 +658,7 @@ export default function Reviews() {
                               if (e.key === 'Escape') setEditingId(null);
                             }}
                             autoFocus
-                            style={{ padding: '0.2rem 0.4rem', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '0.82rem', width: '120px', fontFamily: 'monospace' }}
+                            className="px-1.5 py-0.5 border border-gray-300 rounded text-sm w-[120px] font-mono"
                           />
                           <button
                             disabled={savingIwasku}
@@ -688,32 +669,32 @@ export default function Reviews() {
                                 .catch((err: any) => setMessage(err.response?.data?.error || 'Save failed'))
                                 .finally(() => setSavingIwasku(false));
                             }}
-                            style={{ padding: '0.15rem 0.4rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}
+                            className="px-1.5 py-0.5 bg-emerald-600 text-white border-none rounded cursor-pointer text-[0.72rem]"
                           >
-                            {savingIwasku ? '...' : '✓'}
+                            {savingIwasku ? '...' : '\u2713'}
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
-                            style={{ padding: '0.15rem 0.4rem', background: 'none', color: '#94a3b8', border: '1px solid #d1d5db', borderRadius: '4px', cursor: 'pointer', fontSize: '0.72rem' }}
-                          >✕</button>
+                            className="px-1.5 py-0.5 bg-transparent text-slate-400 border border-gray-300 rounded cursor-pointer text-[0.72rem]"
+                          >{'\u2715'}</button>
                         </span>
                       ) : (
                         <span
                           onClick={() => { setEditingId(t.id); setEditIwasku(t.iwasku || ''); }}
-                          style={{ cursor: 'pointer', color: t.iwasku ? '#0f172a' : '#d1d5db', borderBottom: '1px dashed #d1d5db' }}
+                          className={`cursor-pointer border-b border-dashed border-gray-300 ${t.iwasku ? 'text-slate-900' : 'text-slate-300'}`}
                           title="Click to edit"
                         >
-                          {t.iwasku || '—'}
+                          {t.iwasku || '\u2014'}
                         </span>
                       )}
                     </td>
-                    <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                    <td className="p-2 text-xs text-slate-500">
                       {fmtDate(t.created_at)}
                     </td>
-                    <td style={{ padding: '0.5rem' }}>
+                    <td className="p-2">
                       <button
                         onClick={() => handleDelete(t.id, t.asin)}
-                        style={{ padding: '0.15rem 0.5rem', background: 'none', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                        className="px-2 py-0.5 bg-transparent text-red-500 border border-[#fca5a5] rounded cursor-pointer text-xs"
                       >
                         Remove
                       </button>
@@ -722,7 +703,7 @@ export default function Reviews() {
                 ))}
                 {!trackedLoading && tracked.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    <td colSpan={6} className="p-8 text-center text-slate-400">
                       No tracked ASINs. Add some above or import from Excel.
                     </td>
                   </tr>
@@ -737,37 +718,34 @@ export default function Reviews() {
       {historyAsin && (
         <div
           onClick={() => setHistoryAsin(null)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[1000]"
         >
           <div
             onClick={e => e.stopPropagation()}
-            style={{
-              background: '#fff', borderRadius: '12px', padding: '1.5rem',
-              width: '600px', maxHeight: '75vh', overflow: 'auto',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-            }}
+            className="bg-white rounded-xl p-6 w-[600px] max-h-[75vh] overflow-auto shadow-[0_20px_60px_rgba(0,0,0,0.3)]"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-              <h3 style={{ margin: 0 }}>
-                <span style={{ fontFamily: 'monospace' }}>{historyAsin}</span>
-                <span style={{ fontSize: '0.8rem', color: '#64748b', marginLeft: '0.5rem' }}>({historyCountry})</span>
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="m-0">
+                <span className="font-mono">{historyAsin}</span>
+                <span className="text-xs text-slate-500 ml-2">({historyCountry})</span>
               </h3>
-              <button onClick={() => setHistoryAsin(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: '#94a3b8' }}>✕</button>
+              <button onClick={() => setHistoryAsin(null)} className="bg-transparent border-none cursor-pointer text-xl text-slate-400">{'\u2715'}</button>
             </div>
 
             {/* Modal tabs */}
-            <div style={{ display: 'flex', gap: '0.25rem', borderBottom: '2px solid #e2e8f0', marginBottom: '1rem' }}>
+            <div className="flex gap-1 border-b-2 border-slate-200 mb-4">
               <button
-                style={tabBtn(modalTab === 'history')}
+                className={`px-4 py-2 bg-transparent border-none cursor-pointer text-sm -mb-[2px] ${
+                  modalTab === 'history' ? 'font-semibold text-[#0891b2] border-b-2 border-[#0891b2]' : 'text-slate-500 border-b-2 border-transparent'
+                }`}
                 onClick={() => setModalTab('history')}
               >
                 History
               </button>
               <button
-                style={tabBtn(modalTab === 'items')}
+                className={`px-4 py-2 bg-transparent border-none cursor-pointer text-sm -mb-[2px] ${
+                  modalTab === 'items' ? 'font-semibold text-[#0891b2] border-b-2 border-[#0891b2]' : 'text-slate-500 border-b-2 border-transparent'
+                }`}
                 onClick={() => {
                   setModalTab('items');
                   if (reviewItems.length === 0 && !reviewItemsLoading) {
@@ -783,16 +761,16 @@ export default function Reviews() {
             {modalTab === 'history' && (
               <>
                 {historyLoading ? (
-                  <p style={{ color: '#94a3b8' }}>Loading...</p>
+                  <p className="text-slate-400">Loading...</p>
                 ) : history.length === 0 ? (
-                  <p style={{ color: '#94a3b8' }}>No history records yet.</p>
+                  <p className="text-slate-400">No history records yet.</p>
                 ) : (
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                  <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Rating</th>
-                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Reviews</th>
+                      <tr className="border-b-2 border-slate-200">
+                        <th className="text-left p-2">Date</th>
+                        <th className="text-right p-2">Rating</th>
+                        <th className="text-right p-2">Reviews</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -800,17 +778,17 @@ export default function Reviews() {
                         const prev = history[i + 1];
                         const countDiff = prev ? h.review_count - prev.review_count : 0;
                         return (
-                          <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                          <tr key={i} className="border-b border-slate-100">
+                            <td className="p-2 text-xs text-slate-500">
                               {fmtDate(h.recorded_at)}
                             </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: ratingColor(h.rating) }}>
-                              {h.rating ? Number(h.rating).toFixed(1) : '—'}
+                            <td className="p-2 text-right font-semibold" style={{ color: ratingColor(h.rating) }}>
+                              {h.rating ? Number(h.rating).toFixed(1) : '\u2014'}
                             </td>
-                            <td style={{ padding: '0.5rem', textAlign: 'right', fontFamily: 'monospace' }}>
+                            <td className="p-2 text-right font-mono">
                               {h.review_count.toLocaleString()}
                               {countDiff > 0 && (
-                                <span style={{ color: '#059669', fontSize: '0.75rem', marginLeft: '0.35rem' }}>
+                                <span className="text-emerald-600 text-xs ml-1.5">
                                   +{countDiff}
                                 </span>
                               )}
@@ -828,45 +806,42 @@ export default function Reviews() {
             {modalTab === 'items' && (
               <>
                 {reviewItemsLoading ? (
-                  <p style={{ color: '#94a3b8' }}>Loading...</p>
+                  <p className="text-slate-400">Loading...</p>
                 ) : reviewItems.length === 0 ? (
-                  <p style={{ color: '#94a3b8' }}>No review items yet. Run the fetcher first.</p>
+                  <p className="text-slate-400">No review items yet. Run the fetcher first.</p>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="flex flex-col gap-3">
                     {reviewItems.map(item => (
-                      <div key={item.id} style={{
-                        padding: '0.75rem', border: '1px solid #e2e8f0', borderRadius: '8px',
-                        background: '#fafafa',
-                      }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <div key={item.id} className="p-3 border border-slate-200 rounded-lg bg-[#fafafa]">
+                        <div className="flex justify-between items-center mb-1.5">
+                          <div className="flex items-center gap-2">
                             {item.rating && (
-                              <span style={{ color: ratingColor(item.rating), fontWeight: 600, fontSize: '0.85rem' }}>
-                                {'★'.repeat(Math.round(Number(item.rating)))}{'☆'.repeat(5 - Math.round(Number(item.rating)))}
+                              <span className="font-semibold text-sm" style={{ color: ratingColor(item.rating) }}>
+                                {'\u2605'.repeat(Math.round(Number(item.rating)))}{'\u2606'.repeat(5 - Math.round(Number(item.rating)))}
                               </span>
                             )}
                             {item.is_verified && (
-                              <span style={{ background: '#dbeafe', color: '#2563eb', fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: '3px' }}>
+                              <span className="bg-blue-100 text-blue-600 text-[0.7rem] px-1.5 py-0.5 rounded">
                                 Verified
                               </span>
                             )}
                           </div>
-                          <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <span className="text-xs text-slate-400">
                             {item.author}
                           </span>
                         </div>
                         {item.title && (
-                          <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>
+                          <div className="font-semibold text-sm mb-1">
                             {item.title}
                           </div>
                         )}
                         {item.body && (
-                          <div style={{ fontSize: '0.82rem', color: '#374151', lineHeight: 1.5 }}>
+                          <div className="text-sm text-gray-700 leading-normal">
                             {item.body.length > 200 ? item.body.substring(0, 200) + '...' : item.body}
                           </div>
                         )}
                         {item.review_date && (
-                          <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '0.35rem' }}>
+                          <div className="text-[0.72rem] text-slate-400 mt-1.5">
                             {item.review_date}
                           </div>
                         )}

@@ -14,56 +14,39 @@ const CHANNELS = ['us', 'ca', 'au', 'ae', 'sa', 'uk', 'de', 'fr', 'it', 'es', 'e
 
 const CHANNEL_LABELS: Record<string, string> = { eu: 'EU (All)' };
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const tabStyle = (active: boolean) => ({
-  padding: '0.5rem 1.2rem',
-  background: active ? '#334155' : '#f1f5f9',
-  color: active ? '#fff' : '#475569',
-  border: '1px solid #d1d5db',
-  borderRadius: '6px',
-  cursor: 'pointer' as const,
-  fontSize: '0.9rem',
-  fontWeight: active ? 600 : 400,
-});
-
-const COL_GREEN = '#059669';
-const COL_BLUE = '#2563eb';
-const COL_PURPLE = '#7c3aed';
-const COL_ZERO = '#d1d5db';
+const COL_GREEN = 'text-emerald-600';
+const COL_BLUE = 'text-blue-600';
+const COL_PURPLE = 'text-violet-600';
+const COL_GREEN_HEX = '#059669';
+const COL_BLUE_HEX = '#2563eb';
+const COL_PURPLE_HEX = '#7c3aed';
 
 type SortKey = keyof SalesRow;
 
-const columns: { key: SortKey; label: string; group: string; color: string }[] = [
-  { key: 'iwasku', label: 'SKU', group: 'id', color: '' },
-  { key: 'asin', label: 'ASIN', group: 'id', color: '' },
-  { key: 'last7', label: '7', group: 'current', color: COL_GREEN },
-  { key: 'last30', label: '30', group: 'current', color: COL_GREEN },
-  { key: 'last90', label: '90', group: 'current', color: COL_GREEN },
-  { key: 'last180', label: '180', group: 'current', color: COL_GREEN },
-  { key: 'last366', label: '366', group: 'current', color: COL_GREEN },
-  { key: 'preYearLast7', label: '7', group: 'pyLast', color: COL_BLUE },
-  { key: 'preYearLast30', label: '30', group: 'pyLast', color: COL_BLUE },
-  { key: 'preYearLast90', label: '90', group: 'pyLast', color: COL_BLUE },
-  { key: 'preYearLast180', label: '180', group: 'pyLast', color: COL_BLUE },
-  { key: 'preYearLast365', label: '365', group: 'pyLast', color: COL_BLUE },
-  { key: 'preYearNext7', label: '7', group: 'pyNext', color: COL_PURPLE },
-  { key: 'preYearNext30', label: '30', group: 'pyNext', color: COL_PURPLE },
-  { key: 'preYearNext90', label: '90', group: 'pyNext', color: COL_PURPLE },
-  { key: 'preYearNext180', label: '180', group: 'pyNext', color: COL_PURPLE },
+const columns: { key: SortKey; label: string; group: string; colorClass: string; colorHex: string }[] = [
+  { key: 'iwasku', label: 'SKU', group: 'id', colorClass: '', colorHex: '' },
+  { key: 'asin', label: 'ASIN', group: 'id', colorClass: '', colorHex: '' },
+  { key: 'last7', label: '7', group: 'current', colorClass: COL_GREEN, colorHex: COL_GREEN_HEX },
+  { key: 'last30', label: '30', group: 'current', colorClass: COL_GREEN, colorHex: COL_GREEN_HEX },
+  { key: 'last90', label: '90', group: 'current', colorClass: COL_GREEN, colorHex: COL_GREEN_HEX },
+  { key: 'last180', label: '180', group: 'current', colorClass: COL_GREEN, colorHex: COL_GREEN_HEX },
+  { key: 'last366', label: '366', group: 'current', colorClass: COL_GREEN, colorHex: COL_GREEN_HEX },
+  { key: 'preYearLast7', label: '7', group: 'pyLast', colorClass: COL_BLUE, colorHex: COL_BLUE_HEX },
+  { key: 'preYearLast30', label: '30', group: 'pyLast', colorClass: COL_BLUE, colorHex: COL_BLUE_HEX },
+  { key: 'preYearLast90', label: '90', group: 'pyLast', colorClass: COL_BLUE, colorHex: COL_BLUE_HEX },
+  { key: 'preYearLast180', label: '180', group: 'pyLast', colorClass: COL_BLUE, colorHex: COL_BLUE_HEX },
+  { key: 'preYearLast365', label: '365', group: 'pyLast', colorClass: COL_BLUE, colorHex: COL_BLUE_HEX },
+  { key: 'preYearNext7', label: '7', group: 'pyNext', colorClass: COL_PURPLE, colorHex: COL_PURPLE_HEX },
+  { key: 'preYearNext30', label: '30', group: 'pyNext', colorClass: COL_PURPLE, colorHex: COL_PURPLE_HEX },
+  { key: 'preYearNext90', label: '90', group: 'pyNext', colorClass: COL_PURPLE, colorHex: COL_PURPLE_HEX },
+  { key: 'preYearNext180', label: '180', group: 'pyNext', colorClass: COL_PURPLE, colorHex: COL_PURPLE_HEX },
 ];
 
-const groupHeaders = [
-  { label: '', span: 2 },
-  { label: 'Current', span: 5, color: COL_GREEN },
-  { label: 'PY Last', span: 5, color: COL_BLUE },
-  { label: 'PY Next', span: 4, color: COL_PURPLE },
+const groupHeaders: { label: string; span: number; colorHex: string; colorClass: string }[] = [
+  { label: '', span: 2, colorHex: '', colorClass: 'text-slate-500' },
+  { label: 'Current', span: 5, colorHex: COL_GREEN_HEX, colorClass: COL_GREEN },
+  { label: 'PY Last', span: 5, colorHex: COL_BLUE_HEX, colorClass: COL_BLUE },
+  { label: 'PY Next', span: 4, colorHex: COL_PURPLE_HEX, colorClass: COL_PURPLE },
 ];
 
 export default function SalesAnalysis() {
@@ -118,65 +101,53 @@ export default function SalesAnalysis() {
     return data;
   }, [rows, search, sortKey, sortAsc]);
 
-  const fmtNum = (v: number | null | undefined, color: string) => {
+  const fmtNum = (v: number | null | undefined, colorClass: string) => {
     const n = Number(v) || 0;
     return {
       text: n === 0 ? '-' : n.toLocaleString(),
-      color: n === 0 ? COL_ZERO : color,
+      cls: n === 0 ? 'text-gray-300' : colorClass,
     };
   };
 
-  const thBase = {
-    padding: '0.3rem 0.4rem',
-    cursor: 'pointer',
-    userSelect: 'none' as const,
-    whiteSpace: 'nowrap' as const,
-    fontSize: '0.75rem',
-    fontWeight: 600,
-  };
-
-  const tdBase = {
-    padding: '0.25rem 0.4rem',
-    fontVariantNumeric: 'tabular-nums' as const,
-    fontFamily: 'monospace',
-    fontSize: '0.75rem',
-  };
-
   return (
-    <div style={{ margin: '0 -2rem' }}>
-      <h1 style={{ marginBottom: '1rem', padding: '0 2rem' }}>Sales Analysis</h1>
+    <div className="-mx-8">
+      <h1 className="mb-4 px-8">Sales Analysis</h1>
 
       {/* Channel tabs + search */}
-      <div style={{ ...cardStyle, margin: '0 2rem 1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mx-8 mb-4">
+        <div className="flex justify-between items-center flex-wrap gap-3">
+          <div className="flex gap-2">
             {CHANNELS.map(ch => (
-              <button key={ch} onClick={() => setChannel(ch)} style={tabStyle(channel === ch)}>
+              <button
+                key={ch}
+                onClick={() => setChannel(ch)}
+                className={`px-4 py-2 border border-gray-300 rounded-md cursor-pointer text-sm ${channel === ch ? 'bg-slate-700 text-white font-semibold' : 'bg-slate-100 text-slate-600 font-normal'}`}
+              >
                 {CHANNEL_LABELS[ch] || ch.toUpperCase()}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="flex gap-2 items-center">
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search SKU / ASIN..."
-              style={{ padding: '0.4rem 0.5rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', minWidth: '180px' }}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm min-w-[180px]"
             />
-            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>{filtered.length} items</span>
+            <span className="text-xs text-slate-500">{filtered.length} items</span>
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div style={{ background: '#fff', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', margin: '0 2rem', padding: '0' }}>
+      <div className="bg-white rounded-lg shadow-sm mx-8 p-0">
         {loading ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>Loading...</p>
+          <p className="p-6 text-slate-500">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p style={{ padding: '1.5rem', color: '#64748b' }}>No sales data found.</p>
+          <p className="p-6 text-slate-500">No sales data found.</p>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
             <colgroup>
               <col style={{ width: '110px' }} />
               <col style={{ width: '105px' }} />
@@ -186,36 +157,24 @@ export default function SalesAnalysis() {
             </colgroup>
             {/* Group headers */}
             <thead>
-              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+              <tr className="border-b border-slate-200">
                 {groupHeaders.map((g, i) => (
                   <th
                     key={i}
                     colSpan={g.span}
-                    style={{
-                      padding: '0.3rem 0.4rem',
-                      textAlign: 'center',
-                      fontSize: '0.68rem',
-                      fontWeight: 600,
-                      color: g.color || '#64748b',
-                      letterSpacing: '0.04em',
-                      textTransform: 'uppercase',
-                    }}
+                    className={`px-1.5 py-1 text-center text-[0.68rem] font-semibold tracking-wide uppercase ${g.colorClass}`}
                   >
                     {g.label}
                   </th>
                 ))}
               </tr>
               {/* Column headers */}
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              <tr className="border-b-2 border-slate-200">
                 {columns.map(col => (
                   <th
                     key={col.key}
                     onClick={() => handleSort(col.key)}
-                    style={{
-                      ...thBase,
-                      textAlign: col.group === 'id' ? 'left' : 'right',
-                      color: col.color || '#475569',
-                    }}
+                    className={`px-1.5 py-1 cursor-pointer select-none whitespace-nowrap text-xs font-semibold ${col.group === 'id' ? 'text-left' : 'text-right'} ${col.colorClass || 'text-slate-600'}`}
                   >
                     {col.label} {sortKey === col.key ? (sortAsc ? '\u2191' : '\u2193') : ''}
                   </th>
@@ -224,27 +183,22 @@ export default function SalesAnalysis() {
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr key={i} className="border-b border-slate-100">
                   {columns.map(col => {
                     if (col.group === 'id') {
                       return (
                         <td
                           key={col.key}
-                          style={{
-                            ...tdBase,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
+                          className="px-1.5 py-1 font-mono text-xs tabular-nums overflow-hidden text-ellipsis whitespace-nowrap"
                           title={String(r[col.key])}
                         >
                           {r[col.key]}
                         </td>
                       );
                     }
-                    const { text, color } = fmtNum(r[col.key] as number, col.color);
+                    const { text, cls } = fmtNum(r[col.key] as number, col.colorClass);
                     return (
-                      <td key={col.key} style={{ ...tdBase, textAlign: 'right', color }}>
+                      <td key={col.key} className={`px-1.5 py-1 text-right font-mono text-xs tabular-nums ${cls}`}>
                         {text}
                       </td>
                     );

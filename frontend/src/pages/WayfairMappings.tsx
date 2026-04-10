@@ -17,14 +17,6 @@ interface Pagination {
   pages: number;
 }
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
 export default function WayfairMappings() {
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, pages: 1 });
@@ -131,20 +123,17 @@ export default function WayfairMappings() {
     }
   };
 
+  const isError = message.includes('fail') || message.includes('error') || message.includes('No valid');
+
   return (
     <div>
-      <h1 style={{ marginBottom: '1rem' }}>Wayfair Mappings</h1>
+      <h1 className="mb-4">Wayfair Mappings</h1>
 
       {/* Toolbar */}
-      <div style={{ ...cardStyle, display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4 flex gap-3 items-center flex-wrap">
         {(['all', 'matched', 'unmatched'] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            style={{
-              padding: '0.35rem 0.9rem', border: '1px solid #d1d5db', borderRadius: '6px', cursor: 'pointer',
-              background: filter === f ? '#0891b2' : '#fff',
-              color: filter === f ? '#fff' : '#374151',
-              fontSize: '0.85rem',
-            }}>
+            className={`px-3.5 py-1 border border-gray-300 rounded-md cursor-pointer text-sm ${filter === f ? 'bg-cyan-600 text-white' : 'bg-white text-gray-700'}`}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
@@ -154,111 +143,102 @@ export default function WayfairMappings() {
           placeholder="Search part number or iwasku..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{
-            padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px',
-            fontSize: '0.85rem', width: '220px',
-          }}
+          className="py-1 px-3 border border-gray-300 rounded-md text-sm w-[220px]"
         />
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>
+        <div className="ml-auto flex gap-2">
           <button onClick={handleExport}
-            style={{ padding: '0.4rem 1rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+            className="px-4 py-1.5 bg-emerald-600 text-white border-none rounded-md cursor-pointer text-sm">
             Export Excel
           </button>
-          <label style={{ padding: '0.4rem 1rem', background: '#7c3aed', color: '#fff', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem' }}>
+          <label className="px-4 py-1.5 bg-violet-600 text-white rounded-md cursor-pointer text-sm">
             {importing ? 'Importing...' : 'Import Excel'}
-            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} disabled={importing} />
+            <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
           </label>
         </div>
       </div>
 
       {message && (
-        <div style={{
-          padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1rem',
-          background: message.includes('fail') || message.includes('error') || message.includes('No valid') ? '#fef2f2' : '#f0fdf4',
-          color: message.includes('fail') || message.includes('error') || message.includes('No valid') ? '#dc2626' : '#059669',
-          border: '1px solid',
-          borderColor: message.includes('fail') || message.includes('error') || message.includes('No valid') ? '#fecaca' : '#bbf7d0',
-        }}>
+        <div className={`px-4 py-3 rounded-md mb-4 border ${isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-emerald-600 border-green-200'}`}>
           {message}
         </div>
       )}
 
-      <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.75rem' }}>
-        Export Excel → <code>iwasku</code> kolonunu doldur → Import Excel
+      <div className="text-xs text-slate-500 mb-3">
+        Export Excel &rarr; <code>iwasku</code> kolonunu doldur &rarr; Import Excel
       </div>
 
       {/* Table */}
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.85rem', color: '#64748b' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+        <div className="flex justify-between mb-3 items-center">
+          <span className="text-sm text-slate-500">
             {loading ? 'Loading...' : `${pagination.total} items`}
           </span>
           {pagination.pages > 1 && (
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div className="flex gap-2 items-center">
               <button disabled={pagination.page <= 1 || loading} onClick={() => fetchData(pagination.page - 1)}
-                style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
-                ‹
+                className="px-2 py-1 cursor-pointer border border-gray-300 rounded bg-white">
+                {'\u2039'}
               </button>
-              <span style={{ fontSize: '0.85rem' }}>{pagination.page} / {pagination.pages}</span>
+              <span className="text-sm">{pagination.page} / {pagination.pages}</span>
               <button disabled={pagination.page >= pagination.pages || loading} onClick={() => fetchData(pagination.page + 1)}
-                style={{ padding: '0.25rem 0.6rem', cursor: 'pointer', border: '1px solid #d1d5db', borderRadius: '4px', background: '#fff' }}>
-                ›
+                className="px-2 py-1 cursor-pointer border border-gray-300 rounded bg-white">
+                {'\u203A'}
               </button>
             </div>
           )}
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Part Number</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Account</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>IWASKU</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem', width: '80px' }}></th>
+            <tr className="border-b-2 border-slate-200">
+              <th className="text-left p-2">Part Number</th>
+              <th className="text-left p-2">Account</th>
+              <th className="text-left p-2">IWASKU</th>
+              <th className="text-left p-2 w-[80px]"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map(row => (
-              <tr key={row.part_number} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{row.part_number}</td>
-                <td style={{ padding: '0.5rem', fontSize: '0.8rem', color: row.accounts[0] === 'shukran' ? '#1e40af' : row.accounts[0] === 'mdn' ? '#9d174d' : '#94a3b8', fontWeight: 500 }}>
-                  {row.accounts[0] ? (ACCOUNT_LABELS[row.accounts[0]] || row.accounts[0].toUpperCase()) : '—'}
+              <tr key={row.part_number} className="border-b border-slate-100">
+                <td className="p-2 font-mono text-sm">{row.part_number}</td>
+                <td className={`p-2 text-xs font-medium ${row.accounts[0] === 'shukran' ? 'text-blue-800' : row.accounts[0] === 'mdn' ? 'text-pink-800' : 'text-slate-400'}`}>
+                  {row.accounts[0] ? (ACCOUNT_LABELS[row.accounts[0]] || row.accounts[0].toUpperCase()) : '\u2014'}
                 </td>
-                <td style={{ padding: '0.5rem' }}>
+                <td className="p-2">
                   {editingPn === row.part_number ? (
-                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                    <div className="flex gap-1.5">
                       <input
                         autoFocus
                         type="text"
                         value={editValue}
                         onChange={e => setEditValue(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') saveEdit(row.part_number); if (e.key === 'Escape') cancelEdit(); }}
-                        style={{ padding: '0.25rem 0.5rem', border: '1px solid #2563eb', borderRadius: '4px', width: '140px', fontFamily: 'monospace', fontSize: '0.82rem' }}
+                        className="px-2 py-1 border border-blue-600 rounded w-[140px] font-mono text-sm"
                       />
                       <button disabled={saving} onClick={() => saveEdit(row.part_number)}
-                        style={{ padding: '0.25rem 0.5rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
-                        {saving ? '...' : '✓'}
+                        className="px-2 py-1 bg-emerald-600 text-white border-none rounded cursor-pointer text-xs">
+                        {saving ? '...' : '\u2713'}
                       </button>
                       <button onClick={cancelEdit}
-                        style={{ padding: '0.25rem 0.5rem', background: '#e2e8f0', color: '#374151', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
-                        ✕
+                        className="px-2 py-1 bg-slate-200 text-gray-700 border-none rounded cursor-pointer text-xs">
+                        \u2715
                       </button>
                     </div>
                   ) : (
                     <span
                       onClick={() => startEdit(row)}
-                      style={{ cursor: 'pointer', fontFamily: 'monospace', fontSize: '0.82rem', color: row.iwasku ? '#0f172a' : '#94a3b8' }}
+                      className={`cursor-pointer font-mono text-sm ${row.iwasku ? 'text-slate-900' : 'text-slate-400'}`}
                       title="Click to edit"
                     >
-                      {row.iwasku || '— click to add —'}
+                      {row.iwasku || '\u2014 click to add \u2014'}
                     </span>
                   )}
                 </td>
-                <td style={{ padding: '0.5rem' }}>
+                <td className="p-2">
                   {row.iwasku && (
                     <button onClick={() => deleteMapping(row.part_number)}
-                      style={{ padding: '0.15rem 0.5rem', background: 'none', color: '#ef4444', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
+                      className="px-2 py-0.5 bg-transparent text-red-500 border border-red-300 rounded cursor-pointer text-xs">
                       Remove
                     </button>
                   )}
@@ -267,7 +247,7 @@ export default function WayfairMappings() {
             ))}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                <td colSpan={4} className="p-8 text-center text-slate-400">
                   No items found. Run a Wayfair sync first to populate part numbers.
                 </td>
               </tr>

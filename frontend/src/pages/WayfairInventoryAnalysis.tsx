@@ -14,19 +14,6 @@ interface WfAccount { id: number; label: string; channel: string; is_active: boo
 
 const ACCOUNT_LABELS: Record<string, string> = { shukran: 'Shukran', mdn: 'MDN' };
 
-const cardStyle = {
-  background: '#fff',
-  borderRadius: '8px',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  marginBottom: '1rem',
-} as const;
-
-const COL_GREEN = '#059669';
-const COL_BLUE = '#2563eb';
-const COL_ORANGE = '#d97706';
-const COL_ZERO = '#9ca3af';
-
 type SortKey = 'part_number' | 'iwasku' | 'on_hand_qty' | 'available_qty' | 'shipping_cost';
 
 export default function WayfairInventoryAnalysis() {
@@ -106,48 +93,22 @@ export default function WayfairInventoryAnalysis() {
     return { totalParts, totalOnHand, totalAvailable, matched, unmatched: totalParts - matched, matchPct };
   }, [rows]);
 
-  const summaryCards = [
-    { label: 'Total Parts', value: summary.totalParts.toLocaleString(), color: '#334155' },
-    { label: 'On Hand', value: summary.totalOnHand.toLocaleString(), color: COL_GREEN },
-    { label: 'Available', value: summary.totalAvailable.toLocaleString(), color: COL_BLUE },
-    { label: 'Match Rate', value: `${summary.matchPct}%`, color: summary.unmatched > 0 ? COL_ORANGE : COL_GREEN },
+  const summaryCards: { label: string; value: string; colorClass: string }[] = [
+    { label: 'Total Parts', value: summary.totalParts.toLocaleString(), colorClass: 'text-slate-700' },
+    { label: 'On Hand', value: summary.totalOnHand.toLocaleString(), colorClass: 'text-emerald-600' },
+    { label: 'Available', value: summary.totalAvailable.toLocaleString(), colorClass: 'text-blue-600' },
+    { label: 'Match Rate', value: `${summary.matchPct}%`, colorClass: summary.unmatched > 0 ? 'text-amber-600' : 'text-emerald-600' },
   ];
-
-  const thStyle = (_key: SortKey, align: string = 'left') => ({
-    textAlign: align as React.CSSProperties['textAlign'],
-    padding: '0.5rem',
-    cursor: 'pointer',
-    userSelect: 'none' as const,
-    whiteSpace: 'nowrap' as const,
-    fontSize: '0.82rem',
-    fontWeight: 600,
-  });
-
-  const toggleBtn = (active: boolean) => ({
-    padding: '0.35rem 0.7rem',
-    background: active ? '#334155' : '#f1f5f9',
-    color: active ? '#fff' : '#475569',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    cursor: 'pointer' as const,
-    fontSize: '0.8rem',
-  });
 
   return (
     <div>
-      <h1 style={{ marginBottom: '1.5rem' }}>Wayfair Inventory Analysis</h1>
+      <h1 className="mb-6">Wayfair Inventory Analysis</h1>
 
       {accounts.length > 1 && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="flex gap-2 mb-4">
           {accounts.map(a => (
             <button key={a.label} onClick={() => setSelectedAccount(a.label)}
-              style={{
-                padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer',
-                fontSize: '0.85rem', fontWeight: 600, border: '2px solid',
-                background: selectedAccount === a.label ? '#0891b2' : '#fff',
-                color: selectedAccount === a.label ? '#fff' : '#334155',
-                borderColor: selectedAccount === a.label ? '#0891b2' : '#d1d5db',
-              }}>
+              className={`px-4 py-1.5 rounded-md cursor-pointer text-sm font-semibold border-2 ${selectedAccount === a.label ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-slate-700 border-gray-300'}`}>
               {ACCOUNT_LABELS[a.label] || a.label.toUpperCase()}
             </button>
           ))}
@@ -156,11 +117,11 @@ export default function WayfairInventoryAnalysis() {
 
       {/* Summary cards */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+        <div className="grid grid-cols-4 gap-4 mb-4">
           {summaryCards.map(card => (
-            <div key={card.label} style={{ ...cardStyle, marginBottom: 0, textAlign: 'center' }}>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '0.3rem' }}>{card.label}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: card.color }}>{card.value}</div>
+            <div key={card.label} className="bg-white rounded-lg p-6 shadow-sm text-center">
+              <div className="text-xs text-slate-500 mb-1">{card.label}</div>
+              <div className={`text-2xl font-bold ${card.colorClass}`}>{card.value}</div>
             </div>
           ))}
         </div>
@@ -168,100 +129,96 @@ export default function WayfairInventoryAnalysis() {
 
       {/* Match progress bar */}
       {!loading && summary.totalParts > 0 && (
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
-            <span style={{ color: COL_GREEN }}><strong>{summary.matched}</strong> matched</span>
-            <span style={{ color: summary.unmatched > 0 ? COL_ORANGE : COL_GREEN }}><strong>{summary.unmatched}</strong> unmatched</span>
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <div className="flex gap-6 mb-2 text-sm">
+            <span className="text-emerald-600"><strong>{summary.matched}</strong> matched</span>
+            <span className={summary.unmatched > 0 ? 'text-amber-600' : 'text-emerald-600'}><strong>{summary.unmatched}</strong> unmatched</span>
           </div>
-          <div style={{ background: '#e2e8f0', borderRadius: '4px', height: '8px', overflow: 'hidden' }}>
-            <div style={{ background: COL_GREEN, height: '100%', width: `${summary.matchPct}%`, borderRadius: '4px' }} />
+          <div className="bg-slate-200 rounded h-2 overflow-hidden">
+            <div className="bg-emerald-600 h-full rounded" style={{ width: `${summary.matchPct}%` }} />
           </div>
         </div>
       )}
 
       {/* Filters */}
-      <div style={{ ...cardStyle, display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="bg-white rounded-lg p-6 shadow-sm mb-4 flex gap-3 items-center flex-wrap">
         <input type="text" placeholder="Search part number / iwasku..." value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: '0.35rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.85rem', width: '240px' }} />
-        <div style={{ display: 'flex', gap: '2px' }}>
+          className="py-1 px-3 border border-gray-300 rounded-md text-sm w-[240px]" />
+        <div className="flex gap-0.5">
           {(['all', 'matched', 'unmatched'] as const).map(f => (
-            <button key={f} onClick={() => setMatchFilter(f)} style={toggleBtn(matchFilter === f)}>
+            <button key={f} onClick={() => setMatchFilter(f)} className={`px-3 py-1 rounded text-xs cursor-pointer border border-gray-300 ${matchFilter === f ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
         </div>
-        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{filtered.length} items</span>
+        <span className="text-sm text-slate-500">{filtered.length} items</span>
       </div>
 
       {/* Table */}
-      <div style={{ ...cardStyle, padding: 0 }}>
+      <div className="bg-white rounded-lg shadow-sm mb-4 p-0">
         {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Loading...</div>
+          <div className="p-12 text-center text-slate-400">Loading...</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>No inventory data found.</div>
+          <div className="p-12 text-center text-slate-400">No inventory data found.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th onClick={() => handleSort('part_number')} style={thStyle('part_number')}>
+              <tr className="border-b-2 border-slate-200">
+                <th onClick={() => handleSort('part_number')} className="text-left p-2 cursor-pointer select-none whitespace-nowrap text-sm font-semibold">
                   Part Number {sortKey === 'part_number' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
-                <th onClick={() => handleSort('iwasku')} style={thStyle('iwasku')}>
+                <th onClick={() => handleSort('iwasku')} className="text-left p-2 cursor-pointer select-none whitespace-nowrap text-sm font-semibold">
                   IWASKU {sortKey === 'iwasku' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
-                <th onClick={() => handleSort('on_hand_qty')} style={thStyle('on_hand_qty', 'right')}>
+                <th onClick={() => handleSort('on_hand_qty')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-sm font-semibold">
                   On Hand {sortKey === 'on_hand_qty' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
-                <th onClick={() => handleSort('available_qty')} style={thStyle('available_qty', 'right')}>
+                <th onClick={() => handleSort('available_qty')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-sm font-semibold">
                   Available {sortKey === 'available_qty' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
-                <th onClick={() => handleSort('shipping_cost')} style={thStyle('shipping_cost', 'right')}>
+                <th onClick={() => handleSort('shipping_cost')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-sm font-semibold">
                   Ship Cost {sortKey === 'shipping_cost' ? (sortAsc ? '\u2191' : '\u2193') : ''}
                 </th>
-                <th style={{ textAlign: 'left', padding: '0.5rem', fontSize: '0.82rem', fontWeight: 600 }}>Status</th>
+                <th className="text-left p-2 text-sm font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={r.part_number} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem' }}>{r.part_number}</td>
-                  <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.82rem', color: r.iwasku ? '#0f172a' : '#94a3b8' }}>{r.iwasku || '—'}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 500, color: (r.on_hand_qty || 0) > 0 ? '#0f172a' : COL_ZERO }}>{r.on_hand_qty ?? 0}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: (r.available_qty || 0) > 0 ? COL_GREEN : COL_ZERO }}>{r.available_qty ?? 0}</td>
-                  <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                <tr key={r.part_number} className="border-b border-slate-100">
+                  <td className="p-2 font-mono text-sm">{r.part_number}</td>
+                  <td className={`p-2 font-mono text-sm ${r.iwasku ? 'text-slate-900' : 'text-slate-400'}`}>{r.iwasku || '\u2014'}</td>
+                  <td className={`p-2 text-right font-medium ${(r.on_hand_qty || 0) > 0 ? 'text-slate-900' : 'text-gray-400'}`}>{r.on_hand_qty ?? 0}</td>
+                  <td className={`p-2 text-right font-semibold ${(r.available_qty || 0) > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>{r.available_qty ?? 0}</td>
+                  <td className="p-2 text-right">
                     {editingPn === r.part_number ? (
-                      <div style={{ display: 'flex', gap: '0.25rem', justifyContent: 'flex-end' }}>
+                      <div className="flex gap-1 justify-end">
                         <input
                           autoFocus type="number" step="0.01" value={editValue}
                           onChange={e => setEditValue(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') saveCost(r.part_number); if (e.key === 'Escape') setEditingPn(null); }}
-                          style={{ width: '70px', padding: '0.2rem 0.4rem', border: '1px solid #2563eb', borderRadius: '4px', fontSize: '0.82rem', textAlign: 'right' }}
+                          className="w-[70px] px-1.5 py-0.5 border border-blue-600 rounded text-sm text-right"
                         />
                         <button disabled={saving} onClick={() => saveCost(r.part_number)}
-                          style={{ padding: '0.2rem 0.4rem', background: '#059669', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
-                          {saving ? '..' : '✓'}
+                          className="px-1.5 py-0.5 bg-emerald-600 text-white border-none rounded cursor-pointer text-xs">
+                          {saving ? '..' : '\u2713'}
                         </button>
                         <button onClick={() => setEditingPn(null)}
-                          style={{ padding: '0.2rem 0.4rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>
-                          ✕
+                          className="px-1.5 py-0.5 bg-slate-200 border-none rounded cursor-pointer text-xs">
+                          \u2715
                         </button>
                       </div>
                     ) : (
                       <span
                         onClick={() => { setEditingPn(r.part_number); setEditValue(r.shipping_cost != null ? String(r.shipping_cost) : ''); }}
-                        style={{ cursor: 'pointer', color: r.shipping_cost != null ? '#0f172a' : '#94a3b8', fontWeight: 500 }}
+                        className={`cursor-pointer font-medium ${r.shipping_cost != null ? 'text-slate-900' : 'text-slate-400'}`}
                         title="Click to edit"
                       >
-                        {r.shipping_cost != null ? `$${Number(r.shipping_cost).toFixed(2)}` : '—'}
+                        {r.shipping_cost != null ? `$${Number(r.shipping_cost).toFixed(2)}` : '\u2014'}
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: '0.5rem' }}>
-                    <span style={{
-                      padding: '0.15rem 0.5rem', borderRadius: '999px', fontSize: '0.75rem',
-                      background: r.iwasku ? '#dcfce7' : '#fef3c7',
-                      color: r.iwasku ? '#166534' : '#92400e',
-                    }}>
+                  <td className="p-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${r.iwasku ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
                       {r.iwasku ? 'Matched' : 'Unmatched'}
                     </span>
                   </td>
