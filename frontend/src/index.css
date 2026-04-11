@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "../../../shared/tokens.css";
+@import "../../shared/tokens.css";
 
 @layer base {
   body {
