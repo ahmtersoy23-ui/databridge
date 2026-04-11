@@ -1,0 +1,67 @@
+/*
+ * IWA Design Tokens
+ *
+ * Tum app'lerde ortak renk, spacing, radius tanimlari.
+ * Kullanim: @import "../../shared/tokens.css"; (veya relative path'e gore)
+ *
+ * Token'lar Tailwind slate/blue paletine dayanir — zaten cogu app'te kullaniliyor.
+ * App'ler istedigi token'i override edebilir.
+ */
+
+:root {
+  /* ── Primary ── */
+  --iwa-primary-50: #eff6ff;
+  --iwa-primary-100: #dbeafe;
+  --iwa-primary-500: #3b82f6;
+  --iwa-primary-600: #2563eb;
+  --iwa-primary-700: #1d4ed8;
+
+  /* ── Semantic ── */
+  --iwa-success: #10b981;
+  --iwa-warning: #f59e0b;
+  --iwa-error: #ef4444;
+  --iwa-info: #8b5cf6;
+
+  /* ── Neutrals (slate) ── */
+  --iwa-gray-50: #f8fafc;
+  --iwa-gray-100: #f1f5f9;
+  --iwa-gray-200: #e2e8f0;
+  --iwa-gray-300: #cbd5e1;
+  --iwa-gray-400: #94a3b8;
+  --iwa-gray-500: #64748b;
+  --iwa-gray-600: #475569;
+  --iwa-gray-700: #334155;
+  --iwa-gray-800: #1e293b;
+  --iwa-gray-900: #0f172a;
+
+  /* ── Light theme defaults ── */
+  --iwa-bg: #f8fafc;
+  --iwa-bg-card: #ffffff;
+  --iwa-text: #1e293b;
+  --iwa-text-secondary: #64748b;
+  --iwa-text-muted: #94a3b8;
+  --iwa-border: #e2e8f0;
+
+  /* ── Radius ── */
+  --iwa-radius-sm: 4px;
+  --iwa-radius-md: 6px;
+  --iwa-radius-lg: 8px;
+
+  /* ── Shadow ── */
+  --iwa-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --iwa-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/*
+ * Dark tema token'lari.
+ * StockPulse ve benzeri dark app'ler bu class'i html/body'ye ekler.
+ * Veya prefers-color-scheme ile otomatik uygulanir.
+ */
+.dark {
+  --iwa-bg: #0a0e14;
+  --iwa-bg-card: #1a2234;
+  --iwa-text: #f1f5f9;
+  --iwa-text-secondary: #94a3b8;
+  --iwa-text-muted: #64748b;
+  --iwa-border: #2d3a4f;
+}
