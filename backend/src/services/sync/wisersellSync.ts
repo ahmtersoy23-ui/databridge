@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { pool } from '../../config/database';
+import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
 
@@ -181,6 +181,70 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
   }
 }
 
+/**
+ * Sync wisersell_products → pricelab_db.products
+ * Existing products: updates name and category only.
+ * New products: inserts with all available data (name, category, weight, size, dimensions).
+ */
+async function syncProductsTable(): Promise<{ updated: number; inserted: number }> {
+  // Read from wisersell_products + categories (databridge_db)
+  const result = await pool.query(`
+    SELECT wp.code, wp.name, wp.weight, wp.deci,
+           wp.width, wp.length, wp.height,
+           wc.name AS category_name
+    FROM wisersell_products wp
+    LEFT JOIN wisersell_categories wc ON wp.category_id = wc.id
+    WHERE wp.code IS NOT NULL AND wp.code != '' AND wp.name IS NOT NULL
+  `);
+
+  if (result.rows.length === 0) return { updated: 0, inserted: 0 };
+
+  const BATCH = 200;
+  let updated = 0;
+  let inserted = 0;
+
+  for (let i = 0; i < result.rows.length; i += BATCH) {
+    const batch = result.rows.slice(i, i + BATCH);
+
+    const codes = batch.map((r: { code: string }) => r.code);
+    const names = batch.map((r: { name: string }) => r.name);
+    const categories = batch.map((r: { category_name: string | null }) => r.category_name || null);
+    const weights = batch.map((r: { weight: string | null }) => r.weight != null ? parseFloat(r.weight) : null);
+    const sizes = batch.map((r: { deci: string | null }) => r.deci != null ? parseFloat(r.deci) : null);
+    const widths = batch.map((r: { width: string | null }) => r.width != null ? parseFloat(r.width) : null);
+    const lengths = batch.map((r: { length: string | null }) => r.length != null ? parseFloat(r.length) : null);
+    const heights = batch.map((r: { height: string | null }) => r.height != null ? parseFloat(r.height) : null);
+
+    const res = await sharedPool.query(`
+      INSERT INTO products (product_sku, name, category, weight, size, width, length, height, source)
+      SELECT t.product_sku, t.name, t.category, t.weight, t.size, t.width, t.length, t.height, 'wisersell'
+      FROM UNNEST(
+        $1::text[], $2::text[], $3::text[],
+        $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[]
+      ) AS t(product_sku, name, category, weight, size, width, length, height)
+      ON CONFLICT (product_sku) DO UPDATE SET
+        name = EXCLUDED.name,
+        category = COALESCE(EXCLUDED.category, products.category),
+        updated_at = NOW()
+      WHERE products.name IS DISTINCT FROM EXCLUDED.name
+         OR products.category IS DISTINCT FROM EXCLUDED.category
+    `, [codes, names, categories, weights, sizes, widths, lengths, heights]);
+
+    const affected = (res as unknown as { rowCount?: number }).rowCount || 0;
+    updated += affected;
+  }
+
+  // Count actual new inserts (products with source='wisersell' created recently)
+  const newCount = await sharedPool.query(
+    `SELECT COUNT(*) as cnt FROM products WHERE source = 'wisersell' AND created_at > NOW() - INTERVAL '1 minute'`
+  );
+  inserted = parseInt(newCount.rows[0]?.cnt || '0');
+  updated = updated - inserted;
+
+  logger.info(`[WisersellSync] Products table sync: ${updated} updated, ${inserted} inserted`);
+  return { updated, inserted };
+}
+
 export async function syncWisersell(): Promise<number> {
   const jobId = await createSyncJob('wisersell_sync', 'WISERSELL');
 
@@ -204,6 +268,9 @@ export async function syncWisersell(): Promise<number> {
     }
 
     await upsertProducts(products);
+
+    // Sync wisersell_products → pricelab_db.products (name, category, dimensions)
+    await syncProductsTable();
 
     await updateSyncJob(jobId, 'completed', products.length);
     logger.info(`[WisersellSync] Completed: ${products.length} products, ${categories.length} categories`);

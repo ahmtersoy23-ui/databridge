@@ -43,7 +43,6 @@ const FBA_INVENTORY_COLUMNS = [
 
 const SKU_MASTER_COLUMNS = [
   'id', 'sku', 'marketplace', 'country_code', 'asin', 'iwasku',
-  'name', 'parent', 'category', 'cost', 'size',
   'custom_shipping', 'fbm_source',
   'created_at', 'updated_at', 'fulfillment',
 ];

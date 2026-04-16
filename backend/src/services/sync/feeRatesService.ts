@@ -56,7 +56,7 @@ export async function calculateProductFeeRates(): Promise<number> {
   logger.info('[FeeRates] Step 2: Calculating name-level rates...');
   const result = await sharedPool.query(`
     SELECT
-      sm.name as product_name,
+      p.name as product_name,
       CASE
         WHEN COUNT(DISTINCT sm.fulfillment) > 1 THEN 'Mixed'
         ELSE MAX(sm.fulfillment)
@@ -74,10 +74,11 @@ export async function calculateProductFeeRates(): Promise<number> {
         / NULLIF(SUM(CASE WHEN t.type = 'Order' THEN t.product_sales ELSE 0 END), 0) * 100, 2) as other_fee_pct
     FROM amz_transactions t
     JOIN sku_master sm ON t.sku = sm.sku AND sm.country_code = 'US'
+    JOIN products p ON sm.iwasku = p.product_sku
     WHERE t.marketplace_code = 'US'
       AND t.date_only >= $1 AND t.date_only <= $2
-      AND sm.name IS NOT NULL AND sm.name != ''
-    GROUP BY sm.name
+      AND p.name IS NOT NULL AND p.name != ''
+    GROUP BY p.name
     HAVING SUM(CASE WHEN t.type = 'Order' THEN t.product_sales ELSE 0 END) > 0
     ORDER BY revenue DESC
   `, [startStr, endStr]);
