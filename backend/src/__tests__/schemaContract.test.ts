@@ -159,19 +159,18 @@ describe('fba_inventory schema contract', () => {
 });
 
 describe('sku_master schema contract', () => {
-  // All apps read: iwasku, asin, name, parent, category
-  const COMMON_READS = ['iwasku', 'sku', 'asin', 'name', 'parent', 'category', 'marketplace'];
+  // All apps read SKU-level fields only; product fields come via JOIN products (sm.iwasku = p.product_sku)
+  const COMMON_READS = ['iwasku', 'sku', 'asin', 'marketplace'];
 
-  // AmzSellMetrics reads: cost, size, custom_shipping, fbm_source
-  const AMZSELLMETRICS_READS = [...COMMON_READS, 'cost', 'size', 'custom_shipping', 'fbm_source'];
+  // AmzSellMetrics reads: custom_shipping, fbm_source (product fields via JOIN products)
+  const AMZSELLMETRICS_READS = [...COMMON_READS, 'custom_shipping', 'fbm_source'];
 
-  // StockPulse reads: iwasku, category
-  const STOCKPULSE_READS = ['iwasku', 'asin', 'category', 'name'];
+  // StockPulse reads: iwasku, asin (product fields via JOIN products)
+  const STOCKPULSE_READS = ['iwasku', 'asin'];
 
-  // PriceLab writes: all columns
+  // PriceLab writes: SKU-level columns only (product fields live in products table)
   const PRICELAB_WRITES = [
     'sku', 'marketplace', 'country_code', 'asin', 'iwasku',
-    'name', 'parent', 'category', 'cost', 'size',
     'custom_shipping', 'fbm_source', 'fulfillment',
   ];
 
@@ -200,6 +199,6 @@ describe('sku_master schema contract', () => {
   });
 
   it('snapshot has expected column count', () => {
-    expect(SKU_MASTER_COLUMNS).toHaveLength(16);
+    expect(SKU_MASTER_COLUMNS).toHaveLength(11);
   });
 });
