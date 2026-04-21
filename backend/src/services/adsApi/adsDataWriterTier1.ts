@@ -449,7 +449,7 @@ export async function writeSdPurchasedProductData(profileId: number, startDate: 
   if (!rows.length) return 0;
 
   const deduped = deduplicateRows(rows, (r) =>
-    `${r.date}_${r.campaignId}_${r.adGroupId}_${r.promotedAsin || r.advertisedAsin}_${r.purchasedAsin}`
+    `${r.date}_${r.campaignId}_${r.adGroupId}_${r.promotedAsin || r.advertisedAsin}_${r.asinBrandHalo || r.purchasedAsin}`
   );
   if (deduped.length < rows.length) {
     logger.info(`[AdsWriter] SD Purchased Product: deduplicated ${rows.length} → ${deduped.length} rows`);
@@ -463,8 +463,8 @@ export async function writeSdPurchasedProductData(profileId: number, startDate: 
 
     for (let j = 0; j < batch.length; j++) {
       const r = batch[j];
-      const offset = j * 13;
-      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`);
+      const offset = j * 12;
+      placeholders.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12})`);
       values.push(
         profileId,
         r.date || startDate,
@@ -474,10 +474,10 @@ export async function writeSdPurchasedProductData(profileId: number, startDate: 
         r.adGroupName || null,
         r.promotedAsin || r.advertisedAsin || null,
         r.promotedSku || r.advertisedSku || null,
-        r.purchasedAsin || null,
-        r.purchasesClicks || r.purchases || r.brandHaloOrders || 0,
-        r.unitsSoldClicks || r.unitsSold || r.brandHaloUnits || 0,
-        r.salesClicks || r.sales || r.brandHaloSales || 0,
+        r.asinBrandHalo || r.purchasedAsin || null,
+        r.conversionsBrandHaloClicks || r.purchasesClicks || r.purchases || r.brandHaloOrders || 0,
+        r.unitsSoldBrandHaloClicks || r.unitsSoldClicks || r.unitsSold || r.brandHaloUnits || 0,
+        r.salesBrandHaloClicks || r.salesClicks || r.sales || r.brandHaloSales || 0,
       );
     }
 
