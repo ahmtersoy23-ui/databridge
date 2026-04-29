@@ -11,6 +11,14 @@ const PORT = parseInt(process.env.PORT || '3008');
 // Validate required environment variables before starting
 function validateEnv(): void {
   const required = ['DB_HOST', 'DB_USER', 'DB_PASSWORD', 'DB_NAME'];
+
+  // Production'da credential encryption ve internal API key zorunlu —
+  // eksikse credential'lar plain text saklanir veya sync trigger endpoint'i acik kalir.
+  // Development'ta opsiyonel (lokal gelistirici deneyimi icin).
+  if (process.env.NODE_ENV === 'production') {
+    required.push('CREDENTIAL_ENCRYPTION_KEY', 'INTERNAL_API_KEY');
+  }
+
   const missing = required.filter(key => !process.env[key]);
   if (missing.length > 0) {
     logger.error(`Missing required environment variables: ${missing.join(', ')}`);
@@ -18,7 +26,10 @@ function validateEnv(): void {
   }
 
   if (!process.env.CREDENTIAL_ENCRYPTION_KEY) {
-    logger.warn('CREDENTIAL_ENCRYPTION_KEY not set — credentials will be stored in plaintext');
+    logger.warn('CREDENTIAL_ENCRYPTION_KEY not set — credentials will be stored in plaintext (development only)');
+  }
+  if (!process.env.INTERNAL_API_KEY) {
+    logger.warn('INTERNAL_API_KEY not set — sync trigger endpoint will return 503 (development only)');
   }
 }
 

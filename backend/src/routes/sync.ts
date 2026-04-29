@@ -7,10 +7,16 @@ import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
 import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
 import { validateBody } from '../middleware/validate';
+import { internalAuth } from '../middleware/internalAuth';
 import { withSyncLog } from '../utils/syncLog';
 import logger from '../config/logger';
 
 const router = Router();
+
+// Tum /sync/* endpoint'leri INTERNAL_API_KEY header'i gerektirir.
+// Nginx allow 127.0.0.1 + INTERNAL_API_KEY = iki katmanli koruma. Saldirgan localhost'a
+// ulassa bile (privileged container, supply chain compromise) auth gate'i asmasi gerekir.
+router.use(internalAuth);
 
 const triggerSchema = z.object({
   type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates']),
@@ -18,7 +24,7 @@ const triggerSchema = z.object({
   months: z.number().min(1).max(24).optional(),
 });
 
-// POST /api/v1/sync/trigger - Manual sync trigger (no auth — internal tool)
+// POST /api/v1/sync/trigger - Manual sync trigger (auth: INTERNAL_API_KEY header)
 router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: Response) => {
   const { type, marketplace, months } = req.body;
 

@@ -195,14 +195,20 @@ interface ChangeSample {
  * New products: inserts with all available data (name, category, weight, size, dimensions).
  */
 async function syncProductsTable(): Promise<{ updated: number; inserted: number; samples: ChangeSample[] }> {
-  // Read from wisersell_products + categories (databridge_db)
+  // Read from wisersell_products + categories (databridge_db).
+  // DISTINCT ON (code) + ORDER BY id DESC: ayni code icin birden fazla wisersell kaydi
+  // varsa (gozlem: 44 duplicate code mevcut) en yeni id'yi tut. Aksi takdirde alttaki
+  // ON CONFLICT DO UPDATE ayni product_sku'yu batch icinde iki kez gorur ve fail eder
+  // ("ON CONFLICT DO UPDATE command cannot affect row a second time").
   const result = await pool.query(`
-    SELECT wp.code, wp.name, wp.weight, wp.deci,
+    SELECT DISTINCT ON (wp.code)
+           wp.code, wp.name, wp.weight, wp.deci,
            wp.width, wp.length, wp.height,
            wc.name AS category_name
     FROM wisersell_products wp
     LEFT JOIN wisersell_categories wc ON wp.category_id = wc.id
     WHERE wp.code IS NOT NULL AND wp.code != '' AND wp.name IS NOT NULL
+    ORDER BY wp.code, wp.id DESC
   `);
 
   if (result.rows.length === 0) return { updated: 0, inserted: 0, samples: [] };
