@@ -191,7 +191,8 @@ export default function Dashboard() {
 
   const fetchStatus = async () => {
     try {
-      const res = await axios.get('/api/v1/status');
+      // /status sade public health probe oldu (UptimeRobot icin); detayli stats /status/detailed'da (admin auth).
+      const res = await axios.get('/api/v1/status/detailed');
       setStatus(res.data.data);
       setError('');
     } catch {

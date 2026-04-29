@@ -1,12 +1,74 @@
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/database';
+import { adminOpsAuth } from '../middleware/adminOps';
 
 const router = Router();
 
-// GET /api/v1/status - Sync status overview
+// GET /api/v1/status — Public health probe (UptimeRobot icin).
+// Body sade: db baglantisi + uptime + timestamp. Detayli sync/marketplace/credential
+// bilgisi /status/detailed'a tasindi (adminOpsAuth ile korumali). Onceden bu endpoint
+// sync error mesajlari, SKU listeleri, credential count ve unmatched orders sizdiriyordu.
 router.get('/', async (_req: Request, res: Response) => {
+  let dbStatus: 'connected' | 'disconnected' = 'disconnected';
   try {
-    // Last sync per job type + marketplace
+    await pool.query('SELECT 1');
+    dbStatus = 'connected';
+  } catch {
+    dbStatus = 'disconnected';
+  }
+
+  res.status(dbStatus === 'connected' ? 200 : 503).json({
+    ok: dbStatus === 'connected',
+    db: dbStatus,
+    uptimeSec: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// GET /api/v1/status/sync/health — Public sync sağlığı (UptimeRobot icin).
+// Body sade: sadece overall healthy boolean + sayım. HTTP 200/503 ile UptimeRobot
+// fail tetikler. Job-spesifik error message ve job_name detaylari /detailed'da.
+router.get('/sync/health', async (_req: Request, res: Response) => {
+  try {
+    const jobs = await pool.query<{
+      job_name: string;
+      status: string;
+      started_at: string;
+    }>(`
+      SELECT DISTINCT ON (job_name) job_name, status, started_at
+      FROM sync_log
+      ORDER BY job_name, started_at DESC
+    `);
+
+    const expected = ['inventory', 'sales', 'transactions', 'nj-warehouse', 'wisersell', 'wayfair', 'ads', 'aging'];
+    const lastRuns = new Map(jobs.rows.map(r => [r.job_name, r]));
+    const now = Date.now();
+
+    let healthyCount = 0;
+    for (const name of expected) {
+      const last = lastRuns.get(name);
+      if (!last || last.status !== 'success') continue;
+      const ageHours = (now - new Date(last.started_at).getTime()) / 3_600_000;
+      const maxAge = name === 'inventory' || name === 'nj-warehouse' ? 10 : 26;
+      if (ageHours < maxAge) healthyCount++;
+    }
+
+    const allHealthy = healthyCount === expected.length;
+    res.status(allHealthy ? 200 : 503).json({
+      healthy: allHealthy,
+      healthyJobs: healthyCount,
+      totalJobs: expected.length,
+    });
+  } catch {
+    res.status(503).json({ healthy: false });
+  }
+});
+
+// GET /api/v1/status/detailed — Tum sync, marketplace, credential, SKU eslesme detayi.
+// Dual-mode auth (adminOpsAuth): cron icin x-internal-api-key header, UI icin SSO admin.
+// Onceden public idi (Fix 5: 2026-04-30 — sync error mesajlari, SKU listeleri sizdiriyordu).
+router.get('/detailed', adminOpsAuth, async (_req: Request, res: Response) => {
+  try {
     const lastSyncs = await pool.query(`
       SELECT DISTINCT ON (job_type, marketplace)
         job_type, marketplace, status, started_at, completed_at,
@@ -15,19 +77,16 @@ router.get('/', async (_req: Request, res: Response) => {
       ORDER BY job_type, marketplace, created_at DESC
     `);
 
-    // Active marketplace count
     const marketplaces = await pool.query(
       'SELECT country_code, channel, warehouse, region, is_active FROM marketplace_config ORDER BY country_code'
     );
 
-    // Credentials status per region
     const credentials = await pool.query(`
       SELECT region, COUNT(*) as count, bool_or(is_active) as has_active
       FROM sp_api_credentials
       GROUP BY region
     `);
 
-    // Data counts (exclude amzn.gr return SKUs)
     const counts = await pool.query(`
       SELECT
         (SELECT COUNT(*) FROM raw_orders WHERE sku NOT LIKE 'amzn.gr.%') as total_orders,
@@ -36,7 +95,6 @@ router.get('/', async (_req: Request, res: Response) => {
         (SELECT COUNT(DISTINCT warehouse) FROM fba_inventory) as warehouses_with_data
     `);
 
-    // SKU match quality (exclude amzn.gr return SKUs)
     const skuMatch = await pool.query(`
       SELECT
         COUNT(*) as total,
@@ -47,8 +105,7 @@ router.get('/', async (_req: Request, res: Response) => {
     `);
 
     const unmatchedSkus = await pool.query(`
-      SELECT sku, asin, channel, COUNT(*) as order_count,
-             SUM(quantity) as total_qty
+      SELECT sku, asin, channel, COUNT(*) as order_count, SUM(quantity) as total_qty
       FROM raw_orders
       WHERE iwasku IS NULL AND sku NOT LIKE 'amzn.gr.%'
       GROUP BY sku, asin, channel
@@ -56,7 +113,6 @@ router.get('/', async (_req: Request, res: Response) => {
       LIMIT 20
     `);
 
-    // Inventory match quality (exclude amzn.gr return SKUs)
     const invMatch = await pool.query(`
       SELECT
         COUNT(*) as total,
@@ -74,7 +130,6 @@ router.get('/', async (_req: Request, res: Response) => {
       LIMIT 20
     `);
 
-    // Wayfair inventory match quality (by distinct part_number)
     const wfInvMatch = await pool.query(`
       SELECT
         COUNT(DISTINCT part_number) as total,
@@ -111,46 +166,9 @@ router.get('/', async (_req: Request, res: Response) => {
         },
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// GET /api/v1/sync/health - Last run per job (for monitoring)
-router.get('/sync/health', async (_req: Request, res: Response) => {
-  try {
-    const jobs = await pool.query(`
-      SELECT DISTINCT ON (job_name)
-        job_name, status, started_at, finished_at, rows_processed, duration_ms, error_message
-      FROM sync_log
-      ORDER BY job_name, started_at DESC
-    `);
-
-    const expected = ['inventory', 'sales', 'transactions', 'nj-warehouse', 'wisersell', 'wayfair', 'ads', 'aging'];
-    const lastRuns = new Map(jobs.rows.map((r: any) => [r.job_name, r]));
-    const now = Date.now();
-
-    const results = expected.map(name => {
-      const last = lastRuns.get(name);
-      if (!last) return { job: name, status: 'never_ran', healthy: false };
-      const ageHours = (now - new Date(last.started_at).getTime()) / 3_600_000;
-      const maxAge = name === 'inventory' || name === 'nj-warehouse' ? 10 : 26; // 8h jobs get 10h window, daily get 26h
-      return {
-        job: name,
-        status: last.status,
-        healthy: last.status === 'success' && ageHours < maxAge,
-        lastRun: last.started_at,
-        ageHours: Math.round(ageHours * 10) / 10,
-        rows: last.rows_processed,
-        durationSec: last.duration_ms ? Math.round(last.duration_ms / 1000) : null,
-        error: last.error_message || null,
-      };
-    });
-
-    const allHealthy = results.every(r => r.healthy);
-    res.status(allHealthy ? 200 : 503).json({ healthy: allHealthy, jobs: results });
-  } catch (err: any) {
-    res.status(500).json({ healthy: false, error: err.message });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ success: false, error: message });
   }
 });
 
