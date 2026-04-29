@@ -181,12 +181,20 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
   }
 }
 
+interface ChangeSample {
+  sku: string;
+  old_name?: string | null;
+  new_name?: string | null;
+  old_category?: string | null;
+  new_category?: string | null;
+}
+
 /**
  * Sync wisersell_products → pricelab_db.products
  * Existing products: updates name and category only.
  * New products: inserts with all available data (name, category, weight, size, dimensions).
  */
-async function syncProductsTable(): Promise<{ updated: number; inserted: number }> {
+async function syncProductsTable(): Promise<{ updated: number; inserted: number; samples: ChangeSample[] }> {
   // Read from wisersell_products + categories (databridge_db)
   const result = await pool.query(`
     SELECT wp.code, wp.name, wp.weight, wp.deci,
@@ -197,11 +205,13 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number 
     WHERE wp.code IS NOT NULL AND wp.code != '' AND wp.name IS NOT NULL
   `);
 
-  if (result.rows.length === 0) return { updated: 0, inserted: 0 };
+  if (result.rows.length === 0) return { updated: 0, inserted: 0, samples: [] };
 
   const BATCH = 200;
+  const SAMPLE_LIMIT = 100;
   let updated = 0;
   let inserted = 0;
+  const samples: ChangeSample[] = [];
 
   for (let i = 0; i < result.rows.length; i += BATCH) {
     const batch = result.rows.slice(i, i + BATCH);
@@ -214,6 +224,20 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number 
     const widths = batch.map((r: { width: string | null }) => r.width != null ? parseFloat(r.width) : null);
     const lengths = batch.map((r: { length: string | null }) => r.length != null ? parseFloat(r.length) : null);
     const heights = batch.map((r: { height: string | null }) => r.height != null ? parseFloat(r.height) : null);
+
+    // Diff için mevcut kayıtları önceden çek (sample_changes audit'i için)
+    let existingMap = new Map<string, { name: string | null; category: string | null }>();
+    if (samples.length < SAMPLE_LIMIT) {
+      const existing = await sharedPool.query(
+        `SELECT product_sku, name, category FROM products WHERE product_sku = ANY($1::text[])`,
+        [codes]
+      );
+      existingMap = new Map(
+        existing.rows.map((r: { product_sku: string; name: string | null; category: string | null }) => [
+          r.product_sku, { name: r.name, category: r.category },
+        ])
+      );
+    }
 
     const res = await sharedPool.query(`
       INSERT INTO products (product_sku, name, category, weight, size, width, length, height, source)
@@ -232,6 +256,24 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number 
 
     const affected = (res as unknown as { rowCount?: number }).rowCount || 0;
     updated += affected;
+
+    // Bu batch'teki gerçek değişiklikleri sample'a ekle (cap: SAMPLE_LIMIT)
+    for (let j = 0; j < codes.length && samples.length < SAMPLE_LIMIT; j++) {
+      const old = existingMap.get(codes[j]);
+      if (!old) continue; // yeni insert — UPDATE değişikliği değil
+      const newCat = categories[j] ?? old.category;
+      const nameChanged = old.name !== names[j];
+      const categoryChanged = old.category !== newCat;
+      if (nameChanged || categoryChanged) {
+        samples.push({
+          sku: codes[j],
+          old_name: nameChanged ? old.name : undefined,
+          new_name: nameChanged ? names[j] : undefined,
+          old_category: categoryChanged ? old.category : undefined,
+          new_category: categoryChanged ? newCat : undefined,
+        });
+      }
+    }
   }
 
   // Count actual new inserts (products with source='wisersell' created recently)
@@ -241,8 +283,8 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number 
   inserted = parseInt(newCount.rows[0]?.cnt || '0');
   updated = updated - inserted;
 
-  logger.info(`[WisersellSync] Products table sync: ${updated} updated, ${inserted} inserted`);
-  return { updated, inserted };
+  logger.info(`[WisersellSync] Products table sync: ${updated} updated, ${inserted} inserted, ${samples.length} sample changes`);
+  return { updated, inserted, samples };
 }
 
 export async function syncWisersell(): Promise<number> {
@@ -270,7 +312,19 @@ export async function syncWisersell(): Promise<number> {
     await upsertProducts(products);
 
     // Sync wisersell_products → pricelab_db.products (name, category, dimensions)
-    await syncProductsTable();
+    const startedAt = new Date();
+    const { updated, inserted, samples } = await syncProductsTable();
+
+    // Hafif audit log: sync başına özet + ilk 100 değişikliğin diff örneği
+    try {
+      await pool.query(
+        `INSERT INTO wisersell_sync_log (started_at, finished_at, inserted_count, updated_count, sample_changes)
+         VALUES ($1, NOW(), $2, $3, $4)`,
+        [startedAt, inserted, updated, JSON.stringify(samples)]
+      );
+    } catch (logErr: any) {
+      logger.error('[WisersellSync] Failed to write sync log:', logErr.message);
+    }
 
     await updateSyncJob(jobId, 'completed', products.length);
     logger.info(`[WisersellSync] Completed: ${products.length} products, ${categories.length} categories`);
