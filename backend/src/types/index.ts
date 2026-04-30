@@ -94,6 +94,10 @@ export interface FinancialTransaction {
   liquidations: number;
   total: number;
   credential_id: number | null;
+  // Finances API v2024-06-19 additions (DD+7 deferred reserve rollout, Apr 2026)
+  transaction_status?: string | null;
+  maturity_date?: Date | null;
+  deferral_reason?: string | null;
 }
 
 // StockPulse-compatible sales response item

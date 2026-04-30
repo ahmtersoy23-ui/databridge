@@ -1,5 +1,6 @@
 import { pool } from '../../config/database';
-import { fetchTransactionsByDateRange, fetchSettlementTransactions } from '../spApi/transactions';
+import { fetchSettlementTransactions } from '../spApi/transactions';
+import { fetchTransactionsV2024 } from '../spApi/transactionsV2';
 import logger from '../../config/logger';
 import { TRANSACTION_OVERLAP_DAYS } from '../../config/constants';
 import type { MarketplaceConfig } from '../../types';
@@ -18,8 +19,10 @@ export async function syncTransactionsForMarketplace(
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysBack);
 
-    // Fetch from Finances API (Orders, Refunds, Adjustments, Service Fees, etc.)
-    const financesTransactions = await fetchTransactionsByDateRange(marketplace, startDate, endDate);
+    // Fetch from Finances API v2024-06-19 listTransactions (RELEASED + DEFERRED).
+    // Replaces v0 listFinancialEvents which stopped returning DD+7 deferred shipments
+    // after Amazon's 2026-04 transaction-level reserve rollout.
+    const financesTransactions = await fetchTransactionsV2024(marketplace, startDate, endDate);
 
     // Fetch from Settlement Reports (FBA Inventory Fee, Shipping Services, etc.)
     let settlementTransactions: FinancialTransaction[] = [];
@@ -64,7 +67,7 @@ export async function backfillTransactions(marketplace: MarketplaceConfig, month
     startDate.setMonth(startDate.getMonth() - 1);
 
     try {
-      const transactions = await fetchTransactionsByDateRange(marketplace, startDate, endDate);
+      const transactions = await fetchTransactionsV2024(marketplace, startDate, endDate);
 
       if (transactions.length > 0) {
         await upsertTransactions(transactions);
@@ -96,14 +99,16 @@ async function upsertTransactions(transactions: FinancialTransaction[]): Promise
 
   const BATCH_SIZE = 100;
 
+  const COL_COUNT = 27;
+
   for (let i = 0; i < deduped.length; i += BATCH_SIZE) {
     const batch = deduped.slice(i, i + BATCH_SIZE);
     const values: string[] = [];
     const params: any[] = [];
 
     batch.forEach((t, idx) => {
-      const offset = idx * 24;
-      const placeholders = Array.from({ length: 24 }, (_, j) => `$${offset + j + 1}`);
+      const offset = idx * COL_COUNT;
+      const placeholders = Array.from({ length: COL_COUNT }, (_, j) => `$${offset + j + 1}`);
       values.push(`(${placeholders.join(', ')})`);
       params.push(
         t.transaction_id, t.file_name, t.transaction_date, t.date_only,
@@ -111,7 +116,10 @@ async function upsertTransactions(transactions: FinancialTransaction[]): Promise
         t.marketplace, t.marketplace_code, t.fulfillment, t.order_postal,
         t.quantity, t.product_sales, t.promotional_rebates, t.selling_fees,
         t.fba_fees, t.other_transaction_fees, t.other, t.vat,
-        t.liquidations, t.total, t.credential_id
+        t.liquidations, t.total, t.credential_id,
+        t.transaction_status ?? null,
+        t.maturity_date ?? null,
+        t.deferral_reason ?? null
       );
     });
 
@@ -122,7 +130,8 @@ async function upsertTransactions(transactions: FinancialTransaction[]): Promise
         marketplace, marketplace_code, fulfillment, order_postal,
         quantity, product_sales, promotional_rebates, selling_fees,
         fba_fees, other_transaction_fees, other, vat,
-        liquidations, total, credential_id
+        liquidations, total, credential_id,
+        transaction_status, maturity_date, deferral_reason
       ) VALUES ${values.join(', ')}
       ON CONFLICT (transaction_id) DO UPDATE SET
         file_name = EXCLUDED.file_name,
@@ -148,6 +157,9 @@ async function upsertTransactions(transactions: FinancialTransaction[]): Promise
         liquidations = EXCLUDED.liquidations,
         total = EXCLUDED.total,
         credential_id = EXCLUDED.credential_id,
+        transaction_status = EXCLUDED.transaction_status,
+        maturity_date = EXCLUDED.maturity_date,
+        deferral_reason = EXCLUDED.deferral_reason,
         synced_at = NOW()
     `, params);
   }

@@ -28,7 +28,8 @@ export async function writeTransactionData(): Promise<void> {
            order_id, sku, description, marketplace, marketplace_code,
            fulfillment, order_postal, quantity,
            product_sales, promotional_rebates, selling_fees, fba_fees,
-           other_transaction_fees, other, vat, liquidations, total
+           other_transaction_fees, other, vat, liquidations, total,
+           transaction_status, maturity_date, deferral_reason
     FROM financial_transactions
     WHERE category_type IN ('Order', 'Refund')
       AND date_only BETWEEN $1 AND $2
@@ -60,9 +61,10 @@ export async function writeTransactionData(): Promise<void> {
       const values: string[] = [];
       const params: any[] = [];
 
+      const COL_COUNT = 26;
       batch.forEach((t: any, idx: number) => {
-        const offset = idx * 23;
-        const placeholders = Array.from({ length: 23 }, (_, j) => `$${offset + j + 1}`);
+        const offset = idx * COL_COUNT;
+        const placeholders = Array.from({ length: COL_COUNT }, (_, j) => `$${offset + j + 1}`);
         values.push(`(${placeholders.join(', ')})`);
         params.push(
           t.transaction_id, 'sp-api-sync', t.transaction_date, t.date_only,
@@ -71,7 +73,10 @@ export async function writeTransactionData(): Promise<void> {
           t.product_sales || 0, t.promotional_rebates || 0, t.selling_fees || 0,
           t.fba_fees || 0, t.other_transaction_fees || 0, t.other || 0,
           t.vat || 0, t.liquidations || 0, t.total || 0,
-          t.marketplace_code || null
+          t.marketplace_code || null,
+          t.transaction_status ?? null,
+          t.maturity_date ?? null,
+          t.deferral_reason ?? null
         );
       });
 
@@ -82,7 +87,8 @@ export async function writeTransactionData(): Promise<void> {
           marketplace, fulfillment, order_postal, quantity,
           product_sales, promotional_rebates, selling_fees, fba_fees,
           other_transaction_fees, other, vat, liquidations, total,
-          marketplace_code
+          marketplace_code,
+          transaction_status, maturity_date, deferral_reason
         ) VALUES ${values.join(', ')}
         ON CONFLICT (transaction_id) DO UPDATE SET
           file_name = EXCLUDED.file_name,
@@ -106,7 +112,10 @@ export async function writeTransactionData(): Promise<void> {
           vat = EXCLUDED.vat,
           liquidations = EXCLUDED.liquidations,
           total = EXCLUDED.total,
-          marketplace_code = EXCLUDED.marketplace_code
+          marketplace_code = EXCLUDED.marketplace_code,
+          transaction_status = EXCLUDED.transaction_status,
+          maturity_date = EXCLUDED.maturity_date,
+          deferral_reason = EXCLUDED.deferral_reason
       `, params);
 
       written += batch.length;
