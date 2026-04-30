@@ -5,7 +5,7 @@ import { syncSalesForMarketplace } from './salesSync';
 import { syncTransactionsForMarketplace } from './transactionSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
-import { writeTransactionData, cleanupOldTransactions } from './transactionDataWriter';
+import { writeTransactionData } from './transactionDataWriter';
 import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
@@ -203,13 +203,6 @@ async function runTransactionSync(): Promise<void> {
 
   isTransactionSyncing = true;
   try {
-    // Clean up old transactions (older than 35 days)
-    try {
-      await cleanupOldTransactions();
-    } catch (err: any) {
-      logger.error('[Scheduler] cleanupOldTransactions error:', err.message);
-    }
-
     const eligibleMarketplaces = await getEligibleMarketplaces();
 
     // Group by credential_id — Finances API returns all marketplaces for a credential in one call
