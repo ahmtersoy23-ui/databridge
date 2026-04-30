@@ -90,6 +90,7 @@ export default function Reviews() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // History/Review items modal
+  const modalCloseBtnRef = useRef<HTMLButtonElement>(null);
   const [historyAsin, setHistoryAsin] = useState<string | null>(null);
   const [historyCountry, setHistoryCountry] = useState('');
   const [modalTab, setModalTab] = useState<'history' | 'items'>('history');
@@ -144,6 +145,18 @@ export default function Reviews() {
       if (res.data.success) setFetchStatus(res.data.data);
     }).catch(() => {});
   }, []);
+
+  // --- Modal: Escape to close + initial focus on open ---
+  useEffect(() => {
+    if (!historyAsin) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setHistoryAsin(null);
+    };
+    document.addEventListener('keydown', handleKey);
+    // Focus the close button on open so keyboard users land inside the dialog.
+    modalCloseBtnRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [historyAsin]);
 
   // --- Trigger review fetch ---
   const handleFetch = async () => {
@@ -763,6 +776,7 @@ export default function Reviews() {
                 <span className="text-xs text-slate-500 ml-2">({historyCountry})</span>
               </h3>
               <button
+                ref={modalCloseBtnRef}
                 type="button"
                 onClick={() => setHistoryAsin(null)}
                 aria-label="Close history dialog"
