@@ -407,8 +407,9 @@ export default function Settings() {
           </p>
         )}
         <form onSubmit={handleWisersellSubmit}>
-          <label className="block mb-1 font-medium">Email</label>
+          <label htmlFor="wisersell-email" className="block mb-1 font-medium">Email</label>
           <input
+            id="wisersell-email"
             type="email"
             placeholder="wisersell@example.com"
             value={wisersellForm.email}
@@ -416,8 +417,9 @@ export default function Settings() {
             className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3"
             required
           />
-          <label className="block mb-1 font-medium">Password</label>
+          <label htmlFor="wisersell-password" className="block mb-1 font-medium">Password</label>
           <input
+            id="wisersell-password"
             type="password"
             placeholder={wisersellConfig?.configured ? 'Leave blank to keep current' : 'Password'}
             value={wisersellForm.password}
@@ -425,7 +427,7 @@ export default function Settings() {
             className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3"
             required={!wisersellConfig?.configured}
           />
-          <label className="block mb-1 font-medium">API URL</label>
+          <label htmlFor="wisersell-api-url" className="block mb-1 font-medium">API URL</label>
           <div className="flex gap-2 mb-3">
             <button type="button"
               onClick={() => setWisersellForm({ ...wisersellForm, api_url: 'https://dev2.wisersell.com/restapi' })}
@@ -438,6 +440,7 @@ export default function Settings() {
               Prod
             </button>
             <input
+              id="wisersell-api-url"
               type="text"
               value={wisersellForm.api_url}
               onChange={e => setWisersellForm({ ...wisersellForm, api_url: e.target.value })}
@@ -529,41 +532,41 @@ export default function Settings() {
           <form onSubmit={handleWayfairSubmit}>
             <div className="grid grid-cols-2 gap-x-4">
               <div>
-                <label className="block mb-1 font-medium">Account Label</label>
-                <input type="text" placeholder="e.g. shukran, mdn" value={wayfairForm.label}
+                <label htmlFor="wayfair-label" className="block mb-1 font-medium">Account Label</label>
+                <input id="wayfair-label" type="text" placeholder="e.g. shukran, mdn" value={wayfairForm.label}
                   onChange={e => setWayfairForm({ ...wayfairForm, label: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
               </div>
               <div>
-                <label className="block mb-1 font-medium">
+                <label htmlFor="wayfair-supplier-id" className="block mb-1 font-medium">
                   Supplier ID <span className="font-normal text-slate-400 text-xs">(auto-discovered)</span>
                 </label>
-                <input type="number" placeholder="e.g. 194115" value={wayfairForm.supplier_id}
+                <input id="wayfair-supplier-id" type="number" placeholder="e.g. 194115" value={wayfairForm.supplier_id}
                   onChange={e => setWayfairForm({ ...wayfairForm, supplier_id: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" />
               </div>
               <div>
-                <label className="block mb-1 font-medium">Client ID</label>
-                <input type="text" placeholder="Wayfair Client ID" value={wayfairForm.client_id}
+                <label htmlFor="wayfair-client-id" className="block mb-1 font-medium">Client ID</label>
+                <input id="wayfair-client-id" type="text" placeholder="Wayfair Client ID" value={wayfairForm.client_id}
                   onChange={e => setWayfairForm({ ...wayfairForm, client_id: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!wayfairEditingId} />
               </div>
               <div>
-                <label className="block mb-1 font-medium">Client Secret</label>
-                <input type="password" placeholder={wayfairEditingId ? 'Leave blank to keep current' : 'Client Secret'}
+                <label htmlFor="wayfair-client-secret" className="block mb-1 font-medium">Client Secret</label>
+                <input id="wayfair-client-secret" type="password" placeholder={wayfairEditingId ? 'Leave blank to keep current' : 'Client Secret'}
                   value={wayfairForm.client_secret}
                   onChange={e => setWayfairForm({ ...wayfairForm, client_secret: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!wayfairEditingId} />
               </div>
               <div>
-                <label className="block mb-1 font-medium">Sales Channel</label>
-                <input type="text" placeholder="e.g. wfs, wfm" value={wayfairForm.channel}
+                <label htmlFor="wayfair-channel" className="block mb-1 font-medium">Sales Channel</label>
+                <input id="wayfair-channel" type="text" placeholder="e.g. wfs, wfm" value={wayfairForm.channel}
                   onChange={e => setWayfairForm({ ...wayfairForm, channel: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!wayfairEditingId} />
               </div>
               <div>
-                <label className="block mb-1 font-medium">Warehouse Code</label>
-                <input type="text" placeholder="e.g. WFS, WFM" value={wayfairForm.warehouse}
+                <label htmlFor="wayfair-warehouse" className="block mb-1 font-medium">Warehouse Code</label>
+                <input id="wayfair-warehouse" type="text" placeholder="e.g. WFS, WFM" value={wayfairForm.warehouse}
                   onChange={e => setWayfairForm({ ...wayfairForm, warehouse: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!wayfairEditingId} />
               </div>
@@ -610,6 +613,7 @@ export default function Settings() {
                           placeholder="Atzr|xxx..."
                           value={adsTokenForm.token}
                           onChange={e => setAdsTokenForm({ ...adsTokenForm, token: e.target.value })}
+                          aria-label="Ads refresh token"
                           className="flex-1 p-2 border border-gray-300 rounded-md text-sm"
                         />
                         <button onClick={() => handleAdsSaveToken(c.id)} disabled={adsSaving} className="px-3 py-1 bg-emerald-600 text-white border-none rounded cursor-pointer text-xs mr-1">
@@ -697,8 +701,9 @@ export default function Settings() {
           )}
         </div>
         <form onSubmit={handleSubmit}>
-          <label className="block mb-1 font-medium">Region</label>
+          <label htmlFor="spapi-region" className="block mb-1 font-medium">Region</label>
           <select
+            id="spapi-region"
             value={form.region}
             onChange={e => setForm({ ...form, region: e.target.value })}
             className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3 bg-white"
@@ -708,8 +713,9 @@ export default function Settings() {
             <option value="FE">FE (Far East - AU, JP, SG)</option>
           </select>
 
-          <label className="block mb-1 font-medium">Account Name</label>
+          <label htmlFor="spapi-account-name" className="block mb-1 font-medium">Account Name</label>
           <input
+            id="spapi-account-name"
             type="text"
             placeholder="e.g., iwa concept, IWA Concept AU"
             value={form.account_name}
@@ -717,8 +723,9 @@ export default function Settings() {
             className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3"
           />
 
-          <label className="block mb-1 font-medium">Seller ID</label>
+          <label htmlFor="spapi-seller-id" className="block mb-1 font-medium">Seller ID</label>
           <input
+            id="spapi-seller-id"
             type="text"
             placeholder={editingId ? 'Leave blank to keep current' : 'e.g., A2ABC123DEF'}
             value={form.seller_id}
@@ -727,8 +734,9 @@ export default function Settings() {
             required={!editingId}
           />
 
-          <label className="block mb-1 font-medium">Client ID (LWA)</label>
+          <label htmlFor="spapi-client-id" className="block mb-1 font-medium">Client ID (LWA)</label>
           <input
+            id="spapi-client-id"
             type="text"
             placeholder={editingId ? 'Leave blank to keep current' : 'amzn1.application-oa2-client.xxx'}
             value={form.client_id}
@@ -737,8 +745,9 @@ export default function Settings() {
             required={!editingId}
           />
 
-          <label className="block mb-1 font-medium">Client Secret (LWA)</label>
+          <label htmlFor="spapi-client-secret" className="block mb-1 font-medium">Client Secret (LWA)</label>
           <input
+            id="spapi-client-secret"
             type="password"
             placeholder={editingId ? 'Leave blank to keep current' : 'Client secret from LWA app'}
             value={form.client_secret}
@@ -747,8 +756,9 @@ export default function Settings() {
             required={!editingId}
           />
 
-          <label className="block mb-1 font-medium">Refresh Token</label>
+          <label htmlFor="spapi-refresh-token" className="block mb-1 font-medium">Refresh Token</label>
           <input
+            id="spapi-refresh-token"
             type="password"
             placeholder={editingId ? 'Leave blank to keep current' : 'Atzr|xxx...'}
             value={form.refresh_token}

@@ -89,9 +89,9 @@ function Nav() {
     `px-3.5 py-1 rounded text-sm no-underline ${isActive ? 'text-white bg-[#1e3a5f]' : 'text-slate-400'}`;
 
   return (
-    <>
+    <header role="banner">
       {/* Top nav */}
-      <nav className="flex gap-2 px-8 py-3 bg-[#1a1a2e] items-center">
+      <nav aria-label="Primary" className="flex gap-2 px-8 py-3 bg-[#1a1a2e] items-center">
         <strong className="mr-6 text-lg text-white">DataBridge</strong>
 
         <NavLink to="/" end className={({ isActive }) => topCls(isActive)}>
@@ -127,7 +127,7 @@ function Nav() {
 
       {/* Amazon sub-nav */}
       {isAmazon && (
-        <nav className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+        <nav aria-label="Amazon sections" className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
           <NavLink to="/orders" className={subCls}>Orders</NavLink>
           <NavLink to="/inventory" className={subCls}>Inventory</NavLink>
           <NavLink to="/inventory-aging" className={subCls}>Inv. Aging</NavLink>
@@ -140,7 +140,7 @@ function Nav() {
 
       {/* Wayfair sub-nav */}
       {isWayfair && (
-        <nav className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+        <nav aria-label="Wayfair sections" className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
           <NavLink to="/wayfair/orders" className={subCls}>Orders</NavLink>
           <NavLink to="/wayfair/inventory" className={subCls}>Inventory</NavLink>
           <NavLink to="/wayfair/orders-analysis" className={subCls}>Orders Analysis</NavLink>
@@ -148,7 +148,7 @@ function Nav() {
           <NavLink to="/wayfair/mappings" className={subCls}>Mappings</NavLink>
         </nav>
       )}
-    </>
+    </header>
   );
 }
 

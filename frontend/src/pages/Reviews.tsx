@@ -359,13 +359,24 @@ export default function Reviews() {
 
       {/* Message */}
       {message && (
-        <div className={`px-4 py-3 rounded-md mb-4 border flex justify-between items-center ${
-          message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
-            ? 'bg-red-50 text-red-600 border-[#fecaca]'
-            : 'bg-[#f0fdf4] text-emerald-600 border-[#bbf7d0]'
-        }`}>
+        <div
+          role={message.toLowerCase().includes('fail') || message.toLowerCase().includes('error') ? 'alert' : 'status'}
+          aria-live="polite"
+          className={`px-4 py-3 rounded-md mb-4 border flex justify-between items-center ${
+            message.toLowerCase().includes('fail') || message.toLowerCase().includes('error')
+              ? 'bg-red-50 text-red-600 border-[#fecaca]'
+              : 'bg-[#f0fdf4] text-emerald-600 border-[#bbf7d0]'
+          }`}
+        >
           <span>{message}</span>
-          <button onClick={() => setMessage('')} className="bg-transparent border-none cursor-pointer text-slate-400 text-base">{'\u2715'}</button>
+          <button
+            type="button"
+            onClick={() => setMessage('')}
+            aria-label="Dismiss message"
+            className="bg-transparent border-none cursor-pointer text-slate-400 text-base"
+          >
+            {'\u2715'}
+          </button>
         </div>
       )}
 
@@ -377,6 +388,7 @@ export default function Reviews() {
             <select
               value={countryFilter}
               onChange={e => setCountryFilter(e.target.value)}
+              aria-label="Filter by country"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             >
               <option value="">All Countries</option>
@@ -388,6 +400,7 @@ export default function Reviews() {
               placeholder="Search ASIN or label..."
               value={searchFilter}
               onChange={e => setSearchFilter(e.target.value)}
+              aria-label="Search ASIN or label"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[200px]"
             />
 
@@ -568,11 +581,13 @@ export default function Reviews() {
               value={addAsin}
               onChange={e => setAddAsin(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+              aria-label="ASIN"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[130px] font-mono"
             />
             <select
               value={addCountry}
               onChange={e => setAddCountry(e.target.value)}
+              aria-label="Country code"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             >
               {COUNTRY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -583,6 +598,7 @@ export default function Reviews() {
               value={addLabel}
               onChange={e => setAddLabel(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+              aria-label="Label"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[160px]"
             />
             <input
@@ -591,6 +607,7 @@ export default function Reviews() {
               value={addIwasku}
               onChange={e => setAddIwasku(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') handleAdd(); }}
+              aria-label="IWASKU"
               className="px-3 py-1 border border-gray-300 rounded-md text-sm w-[140px] font-mono"
             />
             <button
@@ -606,7 +623,15 @@ export default function Reviews() {
             <div className="ml-auto flex gap-2">
               <label className="px-4 py-1.5 bg-[#7c3aed] text-white border-none rounded-md cursor-pointer text-sm inline-block">
                 {importing ? 'Importing...' : 'Import Excel'}
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  aria-label="Import tracked ASINs from Excel file"
+                  className="hidden"
+                  onChange={handleImport}
+                  disabled={importing}
+                />
               </label>
             </div>
           </div>
@@ -658,9 +683,11 @@ export default function Reviews() {
                               if (e.key === 'Escape') setEditingId(null);
                             }}
                             autoFocus
+                            aria-label={`Edit IWASKU for ${t.asin}`}
                             className="px-1.5 py-0.5 border border-gray-300 rounded text-sm w-[120px] font-mono"
                           />
                           <button
+                            type="button"
                             disabled={savingIwasku}
                             onClick={() => {
                               setSavingIwasku(true);
@@ -669,12 +696,15 @@ export default function Reviews() {
                                 .catch((err: any) => setMessage(err.response?.data?.error || 'Save failed'))
                                 .finally(() => setSavingIwasku(false));
                             }}
+                            aria-label="Save IWASKU"
                             className="px-1.5 py-0.5 bg-emerald-600 text-white border-none rounded cursor-pointer text-[0.72rem]"
                           >
                             {savingIwasku ? '...' : '\u2713'}
                           </button>
                           <button
+                            type="button"
                             onClick={() => setEditingId(null)}
+                            aria-label="Cancel IWASKU edit"
                             className="px-1.5 py-0.5 bg-transparent text-slate-400 border border-gray-300 rounded cursor-pointer text-[0.72rem]"
                           >{'\u2715'}</button>
                         </span>
@@ -721,15 +751,25 @@ export default function Reviews() {
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-[1000]"
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-history-modal-title"
             onClick={e => e.stopPropagation()}
             className="bg-white rounded-xl p-6 w-[600px] max-h-[75vh] overflow-auto shadow-[0_20px_60px_rgba(0,0,0,0.3)]"
           >
             <div className="flex justify-between items-center mb-3">
-              <h3 className="m-0">
+              <h3 id="review-history-modal-title" className="m-0">
                 <span className="font-mono">{historyAsin}</span>
                 <span className="text-xs text-slate-500 ml-2">({historyCountry})</span>
               </h3>
-              <button onClick={() => setHistoryAsin(null)} className="bg-transparent border-none cursor-pointer text-xl text-slate-400">{'\u2715'}</button>
+              <button
+                type="button"
+                onClick={() => setHistoryAsin(null)}
+                aria-label="Close history dialog"
+                className="bg-transparent border-none cursor-pointer text-xl text-slate-400"
+              >
+                {'\u2715'}
+              </button>
             </div>
 
             {/* Modal tabs */}
