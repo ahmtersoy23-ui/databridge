@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import type { ReactNode } from 'react';
 import axios from 'axios';
 import Dashboard from './pages/Dashboard';
@@ -153,33 +154,37 @@ function Nav() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AuthGate>
-          <Nav />
-          <main className="p-8 max-w-[1200px] mx-auto">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/sales-analysis" element={<SalesAnalysis />} />
-              <Route path="/inventory-aging" element={<InventoryAging />} />
-              <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
-              <Route path="/nj-warehouse" element={<NJWarehouse />} />
-              <Route path="/catalog" element={<Catalog />} />
-              <Route path="/wayfair/orders" element={<WayfairOrders />} />
-              <Route path="/wayfair/inventory" element={<WayfairInventory />} />
-              <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
-              <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
-              <Route path="/wayfair/mappings" element={<WayfairMappings />} />
-              <Route path="/reviews" element={<Reviews />} />
-              <Route path="/ads" element={<Ads />} />
-              <Route path="/logs" element={<Logs />} />
-            </Routes>
-          </main>
-        </AuthGate>
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AuthGate>
+            <Nav />
+            <main className="p-8 max-w-[1200px] mx-auto">
+              <ErrorBoundary>
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/orders" element={<Orders />} />
+                  <Route path="/inventory" element={<Inventory />} />
+                  <Route path="/sales-analysis" element={<SalesAnalysis />} />
+                  <Route path="/inventory-aging" element={<InventoryAging />} />
+                  <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
+                  <Route path="/nj-warehouse" element={<NJWarehouse />} />
+                  <Route path="/catalog" element={<Catalog />} />
+                  <Route path="/wayfair/orders" element={<WayfairOrders />} />
+                  <Route path="/wayfair/inventory" element={<WayfairInventory />} />
+                  <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
+                  <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
+                  <Route path="/wayfair/mappings" element={<WayfairMappings />} />
+                  <Route path="/reviews" element={<Reviews />} />
+                  <Route path="/ads" element={<Ads />} />
+                  <Route path="/logs" element={<Logs />} />
+                </Routes>
+              </ErrorBoundary>
+            </main>
+          </AuthGate>
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
