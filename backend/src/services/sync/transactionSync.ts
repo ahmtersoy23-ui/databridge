@@ -15,8 +15,9 @@ export async function syncTransactionsForMarketplace(
   try {
     await updateSyncJob(jobId, 'running');
 
-    const endDate = new Date();
-    const startDate = new Date();
+    // v2024 listTransactions requires postedBefore to be at least 2 minutes ago — keep a 5min buffer
+    const endDate = new Date(Date.now() - 5 * 60 * 1000);
+    const startDate = new Date(endDate);
     startDate.setDate(startDate.getDate() - daysBack);
 
     // Fetch from Finances API v2024-06-19 listTransactions (RELEASED + DEFERRED).
