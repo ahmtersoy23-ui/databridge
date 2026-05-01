@@ -5,7 +5,9 @@ import { syncSalesForMarketplace } from './salesSync';
 import { syncTransactionsForMarketplace } from './transactionSync';
 import { writeSalesData } from './salesDataWriter';
 import { writeInventoryData } from './inventoryDataWriter';
-import { writeTransactionData } from './transactionDataWriter';
+// writeTransactionData / cleanupOldTransactions intentionally not imported —
+// amz_transactions is no longer mirrored from SP-API. Tests that need the
+// helpers import them directly from transactionDataWriter.
 import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
@@ -227,12 +229,10 @@ async function runTransactionSync(): Promise<void> {
       await new Promise(resolve => setTimeout(resolve, 10_000));
     }
 
-    // Write current month Order/Refund to amz_transactions (pricelab_db)
-    try {
-      await writeTransactionData();
-    } catch (err: any) {
-      logger.error('[Scheduler] writeTransactionData error:', err.message);
-    }
+    // SP-API mirror to amz_transactions intentionally disabled.
+    // Trends Analyzer now reads canonical sales from raw_orders, and
+    // amz_transactions is fed exclusively by Excel transaction-report
+    // uploads (Profit Analyzer's fee/refund detail source).
   } finally {
     isTransactionSyncing = false;
   }
@@ -529,4 +529,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData, writeTransactionData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
