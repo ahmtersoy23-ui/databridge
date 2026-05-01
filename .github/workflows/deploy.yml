@@ -105,4 +105,4 @@ jobs:
           script: |
             cd /var/www/databridge
             npm ci --omit=dev --ignore-scripts
-            pm2 restart databridge-backend || pm2 start dist/index.js --name databridge-backend
+            sudo -u iwaapps -H PM2_HOME=/home/iwaapps/.pm2 pm2 restart databridge-backend || sudo -u iwaapps -H PM2_HOME=/home/iwaapps/.pm2 pm2 start dist/index.js --name databridge-backend
