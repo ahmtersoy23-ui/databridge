@@ -88,12 +88,11 @@ export const SALES_CHANNEL_TO_CHANNEL: Record<string, string> = {
   'Amazon.com.au': 'au',
   'Amazon.ae': 'ae',
   'Amazon.sa': 'sa',
-  // Others — unmapped EU marketplaces
-  'Amazon.se': 'others',
-  'Amazon.nl': 'others',
-  'Amazon.pl': 'others',
-  'Amazon.com.be': 'others',
-  'Amazon.com.tr': 'others',
+  'Amazon.se': 'se',
+  'Amazon.nl': 'nl',
+  'Amazon.pl': 'pl',
+  'Amazon.com.be': 'be',
+  'Amazon.com.tr': 'tr',
 };
 
 // Timezone offsets for marketplace date conversion

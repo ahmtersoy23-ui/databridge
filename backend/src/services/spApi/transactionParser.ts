@@ -157,12 +157,20 @@ export function detectMarketplaceCode(marketplace: unknown): string {
   if (!marketplace) return '';
   const str = String(marketplace).toLowerCase().trim();
 
+  // Order matters — longer/specific matches first so amazon.com.be doesn't
+  // fall through to the generic amazon.com → US branch.
   if (str.includes('amazon.com.au')) return 'AU';
+  if (str.includes('amazon.com.be')) return 'BE';
+  if (str.includes('amazon.com.tr')) return 'TR';
+  if (str.includes('amazon.com.mx')) return 'MX';
   if (str.includes('amazon.co.uk')) return 'UK';
   if (str.includes('amazon.de')) return 'DE';
   if (str.includes('amazon.fr')) return 'FR';
   if (str.includes('amazon.it')) return 'IT';
   if (str.includes('amazon.es')) return 'ES';
+  if (str.includes('amazon.nl')) return 'NL';
+  if (str.includes('amazon.se')) return 'SE';
+  if (str.includes('amazon.pl')) return 'PL';
   if (str.includes('amazon.ca')) return 'CA';
   if (str.includes('amazon.ae')) return 'AE';
   if (str.includes('amazon.sa')) return 'SA';

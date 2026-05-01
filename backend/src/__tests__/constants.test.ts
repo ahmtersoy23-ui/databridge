@@ -12,12 +12,12 @@ describe('SALES_CHANNEL_TO_CHANNEL', () => {
     expect(SALES_CHANNEL_TO_CHANNEL['Amazon.ca']).toBe('ca');
   });
 
-  it('maps unmapped EU marketplaces to others', () => {
-    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.se']).toBe('others');
-    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.nl']).toBe('others');
-    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.pl']).toBe('others');
-    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.com.be']).toBe('others');
-    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.com.tr']).toBe('others');
+  it('maps each EU marketplace to its own channel', () => {
+    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.se']).toBe('se');
+    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.nl']).toBe('nl');
+    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.pl']).toBe('pl');
+    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.com.be']).toBe('be');
+    expect(SALES_CHANNEL_TO_CHANNEL['Amazon.com.tr']).toBe('tr');
   });
 
   it('returns undefined for unknown domains', () => {
