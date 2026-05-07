@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
@@ -20,7 +20,7 @@ const router = Router();
 router.use(adminOpsAuth);
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wayfair', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
 });
@@ -144,6 +144,10 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       withSyncLog('fee-rates', () => runFeeRatesJob())
         .catch(err => logger.error('[Sync] Fee rates calc error:', err));
       res.json({ success: true, message: 'Product fee rates calculation started' });
+    } else if (type === 'fedex_track') {
+      withSyncLog('fedex-track', () => runFedexSync())
+        .catch(err => logger.error('[Sync] FedEx Track sync error:', err));
+      res.json({ success: true, message: 'FedEx Track sync started — check sync_log for results' });
     } else if (type === 'backfill') {
       if (!marketplace) {
         res.status(400).json({ success: false, error: 'Marketplace required for backfill' });
