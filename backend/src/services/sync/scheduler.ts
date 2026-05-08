@@ -12,9 +12,10 @@ import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { syncFedex } from './fedexSync';
+import { syncWisersellShipments } from './wisersellShipmentSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -60,6 +61,8 @@ let isFeeRatesRunning = false;
 let feeRatesTask: cron.ScheduledTask | null = null;
 let isFedexSyncing = false;
 let fedexTrackTask: cron.ScheduledTask | null = null;
+let isWisersellShipmentSyncing = false;
+let wisersellShipmentTask: cron.ScheduledTask | null = null;
 
 async function getActiveMarketplaces(): Promise<MarketplaceConfig[]> {
   const result = await pool.query(
@@ -426,6 +429,23 @@ async function runFedexSync(): Promise<number> {
   }
 }
 
+async function runWisersellShipmentSync(): Promise<number> {
+  if (isWisersellShipmentSyncing) {
+    logger.warn('[Scheduler] Skipping Wisersell shipment sync - already running');
+    return 0;
+  }
+  isWisersellShipmentSyncing = true;
+  try {
+    const summary = await syncWisersellShipments();
+    return summary.inserted + summary.updated;
+  } catch (err: any) {
+    logger.error('[Scheduler] Wisersell shipment sync failed:', err.message);
+    return 0;
+  } finally {
+    isWisersellShipmentSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -512,6 +532,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] FedEx Track sync error:', err));
   });
 
+  wisersellShipmentTask = cron.schedule(SYNC_WISERSELL_SHIPMENT_CRON, () => {
+    withSyncLog('wisersell-shipment', () => runWisersellShipmentSync())
+      .catch(err => logger.error('[Scheduler] Wisersell shipment sync error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -531,6 +556,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Data quality check: ${DATA_QUALITY_CRON}`);
   logger.info(`[Scheduler] Fee rates calc: ${FEE_RATES_CRON}`);
   logger.info(`[Scheduler] FedEx Track sync: ${SYNC_FEDEX_TRACK_CRON}`);
+  logger.info(`[Scheduler] Wisersell shipment sync: ${SYNC_WISERSELL_SHIPMENT_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -552,7 +578,8 @@ export function stopScheduler(): void {
   dataQualityTask?.stop();
   feeRatesTask?.stop();
   fedexTrackTask?.stop();
+  wisersellShipmentTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };

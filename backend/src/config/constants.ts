@@ -25,7 +25,10 @@ export const SYNC_SB_ADS_CRON = '45 6 * * *';         // Daily at 06:45 UTC (aft
 export const SYNC_SD_ADS_CRON = '15 7 * * *';         // Daily at 07:15 UTC (after SB at 06:45)
 export const DATA_QUALITY_CRON = '0 9 * * *';          // Daily at 09:00 UTC (after all syncs complete)
 export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:00 UTC
-export const SYNC_FEDEX_TRACK_CRON = '0 23 * * *';     // Daily at 23:00 UTC (02:00 TR) — quiet slot, after Wisersell 20:00
+// Sıralı çalışır: önce Wisersell shipment (yeni tracking'ler oms_shipments'a)
+// sonra FedEx Track (yeni tracking'ler için API sorgusu)
+export const SYNC_WISERSELL_SHIPMENT_CRON = '30 4 * * *';   // Daily at 04:30 UTC (07:30 TR)
+export const SYNC_FEDEX_TRACK_CRON         = '0 5 * * *';    // Daily at 05:00 UTC (08:00 TR) — Wisersell sync'ten 30dk sonra
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
