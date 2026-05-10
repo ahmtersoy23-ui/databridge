@@ -30,6 +30,7 @@ export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:
 // In-flight ~500 tracking × 4 sorgu = 67 API call/gün, quota'nın %0.07'si.
 export const SYNC_WISERSELL_SHIPMENT_CRON = '30 4 * * *';        // 04:30 UTC (07:30 TR)
 export const SYNC_FEDEX_TRACK_CRON         = '0 5,11,17,23 * * *'; // 05/11/17/23 UTC — 6h aralık
+export const SYNC_WISERSELL_ORDERS_CRON   = '0 21 * * *';         // 21:00 UTC (00:00 TR) — son 14 gün rolling, sabah morning batch ile çakışmaz
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';

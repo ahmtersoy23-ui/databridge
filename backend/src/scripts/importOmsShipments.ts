@@ -76,10 +76,23 @@ function parseDate(value: any): string | null {
 
 function splitTracking(value: any): string[] {
   if (value === null || value === undefined) return [];
-  return String(value)
-    .split(',')
-    .map(s => s.replace(/\s+/g, ''))
-    .filter(s => s.length > 0);
+  const cleaned = String(value).replace(/\s+/g, '');
+  if (!cleaned) return [];
+  // Önce comma/semicolon ile ayır
+  const parts = cleaned.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+  // Her parça 12-haneli FedEx tracking olmalı; bazen Excel'de 24/36... haneli
+  // birleşik string halinde gelebiliyor — 12'şer parçaya böl.
+  const out: string[] = [];
+  for (const piece of parts) {
+    if (/^\d+$/.test(piece) && piece.length >= 24 && piece.length % 12 === 0) {
+      for (let i = 0; i < piece.length; i += 12) {
+        out.push(piece.slice(i, i + 12));
+      }
+    } else {
+      out.push(piece);
+    }
+  }
+  return out;
 }
 
 interface ImportSummary {

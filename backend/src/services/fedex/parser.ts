@@ -25,6 +25,18 @@ export interface ParsedShipment {
   scan_events: unknown;
   raw_response: unknown;
   not_found: boolean;
+  shipper_reference: string | null;
+}
+
+function extractShipperReference(tr: any): string | null {
+  // additionalTrackingInfo.packageIdentifiers[].SHIPPER_REFERENCE.values
+  // Bizim TR ihracat akışı için "ETGB" değeri geliyor — ETGB var/yok gönderinin
+  // bizim FedEx anlaşmamız üzerinden çıkıp çıkmadığını ayırt eden imza.
+  const ids = tr?.additionalTrackingInfo?.packageIdentifiers;
+  if (!Array.isArray(ids)) return null;
+  const ref = ids.find((p: any) => p?.type === 'SHIPPER_REFERENCE');
+  if (!ref || !Array.isArray(ref.values) || ref.values.length === 0) return null;
+  return String(ref.values[0]).trim() || null;
 }
 
 function findDateTime(arr: any[] | undefined, type: string): string | null {
@@ -50,7 +62,7 @@ function getWeightKg(weights: any[] | undefined): number | null {
   return Number(num.toFixed(2));
 }
 
-const NOT_FOUND_TEMPLATE: Omit<ParsedShipment, 'tracking_number' | 'raw_response' | 'not_found'> = {
+const NOT_FOUND_TEMPLATE: Omit<ParsedShipment, 'tracking_number' | 'raw_response' | 'not_found' | 'shipper_reference'> = {
   service_type: null,
   service_description: null,
   ship_timestamp: null,
@@ -79,6 +91,7 @@ export function parseTrackResult(result: FedexTrackResult): ParsedShipment {
         error: { code: result.errorCode, message: result.errorMessage },
       },
       not_found: true,
+      shipper_reference: null,
     };
   }
 
@@ -131,5 +144,6 @@ export function parseTrackResult(result: FedexTrackResult): ParsedShipment {
     scan_events: tr.scanEvents || null,
     raw_response: tr,
     not_found: false,
+    shipper_reference: extractShipperReference(tr),
   };
 }

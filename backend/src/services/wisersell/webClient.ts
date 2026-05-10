@@ -157,3 +157,62 @@ export async function downloadShipmentsExcel(opts: ShipmentExcelOptions = {}): P
 
   return Buffer.from(res.data);
 }
+
+export interface OrderExcelOptions {
+  /** ISO datetime "2025-01-01T00:00:00.000Z" formatında. Tek tarafı boş bırakılabilir. */
+  shipmentDateFrom?: string;
+  shipmentDateTo?: string;
+  /** Default [5, 8] = Kapalı + Teslim Edildi. */
+  status?: number[];
+  storeFilters?: unknown[];
+  globalFilter?: string;
+  sorting?: Array<Record<string, unknown>>;
+}
+
+/**
+ * Wisersell sipariş (Kapalı) Excel'ini buffer olarak döndürür.
+ * /api/excel/order endpoint, query base64 filtre, status: [5,8].
+ */
+export async function downloadOrdersExcel(opts: OrderExcelOptions = {}): Promise<Buffer> {
+  const { baseUrl } = await getWebCredentials();
+  const filter = {
+    shipment_date: [opts.shipmentDateFrom ?? '', opts.shipmentDateTo ?? ''],
+    storeFilters: opts.storeFilters ?? [],
+    globalFilter: opts.globalFilter ?? '',
+    sorting: opts.sorting ?? [],
+    status: opts.status ?? [5, 8],
+  };
+  const query = Buffer.from(JSON.stringify(filter)).toString('base64');
+
+  let token = await getWebToken();
+  const doRequest = async (tk: string) => axios.get(`${baseUrl}/api/excel/order`, {
+    headers: {
+      Authorization: tk,
+      query,
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/147.0.0.0',
+    },
+    responseType: 'arraybuffer',
+    timeout: 180_000, // büyük dosya — 3 dakika
+    validateStatus: () => true,
+  });
+
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    logger.warn('[WisersellWeb] order Excel 401 → token refresh + retry');
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+
+  if (res.status !== 200) {
+    const body = Buffer.from(res.data).toString('utf8').slice(0, 300);
+    throw new Error(`Wisersell order Excel HTTP ${res.status}: ${body}`);
+  }
+
+  const ct = res.headers['content-type'] || '';
+  if (!ct.includes('spreadsheetml')) {
+    throw new Error(`Wisersell order beklenmeyen content-type: ${ct}`);
+  }
+
+  return Buffer.from(res.data);
+}

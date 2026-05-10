@@ -13,6 +13,7 @@ import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { syncFedex } from './fedexSync';
 import { syncWisersellShipments } from './wisersellShipmentSync';
+import { syncWisersellOrders } from './wisersellOrderSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
 import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON } from '../../config/constants';
@@ -446,6 +447,30 @@ async function runWisersellShipmentSync(): Promise<number> {
   }
 }
 
+let isWisersellOrdersSyncing = false;
+async function runWisersellOrdersSync(): Promise<number> {
+  if (isWisersellOrdersSyncing) {
+    logger.warn('[Scheduler] Skipping Wisersell orders sync - already running');
+    return 0;
+  }
+  isWisersellOrdersSyncing = true;
+  try {
+    // Son 14 gün rolling window — gonderim_tarihi >= today-14d
+    const fromDate = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const fromIso = fromDate.toISOString();
+    const summary = await syncWisersellOrders({
+      shipmentDateFrom: fromIso,
+      mode: 'window_replace',
+    });
+    return summary.inserted + summary.updated;
+  } catch (err: any) {
+    logger.error('[Scheduler] Wisersell orders sync failed:', err.message);
+    return 0;
+  } finally {
+    isWisersellOrdersSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -530,6 +555,11 @@ export function startScheduler(): void {
   fedexTrackTask = cron.schedule(SYNC_FEDEX_TRACK_CRON, () => {
     withSyncLog('fedex-track', () => runFedexSync())
       .catch(err => logger.error('[Scheduler] FedEx Track sync error:', err));
+  });
+
+  cron.schedule('0 9 * * *', () => {
+    withSyncLog('wisersell-orders', () => runWisersellOrdersSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Wisersell orders sync error:', err));
   });
 
   wisersellShipmentTask = cron.schedule(SYNC_WISERSELL_SHIPMENT_CRON, () => {
