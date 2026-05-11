@@ -19,6 +19,12 @@ export interface ParsedShipment {
   dest_city: string | null;
   dest_postal: string | null;
   weight_kg: number | null;
+  /** Paket ebatları cm (FedEx packageDetails.weightAndDimensions.dimensions, units=CM). */
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  /** Dimensional weight = L×W×H/5000. FedEx fatura chargeable = max(weight_kg, dim_weight_kg). */
+  dim_weight_kg: number | null;
   package_count: number | null;
   latest_status_code: string | null;
   latest_status_desc: string | null;
@@ -52,7 +58,9 @@ function getAddress(loc: any): any {
 
 function getWeightKg(weights: any[] | undefined): number | null {
   if (!Array.isArray(weights) || weights.length === 0) return null;
-  const w = weights[0];
+  // KG kaydını tercih et, yoksa LB'i çevir
+  const kgRow = weights.find(w => typeof w?.unit === 'string' && w.unit.toUpperCase() === 'KG');
+  const w = kgRow ?? weights[0];
   if (w?.value == null) return null;
   const num = Number(w.value);
   if (!isFinite(num)) return null;
@@ -60,6 +68,36 @@ function getWeightKg(weights: any[] | undefined): number | null {
     return Number((num * 0.453592).toFixed(2));
   }
   return Number(num.toFixed(2));
+}
+
+interface Dims {
+  length_cm: number | null;
+  width_cm: number | null;
+  height_cm: number | null;
+  dim_weight_kg: number | null;
+}
+
+function getDimensionsCm(dims: any[] | undefined): Dims {
+  const empty: Dims = { length_cm: null, width_cm: null, height_cm: null, dim_weight_kg: null };
+  if (!Array.isArray(dims) || dims.length === 0) return empty;
+  const cm = dims.find(d => typeof d?.units === 'string' && d.units.toUpperCase() === 'CM');
+  const inRow = dims.find(d => typeof d?.units === 'string' && d.units.toUpperCase() === 'IN');
+  const source = cm ?? inRow;
+  if (!source) return empty;
+  const toCm = (v: unknown) => {
+    const n = Number(v);
+    if (!isFinite(n)) return null;
+    if (source === inRow) return Number((n * 2.54).toFixed(1));
+    return Number(n.toFixed(1));
+  };
+  const L = toCm(source.length);
+  const W = toCm(source.width);
+  const H = toCm(source.height);
+  const dim_weight_kg =
+    L != null && W != null && H != null && L > 0 && W > 0 && H > 0
+      ? Number(((L * W * H) / 5000).toFixed(2))
+      : null;
+  return { length_cm: L, width_cm: W, height_cm: H, dim_weight_kg };
 }
 
 const NOT_FOUND_TEMPLATE: Omit<ParsedShipment, 'tracking_number' | 'raw_response' | 'not_found' | 'shipper_reference'> = {
@@ -76,6 +114,10 @@ const NOT_FOUND_TEMPLATE: Omit<ParsedShipment, 'tracking_number' | 'raw_response
   dest_city: null,
   dest_postal: null,
   weight_kg: null,
+  length_cm: null,
+  width_cm: null,
+  height_cm: null,
+  dim_weight_kg: null,
   package_count: null,
   latest_status_code: null,
   latest_status_desc: null,
@@ -112,8 +154,10 @@ export function parseTrackResult(result: FedexTrackResult): ParsedShipment {
 
   const shipDetails = tr.shipmentDetails || {};
   const packageDetails = tr.packageDetails || {};
+  const wad = packageDetails.weightAndDimensions || {};
 
-  const weight = getWeightKg(shipDetails.weight || packageDetails.weight);
+  const weight = getWeightKg(wad.weight || shipDetails.weight || packageDetails.weight);
+  const dims = getDimensionsCm(wad.dimensions);
   const packageCount =
     shipDetails.packageCount != null
       ? Number(shipDetails.packageCount)
@@ -138,6 +182,10 @@ export function parseTrackResult(result: FedexTrackResult): ParsedShipment {
     dest_city: destAddr.city || null,
     dest_postal: destAddr.postalCode || null,
     weight_kg: weight,
+    length_cm: dims.length_cm,
+    width_cm: dims.width_cm,
+    height_cm: dims.height_cm,
+    dim_weight_kg: dims.dim_weight_kg,
     package_count: packageCount && isFinite(packageCount) ? packageCount : null,
     latest_status_code: status.code || null,
     latest_status_desc: status.description || status.derivedStatus || null,
