@@ -30,8 +30,32 @@ export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:
 // In-flight ~500 tracking × 4 sorgu = 67 API call/gün, quota'nın %0.07'si.
 export const SYNC_WISERSELL_SHIPMENT_CRON = '30 4 * * *';        // 04:30 UTC (07:30 TR)
 export const SYNC_FEDEX_TRACK_CRON         = '0 5,11,17,23 * * *'; // 05/11/17/23 UTC — 6h aralık
-export const SYNC_WISERSELL_ORDERS_CRON   = '0 21 * * *';         // 21:00 UTC (00:00 TR) — son 14 gün rolling, sabah morning batch ile çakışmaz
+export const SYNC_WISERSELL_ORDERS_CRON   = '0 9 * * *';          // 09:00 UTC (12:00 TR) — ABD gecesi, son 14 gün rolling
+// Pending sync (open + ready_to_ship) — closed sync'in 15 dk arkasından. Stok istatistiği için günde 1 snapshot yeterli.
+export const SYNC_WISERSELL_PENDING_CRON  = '15 9 * * *';         // 09:15 UTC (12:15 TR) — closed sync 09:00'da bitince
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
+
+// Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)
+// Wisersell tarafında değişirse buradan ayarlanır — magic number yok.
+export const WISERSELL_STATUS_CODES: Record<'open' | 'ready_to_ship' | 'closed', number[]> = {
+  open:          [2, 6],   // /ws/order/open — yeni gelen, henüz işleme alınmamış
+  ready_to_ship: [11],     // /ws/order/waiting — kargoya hazır, sevkiyat bekliyor
+  closed:        [5, 8],   // /ws/order/closed — kapalı + teslim edildi
+};
+
+// Wisersell Amazon platformları — sales_data'da zaten kapsama alındığı için pending sync'te dışlanır.
+// Sadece sales_data'da olmayan iki Amazon kanalı (CITI = ayrı seller hesabı, SGP = SP-API kapsamı dışı) dahil edilir.
+export const WISERSELL_AMAZON_PLATFORMS_DUPLICATE = new Set<string>([
+  'Ama_US', 'AMA_CA', 'AMA_UK', 'AMA_Alm', 'Ama_BAE', 'AMA_Fra', 'AMA_ita',
+  'AMA_isp', 'AmaAvust', 'Amazon_SA', 'AMA_Bel', 'AMA_Hol', 'AMA_isv',
+  'AMA_Pol', 'Ama_Tr', 'Amazon_IRL',
+]);
+export const WISERSELL_AMAZON_PLATFORMS_KEEP = new Set<string>(['Ama_CITI', 'Ama_SGP']);
+
+// Pending snapshot retention — 30 gün trend için yeterli, sonrası silinir.
+export const WISERSELL_PENDING_RETENTION_DAYS = 30;
+// Stale işaretleme: sipariş tarihi N günden eskiyse "stale" (operasyonel kapanmamış hayalet).
+export const WISERSELL_PENDING_STALE_AGE_DAYS = 90;
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
 

@@ -14,9 +14,10 @@ import { syncWayfair } from './wayfairSync';
 import { syncFedex } from './fedexSync';
 import { syncWisersellShipments } from './wisersellShipmentSync';
 import { syncWisersellOrders } from './wisersellOrderSync';
+import { syncWisersellPendingOrders } from './wisersellPendingSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -471,6 +472,32 @@ async function runWisersellOrdersSync(): Promise<number> {
   }
 }
 
+let isWisersellPendingSyncing = false;
+let wisersellPendingTask: cron.ScheduledTask | null = null;
+async function runWisersellPendingSync(): Promise<number> {
+  if (isWisersellPendingSyncing) {
+    logger.warn('[Scheduler] Skipping Wisersell pending sync - already running');
+    return 0;
+  }
+  isWisersellPendingSyncing = true;
+  try {
+    const result = await syncWisersellPendingOrders();
+    const total = result.open.inserted + result.ready_to_ship.inserted;
+    logger.info(
+      `[Scheduler] Wisersell pending sync OK: open=${result.open.inserted}, ` +
+      `ready=${result.ready_to_ship.inserted}, ` +
+      `closed-overlap=${result.closed_overlap_removed}, ` +
+      `retention-purged=${result.old_snapshots_removed}`,
+    );
+    return total;
+  } catch (err: any) {
+    logger.error('[Scheduler] Wisersell pending sync failed:', err.message);
+    return 0;
+  } finally {
+    isWisersellPendingSyncing = false;
+  }
+}
+
 export function startScheduler(): void {
   inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
@@ -557,9 +584,15 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] FedEx Track sync error:', err));
   });
 
-  cron.schedule('0 9 * * *', () => {
+  cron.schedule(SYNC_WISERSELL_ORDERS_CRON, () => {
     withSyncLog('wisersell-orders', () => runWisersellOrdersSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Wisersell orders sync error:', err));
+  });
+
+  // Pending sync — closed sync (09:00) bittikten 15 dk sonra
+  wisersellPendingTask = cron.schedule(SYNC_WISERSELL_PENDING_CRON, () => {
+    withSyncLog('wisersell-pending', () => runWisersellPendingSync().then(() => undefined))
+      .catch(err => logger.error('[Scheduler] Wisersell pending sync error:', err));
   });
 
   wisersellShipmentTask = cron.schedule(SYNC_WISERSELL_SHIPMENT_CRON, () => {
@@ -587,6 +620,8 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Fee rates calc: ${FEE_RATES_CRON}`);
   logger.info(`[Scheduler] FedEx Track sync: ${SYNC_FEDEX_TRACK_CRON}`);
   logger.info(`[Scheduler] Wisersell shipment sync: ${SYNC_WISERSELL_SHIPMENT_CRON}`);
+  logger.info(`[Scheduler] Wisersell orders sync: ${SYNC_WISERSELL_ORDERS_CRON}`);
+  logger.info(`[Scheduler] Wisersell pending sync: ${SYNC_WISERSELL_PENDING_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -609,7 +644,8 @@ export function stopScheduler(): void {
   feeRatesTask?.stop();
   fedexTrackTask?.stop();
   wisersellShipmentTask?.stop();
+  wisersellPendingTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
