@@ -9,6 +9,7 @@ interface OrderRow {
   quantity: number;
   price: string;
   total_cost: string | null;
+  is_cancelled: boolean;
 }
 
 interface Pagination {
@@ -36,12 +37,13 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [includeCancelled, setIncludeCancelled] = useState(false);
 
-  const fetchData = async (page = 1, s = search) => {
+  const fetchData = async (page = 1, s = search, inclCancel = includeCancelled) => {
     setLoading(true);
     try {
       const res = await axios.get('/api/v1/wayfair/orders/browse', {
-        params: { type: orderType, account, page, limit: 50, search: s },
+        params: { type: orderType, account, page, limit: 50, search: s, includeCancelled: inclCancel },
       });
       setRows(res.data.data);
       setPagination(res.data.pagination);
@@ -52,11 +54,11 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
     }
   };
 
-  useEffect(() => { setSearch(''); setSearchInput(''); fetchData(1, ''); }, [orderType, account]);
+  useEffect(() => { setSearch(''); setSearchInput(''); fetchData(1, '', includeCancelled); }, [orderType, account, includeCancelled]);
 
   const handleSearch = () => {
     setSearch(searchInput);
-    fetchData(1, searchInput);
+    fetchData(1, searchInput, includeCancelled);
   };
 
   const isCG = orderType === 'castlegate';
@@ -72,7 +74,12 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
           className="py-1 px-3.5 bg-blue-600 text-white border-none rounded-md cursor-pointer text-sm">
           Search
         </button>
-        <span className="text-sm text-slate-500">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={includeCancelled}
+            onChange={e => setIncludeCancelled(e.target.checked)} />
+          <span className="text-sm text-slate-600">İptal edilenleri göster</span>
+        </label>
+        <span className="text-sm text-slate-500 ml-auto">
           {loading ? 'Loading...' : `${pagination.total} rows`}
         </span>
       </div>
@@ -100,11 +107,16 @@ function OrdersTable({ orderType, account }: { orderType: 'castlegate' | 'dropsh
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="border-b border-slate-100">
-                    <td className="p-2 font-mono text-xs">{r.po_number}</td>
+                  <tr key={i} className={`border-b border-slate-100 ${r.is_cancelled ? 'bg-red-50/40 text-slate-400 line-through' : ''}`}>
+                    <td className="p-2 font-mono text-xs">
+                      {r.is_cancelled && (
+                        <span className="inline-block mr-2 px-1.5 py-0.5 text-[10px] no-underline bg-red-100 text-red-700 border border-red-200 rounded font-sans font-semibold">İPTAL</span>
+                      )}
+                      {r.po_number}
+                    </td>
                     <td className="p-2 text-slate-600">{r.po_date ? new Date(r.po_date).toLocaleDateString() : '—'}</td>
                     <td className="p-2 font-mono text-xs">{r.part_number}</td>
-                    <td className={`p-2 font-mono text-xs ${r.iwasku ? 'text-slate-900' : 'text-slate-400'}`}>{r.iwasku || '—'}</td>
+                    <td className={`p-2 font-mono text-xs ${r.is_cancelled ? '' : (r.iwasku ? 'text-slate-900' : 'text-slate-400')}`}>{r.iwasku || '—'}</td>
                     <td className="p-2 text-right">{r.quantity}</td>
                     <td className="p-2 text-right">{r.price != null ? `$${Number(r.price).toFixed(2)}` : '—'}</td>
                     {isCG && <td className="p-2 text-right">{r.total_cost != null ? `$${Number(r.total_cost).toFixed(2)}` : '—'}</td>}

@@ -12,7 +12,7 @@ async function resolveAccount(req: Request) {
   return label ? getAccountByLabel(label) : getAccountById(1);
 }
 
-// GET /api/v1/wayfair/orders/browse?type=castlegate|dropship&account=cg&page=1&limit=50&search=
+// GET /api/v1/wayfair/orders/browse?type=castlegate|dropship&account=cg&page=1&limit=50&search=&includeCancelled=false
 router.get('/browse', async (req: Request, res: Response) => {
   try {
     const orderType = (req.query.type as string) || 'castlegate';
@@ -20,6 +20,7 @@ router.get('/browse', async (req: Request, res: Response) => {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
     const search = ((req.query.search as string) || '').trim();
     const accountLabel = req.query.account as string | undefined;
+    const includeCancelled = req.query.includeCancelled === 'true';
     const offset = (page - 1) * limit;
 
     const conditions = ['order_type = $1'];
@@ -39,6 +40,10 @@ router.get('/browse', async (req: Request, res: Response) => {
       idx++;
     }
 
+    if (!includeCancelled) {
+      conditions.push('is_cancelled = false');
+    }
+
     const where = conditions.join(' AND ');
 
     const countRes = await pool.query(
@@ -48,7 +53,7 @@ router.get('/browse', async (req: Request, res: Response) => {
 
     const dataParams = [...params, limit, offset];
     const rows = await pool.query(`
-      SELECT po_number, po_date, part_number, iwasku, quantity, price, total_cost
+      SELECT po_number, po_date, part_number, iwasku, quantity, price, total_cost, is_cancelled
       FROM wayfair_orders
       WHERE ${where}
       ORDER BY po_date DESC, po_number, part_number
@@ -65,11 +70,12 @@ router.get('/browse', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/v1/wayfair/orders/analysis?account=shukran&type=total|castlegate|dropship
+// GET /api/v1/wayfair/orders/analysis?account=shukran&type=total|castlegate|dropship&includeCancelled=false
 router.get('/analysis', async (req: Request, res: Response) => {
   try {
     const accountLabel = req.query.account as string | undefined;
     const orderType = (req.query.type as string) || 'total';
+    const includeCancelled = req.query.includeCancelled === 'true';
 
     const conditions = ['1=1'];
     const params: unknown[] = [];
@@ -85,6 +91,9 @@ router.get('/analysis', async (req: Request, res: Response) => {
       conditions.push(`wo.order_type = $${idx}`);
       params.push(orderType);
       idx++;
+    }
+    if (!includeCancelled) {
+      conditions.push('wo.is_cancelled = false');
     }
 
     const where = conditions.join(' AND ');
