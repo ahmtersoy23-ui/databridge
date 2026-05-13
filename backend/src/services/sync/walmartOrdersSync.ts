@@ -29,29 +29,33 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
   );
   for (const row of overrideRes.rows) map.set(row.sku, row.iwasku);
 
-  // 2) sku_master lookup (marketplace SKU -> iwasku)
-  //    Prefer marketplace='walmart' rows, fall back to any marketplace match.
+  // Walmart seller'lar SKU alanina farkli sey koyabilir:
+  //   - "B0..." = ASIN (Amazon listing'i Walmart'a aynen tasinmis — en yaygin)
+  //   - "X00..." = FNSKU (Amazon FBA barkodu)
+  //   - "AHM..." = iwasku'nun kendisi
+  //   - Diger = seller'in kendi SKU'su
+  // 4 sutunu tek query'de UNION ile arariz, marketplace='walmart' satirlarini tercih ederiz.
   const missing = skus.filter(s => !map.has(s));
-  if (missing.length > 0) {
-    const smRes = await sharedPool.query<{ sku: string; iwasku: string }>(
-      `SELECT DISTINCT ON (sku) sku, iwasku
-       FROM sku_master
-       WHERE sku = ANY($1) AND iwasku IS NOT NULL
-       ORDER BY sku, (marketplace = 'walmart') DESC, marketplace`,
-      [missing],
-    );
-    for (const row of smRes.rows) map.set(row.sku, row.iwasku);
-  }
+  if (missing.length === 0) return map;
 
-  // 3) Fallback — if the Walmart SKU already matches an iwasku directly, accept it
-  const stillMissing = skus.filter(s => !map.has(s));
-  if (stillMissing.length > 0) {
-    const directRes = await sharedPool.query<{ iwasku: string }>(
-      'SELECT DISTINCT iwasku FROM sku_master WHERE iwasku = ANY($1)',
-      [stillMissing],
-    );
-    for (const row of directRes.rows) map.set(row.iwasku, row.iwasku);
-  }
+  const smRes = await sharedPool.query<{ lookup_key: string; iwasku: string }>(
+    `SELECT DISTINCT ON (lookup_key) lookup_key, iwasku FROM (
+       SELECT sku    AS lookup_key, iwasku, marketplace, 1 AS priority
+         FROM sku_master WHERE iwasku IS NOT NULL AND sku = ANY($1)
+       UNION ALL
+       SELECT asin   AS lookup_key, iwasku, marketplace, 2 AS priority
+         FROM sku_master WHERE iwasku IS NOT NULL AND asin = ANY($1)
+       UNION ALL
+       SELECT fnsku  AS lookup_key, iwasku, marketplace, 3 AS priority
+         FROM sku_master WHERE iwasku IS NOT NULL AND fnsku = ANY($1)
+       UNION ALL
+       SELECT iwasku AS lookup_key, iwasku, marketplace, 4 AS priority
+         FROM sku_master WHERE iwasku IS NOT NULL AND iwasku = ANY($1)
+     ) u
+     ORDER BY lookup_key, priority, (marketplace = 'walmart') DESC, marketplace`,
+    [missing],
+  );
+  for (const row of smRes.rows) map.set(row.lookup_key, row.iwasku);
 
   return map;
 }
