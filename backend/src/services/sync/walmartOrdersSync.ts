@@ -126,8 +126,9 @@ async function upsertOrderLines(
 
 export async function syncWalmartOrdersForAccount(
   account: WalmartAccount,
+  days: number = WALMART_ROLLING_DAYS,
 ): Promise<number> {
-  const startDate = dateNDaysAgo(WALMART_ROLLING_DAYS);
+  const startDate = dateNDaysAgo(days);
   const endDate = todayUtc();
 
   logger.info(
@@ -178,7 +179,7 @@ export async function syncWalmartOrdersForAccount(
   return inserted;
 }
 
-export async function syncWalmartOrders(): Promise<number> {
+export async function syncWalmartOrders(days?: number): Promise<number> {
   const accounts = await getActiveAccounts();
   if (accounts.length === 0) {
     logger.info('[Walmart] No active accounts, skipping');
@@ -188,7 +189,7 @@ export async function syncWalmartOrders(): Promise<number> {
   let total = 0;
   for (const account of accounts) {
     try {
-      total += await syncWalmartOrdersForAccount(account);
+      total += await syncWalmartOrdersForAccount(account, days);
     } catch (err: any) {
       logger.error(
         `[Walmart] '${account.label}' sync failed: ${err.message}`
