@@ -1,9 +1,10 @@
 import { pool } from '../../config/database';
 import { upsertSalesData, type SalesRow } from './salesDataWriter';
-import { getActiveAccounts } from '../kaufland/client';
 import logger from '../../config/logger';
 
-// Kaufland sales_data aggregation, per account/channel.
+// Kaufland sales_data aggregation — single 'kaufland' channel across ALL storefronts
+// (DE/CZ/SK/PL/AT combined). Per-storefront volumes outside DE are too small to
+// warrant separate channels, and the iwasku is the same product everywhere.
 const KAUFLAND_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
@@ -28,7 +29,6 @@ const KAUFLAND_ROLLING_WINDOW_SQL = `
     WHERE iwasku IS NOT NULL
       AND quantity > 0
       AND is_cancelled = false
-      AND account_id = $1
       AND order_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, offer_sku
   )
@@ -56,13 +56,8 @@ const KAUFLAND_ROLLING_WINDOW_SQL = `
 `;
 
 export async function writeKauflandSalesData(): Promise<number> {
-  const accounts = await getActiveAccounts();
-  let total = 0;
-  for (const account of accounts) {
-    const result = await pool.query<SalesRow>(KAUFLAND_ROLLING_WINDOW_SQL, [account.id]);
-    const count = await upsertSalesData(account.channel, result.rows, null);
-    logger.info(`[KauflandSalesData] '${account.label}' (channel=${account.channel}): ${count} rows`);
-    total += count;
-  }
-  return total;
+  const result = await pool.query<SalesRow>(KAUFLAND_ROLLING_WINDOW_SQL);
+  const count = await upsertSalesData('kaufland', result.rows, null);
+  logger.info(`[KauflandSalesData] combined (channel=kaufland): ${count} rows`);
+  return count;
 }

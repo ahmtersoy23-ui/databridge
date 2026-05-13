@@ -76,7 +76,7 @@ const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sand
 const emptyWalmartForm = { label: 'us-main', client_id: '', client_secret: '', use_sandbox: false };
 const emptyBolForm = { label: '', client_id: '', client_secret: '', channel: '' };
 const emptyTakealotForm = { label: 'za-main', api_key: '' };
-const emptyKauflandForm = { label: 'de-main', client_key: '', secret_key: '', storefront: 'de_DE', channel: 'kaufland_de' };
+const emptyKauflandForm = { label: 'de-main', client_key: '', secret_key: '', storefront: 'de_DE', channel: 'kaufland' };
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'takealot' | 'kaufland' | 'wisersell' | 'ads'>('amazon');
@@ -1390,11 +1390,7 @@ export default function Settings() {
               <div>
                 <label htmlFor="kf-storefront" className="block mb-1 font-medium">Storefront</label>
                 <select id="kf-storefront" value={kauflandForm.storefront}
-                  onChange={e => {
-                    const sf = e.target.value;
-                    const suffix = sf.split('_')[0].toLowerCase();
-                    setKauflandForm({ ...kauflandForm, storefront: sf, channel: `kaufland_${suffix}` });
-                  }}
+                  onChange={e => setKauflandForm({ ...kauflandForm, storefront: e.target.value, channel: 'kaufland' })}
                   className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3">
                   <option value="de_DE">de_DE (Germany)</option>
                   <option value="cs_CZ">cs_CZ (Czech Republic)</option>
@@ -1402,12 +1398,7 @@ export default function Settings() {
                   <option value="pl_PL">pl_PL (Poland)</option>
                   <option value="de_AT">de_AT (Austria)</option>
                 </select>
-              </div>
-              <div>
-                <label htmlFor="kf-channel" className="block mb-1 font-medium">Sales Channel Code</label>
-                <input id="kf-channel" type="text" placeholder="kaufland_de" value={kauflandForm.channel}
-                  onChange={e => setKauflandForm({ ...kauflandForm, channel: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+                <p className="text-xs text-slate-500 -mt-2 mb-3">Sales channel: <code>kaufland</code> (5 storefront tek channel'da birleşik)</p>
               </div>
               <div>
                 <label htmlFor="kf-ckey" className="block mb-1 font-medium">Client Key (32 char)</label>
