@@ -34,7 +34,9 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
   //   - "X00..." = FNSKU (Amazon FBA barkodu)
   //   - "AHM..." = iwasku'nun kendisi
   //   - Diger = seller'in kendi SKU'su
-  // 4 sutunu tek query'de UNION ile arariz, marketplace='walmart' satirlarini tercih ederiz.
+  // sku_master'da 4 sutunu (sku/asin/fnsku/iwasku) ariyoruz; eger sku_master'da
+  // hic kayit yoksa (urun hicbir marketplace'te listelenmemis), `products` katalogundan
+  // dogrudan product_sku ile dusuruyoruz. Tek UNION query.
   const missing = skus.filter(s => !map.has(s));
   if (missing.length === 0) return map;
 
@@ -51,6 +53,9 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
        UNION ALL
        SELECT iwasku AS lookup_key, iwasku, marketplace, 4 AS priority
          FROM sku_master WHERE iwasku IS NOT NULL AND iwasku = ANY($1)
+       UNION ALL
+       SELECT product_sku AS lookup_key, product_sku AS iwasku, 'catalog' AS marketplace, 5 AS priority
+         FROM products WHERE product_sku IS NOT NULL AND product_sku = ANY($1)
      ) u
      ORDER BY lookup_key, priority, (marketplace = 'walmart') DESC, marketplace`,
     [missing],
