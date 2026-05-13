@@ -34,6 +34,14 @@ interface KauflandAccount {
   is_active: boolean;
 }
 
+const STOREFRONT_COUNTRY: Record<string, string> = {
+  de_DE: 'Germany',
+  cs_CZ: 'Czech Republic',
+  sk_SK: 'Slovakia',
+  pl_PL: 'Poland',
+  de_AT: 'Austria',
+};
+
 export default function KauflandOrders() {
   const [accounts, setAccounts] = useState<KauflandAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
@@ -87,7 +95,7 @@ export default function KauflandOrders() {
                   ? 'bg-cyan-600 text-white border-cyan-600'
                   : 'bg-white text-slate-700 border-gray-300'
               }`}>
-              {a.label} ({a.storefront})
+              {STOREFRONT_COUNTRY[a.storefront] ?? a.label}
             </button>
           ))}
         </div>

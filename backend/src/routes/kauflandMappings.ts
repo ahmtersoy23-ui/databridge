@@ -42,7 +42,10 @@ router.get('/', async (req: Request, res: Response) => {
     const accountId = req.query.accountId ? parseInt(req.query.accountId as string, 10) : null;
     const offset = (page - 1) * limit;
 
-    const whereParts: string[] = ['ko.offer_sku IS NOT NULL OR ko.ean IS NOT NULL'];
+    // NOTE: parenthesize the OR so it doesn't bind to the iwasku filter below
+    // (SQL: AND has higher precedence than OR — without parens, 'matched' filter
+    // would return offer_sku-only rows even when iwasku IS NULL).
+    const whereParts: string[] = ['(ko.offer_sku IS NOT NULL OR ko.ean IS NOT NULL)'];
     const params: unknown[] = [];
     let idx = 1;
     if (accountId) { whereParts.push(`ko.account_id = $${idx}`); params.push(accountId); idx++; }

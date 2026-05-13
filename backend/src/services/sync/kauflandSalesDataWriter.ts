@@ -2,9 +2,9 @@ import { pool } from '../../config/database';
 import { upsertSalesData, type SalesRow } from './salesDataWriter';
 import logger from '../../config/logger';
 
-// Kaufland sales_data aggregation — single 'kaufland' channel across ALL storefronts
-// (DE/CZ/SK/PL/AT combined). Per-storefront volumes outside DE are too small to
-// warrant separate channels, and the iwasku is the same product everywhere.
+// Per-storefront aggregation: each Kaufland storefront writes its own
+// channel ('kaufland_de', 'kaufland_cz', etc.). StockPulse combines them
+// client-side (similar to Amazon 'all' aggregation pattern).
 const KAUFLAND_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
@@ -29,6 +29,7 @@ const KAUFLAND_ROLLING_WINDOW_SQL = `
     WHERE iwasku IS NOT NULL
       AND quantity > 0
       AND is_cancelled = false
+      AND storefront = $1
       AND order_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, offer_sku
   )
@@ -55,9 +56,32 @@ const KAUFLAND_ROLLING_WINDOW_SQL = `
   ORDER BY iwasku
 `;
 
+// Storefront (DB) → channel code (sales_data)
+const STOREFRONT_CHANNEL: Record<string, string> = {
+  de: 'kaufland_de',
+  cz: 'kaufland_cz',
+  sk: 'kaufland_sk',
+  pl: 'kaufland_pl',
+  at: 'kaufland_at',
+};
+
 export async function writeKauflandSalesData(): Promise<number> {
-  const result = await pool.query<SalesRow>(KAUFLAND_ROLLING_WINDOW_SQL);
-  const count = await upsertSalesData('kaufland', result.rows, null);
-  logger.info(`[KauflandSalesData] combined (channel=kaufland): ${count} rows`);
-  return count;
+  let total = 0;
+  // raw_orders.storefront is the API-side 2-letter country code (de/cz/sk/pl/at)
+  // as it was set during sync. We iterate the storefronts present in DB.
+  const storefronts = await pool.query<{ storefront: string }>(
+    `SELECT DISTINCT storefront FROM kaufland_raw_orders WHERE storefront IS NOT NULL`,
+  );
+  for (const { storefront } of storefronts.rows) {
+    const channel = STOREFRONT_CHANNEL[storefront];
+    if (!channel) {
+      logger.warn(`[KauflandSalesData] unknown storefront '${storefront}', skipping`);
+      continue;
+    }
+    const result = await pool.query<SalesRow>(KAUFLAND_ROLLING_WINDOW_SQL, [storefront]);
+    const count = await upsertSalesData(channel, result.rows, null);
+    logger.info(`[KauflandSalesData] ${channel} (storefront=${storefront}): ${count} rows`);
+    total += count;
+  }
+  return total;
 }
