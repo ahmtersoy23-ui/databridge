@@ -124,7 +124,8 @@ async function upsertInventory(
   if (rows.length === 0) return 0;
 
   // For inventory, simpler approach: delete all and re-insert (snapshot model)
-  await pool.query('TRUNCATE takealot_inventory RESTART IDENTITY');
+  // Use DELETE not TRUNCATE — TRUNCATE RESTART IDENTITY requires sequence ownership.
+  await pool.query('DELETE FROM takealot_inventory');
 
   const CHUNK = 500;
   let inserted = 0;
