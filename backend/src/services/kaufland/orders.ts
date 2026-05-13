@@ -1,5 +1,5 @@
 import logger from '../../config/logger';
-import { kauflandRequest, type KauflandAccount } from './client';
+import { kauflandRequest, storefrontCode, type KauflandAccount } from './client';
 
 // -- Response types (subset of Kaufland /v2/orders) ------------------------
 
@@ -125,7 +125,7 @@ export async function fetchOrdersWithUnits(
   while (offset < total && listIds.length < maxOrders) {
     const resp = await kauflandRequest<OrdersListResponse>(account, 'GET', '/orders', {
       query: {
-        storefront: account.storefront,
+        storefront: storefrontCode(account),
         ts_from: opts.tsFrom,
         limit,
         offset,

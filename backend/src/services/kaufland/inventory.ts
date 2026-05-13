@@ -1,5 +1,5 @@
 import logger from '../../config/logger';
-import { kauflandRequest, type KauflandAccount } from './client';
+import { kauflandRequest, storefrontCode, type KauflandAccount } from './client';
 
 // GET /units returns the seller's listings (offers) with stock and price.
 
@@ -42,7 +42,7 @@ export async function fetchAllUnits(account: KauflandAccount): Promise<ParsedUni
   while (offset < total) {
     const resp = await kauflandRequest<UnitsListResponse>(account, 'GET', '/units', {
       query: {
-        storefront: account.storefront,
+        storefront: storefrontCode(account),
         limit,
         offset,
       },

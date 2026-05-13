@@ -48,6 +48,17 @@ function recordFailure(accountId: number): void {
   circuitBreakers.set(accountId, cb);
 }
 
+// -- Storefront helpers ----------------------------------------------------
+
+/**
+ * Kaufland API endpoints expect storefront as 2-letter country code (lowercase):
+ * `de`, `cz`, `sk`, `pl`, `at`. The DB stores the full locale (`de_DE`, `cs_CZ`)
+ * for clarity, so we normalize at call time.
+ */
+export function storefrontCode(account: KauflandAccount): string {
+  return account.storefront.split('_')[0].toLowerCase();
+}
+
 // -- Account helpers -------------------------------------------------------
 
 export async function getActiveAccounts(): Promise<KauflandAccount[]> {
@@ -157,7 +168,7 @@ export async function testConnection(account: KauflandAccount): Promise<{ ok: tr
     account,
     'GET',
     '/orders',
-    { query: { limit: 1, storefront: account.storefront }, skipCircuitBreaker: true }
+    { query: { limit: 1, storefront: storefrontCode(account) }, skipCircuitBreaker: true }
   );
   const total = res.pagination?.total ?? (Array.isArray(res.data) ? res.data.length : 0);
   return { ok: true, orderCount: total };
