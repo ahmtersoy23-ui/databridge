@@ -55,3 +55,9 @@ CREATE INDEX IF NOT EXISTS idx_wpo_gonderim ON wisersell_pending_orders (gonderi
 
 -- En son snapshot'a hızlı erişim için kompozit indeks
 CREATE INDEX IF NOT EXISTS idx_wpo_latest ON wisersell_pending_orders (snapshot_date DESC, status, effective_status);
+
+-- StockPulse + Cargolens + AI Agent okuma yetkileri (yeni user eklenince burayı güncelle)
+GRANT SELECT ON wisersell_pending_orders TO stockpulse_reader;
+GRANT SELECT ON wisersell_pending_orders TO cargolens_reader;
+GRANT SELECT ON wisersell_pending_orders TO claude_mcp;
+GRANT SELECT ON wisersell_pending_orders TO iwa_agent;
