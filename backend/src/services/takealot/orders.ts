@@ -90,8 +90,8 @@ export async function fetchOrders(
   let page = 1;
   let saleCount = 0;
 
-  // /v2/sales uses filters=start_date:X;end_date:Y semicolon syntax
-  const filters = `start_date:${opts.startDate};end_date:${opts.endDate}`;
+  // /v2/sales filters use COMMA separator (semicolon returns 400 "Invalid date format")
+  const filters = `start_date:${opts.startDate},end_date:${opts.endDate}`;
 
   while (page <= maxPages) {
     const resp = await takealotGet<SalesListResponse>(account, '/v2/sales', {
