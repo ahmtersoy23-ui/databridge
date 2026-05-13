@@ -146,6 +146,8 @@ async function getToken(account: BolAccount): Promise<string> {
 
 export interface BolRequestOptions {
   params?: Record<string, string | number | boolean | undefined>;
+  /** Skip circuit breaker — for detail loops where individual failures shouldn't tank the batch */
+  skipCircuitBreaker?: boolean;
 }
 
 export async function bolGet<T = unknown>(
@@ -153,7 +155,7 @@ export async function bolGet<T = unknown>(
   path: string,
   opts: BolRequestOptions = {}
 ): Promise<T> {
-  checkCircuitBreaker(account.id);
+  if (!opts.skipCircuitBreaker) checkCircuitBreaker(account.id);
 
   try {
     const token = await getToken(account);
@@ -172,10 +174,10 @@ export async function bolGet<T = unknown>(
       timeout: 60_000,
     });
 
-    recordSuccess(account.id);
+    if (!opts.skipCircuitBreaker) recordSuccess(account.id);
     return res.data;
   } catch (err: any) {
-    recordFailure(account.id);
+    if (!opts.skipCircuitBreaker) recordFailure(account.id);
 
     if (err.response?.status === 404) {
       // 404 — empty collection (Bol uses 404 for "no orders in this filter")

@@ -28,9 +28,10 @@ interface OrdersListResponse {
 export interface BolShipmentItem {
   orderItemId: string;
   ean?: string;
+  fulfilment?: { method?: 'FBR' | 'FBB' };
   fulfilmentMethod?: 'FBR' | 'FBB';
-  offer?: { reference?: string };  // seller SKU
-  product?: { title?: string };
+  offer?: { reference?: string; offerId?: string };
+  product?: { title?: string; ean?: string };
   quantity?: number;
   quantityShipped?: number;
   unitPrice?: number;
@@ -92,7 +93,7 @@ function parseOrder(account: BolAccount, order: BolOrder): BolParsedOrderLine[] 
 }
 
 function parseShipment(account: BolAccount, shipment: BolShipment): BolParsedOrderLine[] {
-  // Prefer orderPlacedDateTime; fall back to shipmentDate if order info absent
+  // Prefer orderPlacedDateTime; fall back to shipmentDate
   const placed = new Date(shipment.order?.orderPlacedDateTime || shipment.shipmentDate || Date.now());
   const localDate = placed.toISOString().slice(0, 10);
   const orderId = shipment.order?.orderId || shipment.shipmentId;
@@ -100,20 +101,26 @@ function parseShipment(account: BolAccount, shipment: BolShipment): BolParsedOrd
   return shipment.shipmentItems.map(item => {
     const qty = Number(item.quantityShipped ?? item.quantity) || 0;
     const unitPrice = Number(item.unitPrice) || 0;
+    // EAN: detail response puts it under product.ean (list endpoint had top-level)
+    const ean = (item.product as { ean?: string } | undefined)?.ean ?? item.ean ?? null;
+    // SKU: Bol API offer.reference cogu zaman bos (Bol internal offerId var).
+    // Fallback olarak EAN'i sku alanina da koyuyoruz — boylece user Mappings UI'dan
+    // EAN -> iwasku eslemesi yapabilir.
+    const sku = item.offer?.reference ?? ean;
     return {
       account_id: account.id,
       order_id: orderId,
       order_item_id: item.orderItemId,
       order_placed_at: placed,
       order_date_local: localDate,
-      sku: item.offer?.reference ?? null,
-      ean: item.ean ?? null,
+      sku,
+      ean,
       product_title: item.product?.title ?? null,
       quantity: qty,
       unit_price: unitPrice,
       item_price: unitPrice * qty,
       currency: 'EUR',
-      fulfilment_method: item.fulfilmentMethod ?? null,
+      fulfilment_method: item.fulfilmentMethod ?? item.fulfilment?.method ?? null,
     };
   });
 }
@@ -221,7 +228,7 @@ export async function fetchShipments(
   let fetched = 0;
   for (const id of shipmentIds) {
     try {
-      const detail = await bolGet<BolShipment>(account, `/shipments/${id}`);
+      const detail = await bolGet<BolShipment>(account, `/shipments/${id}`, { skipCircuitBreaker: true });
       allRows.push(...parseShipment(account, detail));
       fetched++;
       if (fetched % 50 === 0) {
