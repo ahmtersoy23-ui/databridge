@@ -3,6 +3,7 @@ import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type WalmartAccount } from '../walmart/client';
 import { fetchOrders, type WalmartParsedOrderLine } from '../walmart/orders';
+import { writeWalmartSalesData } from './walmartSalesDataWriter';
 
 // Rolling window — match user request (start with 30, expand later)
 export const WALMART_ROLLING_DAYS = 30;
@@ -205,6 +206,13 @@ export async function syncWalmartOrders(days?: number): Promise<number> {
       );
       // Continue with other accounts
     }
+  }
+
+  // Aggregate raw_orders -> sales_data (channel='walmart') for StockPulse consumption
+  try {
+    await writeWalmartSalesData();
+  } catch (err: any) {
+    logger.error(`[Walmart] writeWalmartSalesData failed: ${err.message}`);
   }
 
   return total;
