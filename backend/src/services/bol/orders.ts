@@ -226,6 +226,7 @@ export async function fetchShipments(
   logger.info(`[Bol] '${account.label}' fetching detail for ${shipmentIds.length} shipments...`);
   const allRows: BolParsedOrderLine[] = [];
   let fetched = 0;
+  // 250ms throttle between detail calls — Bol rate limit ~5/sec for /shipments/{id}
   for (const id of shipmentIds) {
     try {
       const detail = await bolGet<BolShipment>(account, `/shipments/${id}`, { skipCircuitBreaker: true });
@@ -236,7 +237,13 @@ export async function fetchShipments(
       }
     } catch (err: any) {
       logger.warn(`[Bol] '${account.label}' detail ${id} failed: ${err.message}`);
+      // On 429, wait extra
+      if (err.message?.includes('429') || err.message?.includes('rate limit')) {
+        logger.info(`[Bol] '${account.label}' 429 backoff: 5s`);
+        await new Promise(r => setTimeout(r, 5000));
+      }
     }
+    await new Promise(r => setTimeout(r, 250));
   }
 
   logger.info(
