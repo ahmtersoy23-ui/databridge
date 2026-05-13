@@ -90,9 +90,8 @@ export async function takealotGet<T = unknown>(
     const res = await axios.get<T>(`${API_BASE}${path}`, {
       params: cleanParams,
       headers: {
-        // Takealot doc doesn't standardize — most common is "Key <api_key>".
-        // If that fails (401), env var TAKEALOT_AUTH_SCHEME=Bearer can override.
-        Authorization: `${process.env.TAKEALOT_AUTH_SCHEME || 'Key'} ${account.api_key}`,
+        // Takealot uses 'X-API-Key' header (not Authorization Bearer/Key)
+        'X-API-Key': account.api_key,
         Accept: 'application/json',
       },
       timeout: 60_000,

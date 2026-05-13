@@ -91,10 +91,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       message: `Connection OK — today total: ${total} sales (auth scheme works)`,
     });
   } catch (err: any) {
-    const status = err.response?.status;
-    let hint = '';
-    if (status === 401) hint = ' — auth scheme yanlış olabilir (TAKEALOT_AUTH_SCHEME=Bearer dene)';
-    res.status(400).json({ success: false, error: (err.message || 'failed') + hint });
+    res.status(400).json({ success: false, error: err.message || 'failed' });
   }
 });
 
