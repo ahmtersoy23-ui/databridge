@@ -8,7 +8,9 @@ import { writeBolSalesData } from './bolSalesDataWriter';
 // Rolling window — Bol allows max 3 months via latest-change-date.
 // Default daily sync = 30 days (matches Walmart pattern).
 export const BOL_ROLLING_DAYS = 30;
-const BOL_MAX_HISTORY_DAYS = 90;  // Bol API hard limit
+// Bol API "older than 3 months" hatasi veriyor — 90 gun cap'i takvim ayina gore degisken.
+// Guvenli kenarda 80 gun kullaniyoruz (3 ay - 10 gun buffer).
+const BOL_MAX_HISTORY_DAYS = 80;
 
 function dateNDaysAgo(days: number): string {
   const d = new Date();

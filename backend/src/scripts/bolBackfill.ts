@@ -1,11 +1,12 @@
 /**
  * Bol.com orders backfill (multi-account).
  *
- * Default 90 gun (Bol API hard limit). Daha kisa istersen --days N.
+ * Default 80 gun (Bol API "older than 3 months" hatasini onlemek icin guvenli kenar).
+ * --days N ile ayarlanabilir; syncBolOrdersForAccount BOL_MAX_HISTORY_DAYS=80 ile clamp eder.
  *
  * Kullanim:
  *   ssh -p 2222 root@78.47.117.36 \
- *     'cd /var/www/databridge && node dist/scripts/bolBackfill.js --days 90'
+ *     'cd /var/www/databridge && node dist/scripts/bolBackfill.js --days 80'
  */
 import 'dotenv/config';
 import { syncBolOrders } from '../services/sync/bolOrdersSync';
@@ -18,7 +19,7 @@ function parseDays(): number {
     const n = parseInt(process.argv[idx + 1], 10);
     if (Number.isFinite(n) && n > 0) return n;
   }
-  return 90;
+  return 80;
 }
 
 async function main(): Promise<void> {
