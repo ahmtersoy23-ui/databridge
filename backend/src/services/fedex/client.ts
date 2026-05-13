@@ -77,6 +77,8 @@ export async function getAccessToken(forceRefresh = false): Promise<string> {
 export interface FedexTrackResult {
   trackingNumber: string;
   notFound: boolean;
+  /** Transient API error (INTERNAL.SERVER.ERROR vs) — caller bunu DB'ye yazmamalı, retry edilsin. */
+  isTransient?: boolean;
   errorCode?: string;
   errorMessage?: string;
   raw?: any;
@@ -134,9 +136,17 @@ export async function trackBatch(trackingNumbers: string[]): Promise<FedexTrackR
     }
 
     if (tr.error) {
+      // FedEx Track API "gerçek yok" vs "geçici hata" ayrımı:
+      //   TRACKING.TRACKINGNUMBER.NOTFOUND → kalıcı, not_found=true
+      //   INTERNAL.SERVER.ERROR / SYSTEM.UNEXPECTED.ERROR / vs → transient,
+      //     retry edilmeli (caller DB'ye yazmamalı)
+      // Önceden tüm error'lar not_found=true sayılıyordu → 35 tracking yanlış
+      // işaretlenmiş (2026-05-13 audit).
+      const isPermanentNotFound = tr.error.code === 'TRACKING.TRACKINGNUMBER.NOTFOUND';
       out.push({
         trackingNumber: tn,
-        notFound: true,
+        notFound: isPermanentNotFound,
+        isTransient: !isPermanentNotFound,
         errorCode: tr.error.code,
         errorMessage: tr.error.message,
         raw: tr,
