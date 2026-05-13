@@ -753,7 +753,7 @@ export default function Settings() {
       {/* Tab bar */}
       <div className="flex gap-1 mb-6 border-b-2 border-slate-200">
         {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'wisersell'] as const).map(t => {
-          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', takealot: 'Takealot', wisersell: 'Wisersell' };
+          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', takealot: 'Takealot', kaufland: 'Kaufland', wisersell: 'Wisersell' };
           return (
             <button
               key={t}
