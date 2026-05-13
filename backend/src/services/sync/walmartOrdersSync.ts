@@ -29,14 +29,28 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
   );
   for (const row of overrideRes.rows) map.set(row.sku, row.iwasku);
 
-  // 2) sku_master matches (sku_master.product_sku is iwasku; some sellers list the same code as SKU)
+  // 2) sku_master lookup (marketplace SKU -> iwasku)
+  //    Prefer marketplace='walmart' rows, fall back to any marketplace match.
   const missing = skus.filter(s => !map.has(s));
   if (missing.length > 0) {
-    const smRes = await sharedPool.query<{ product_sku: string }>(
-      'SELECT DISTINCT product_sku FROM sku_master WHERE product_sku = ANY($1)',
+    const smRes = await sharedPool.query<{ sku: string; iwasku: string }>(
+      `SELECT DISTINCT ON (sku) sku, iwasku
+       FROM sku_master
+       WHERE sku = ANY($1) AND iwasku IS NOT NULL
+       ORDER BY sku, (marketplace = 'walmart') DESC, marketplace`,
       [missing],
     );
-    for (const row of smRes.rows) map.set(row.product_sku, row.product_sku);
+    for (const row of smRes.rows) map.set(row.sku, row.iwasku);
+  }
+
+  // 3) Fallback — if the Walmart SKU already matches an iwasku directly, accept it
+  const stillMissing = skus.filter(s => !map.has(s));
+  if (stillMissing.length > 0) {
+    const directRes = await sharedPool.query<{ iwasku: string }>(
+      'SELECT DISTINCT iwasku FROM sku_master WHERE iwasku = ANY($1)',
+      [stillMissing],
+    );
+    for (const row of directRes.rows) map.set(row.iwasku, row.iwasku);
   }
 
   return map;

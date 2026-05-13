@@ -17,6 +17,9 @@ import WayfairOrders from './pages/WayfairOrders';
 import WayfairInventory from './pages/WayfairInventory';
 import WayfairOrdersAnalysis from './pages/WayfairOrdersAnalysis';
 import WayfairInventoryAnalysis from './pages/WayfairInventoryAnalysis';
+import WalmartOrders from './pages/WalmartOrders';
+import WalmartOrdersAnalysis from './pages/WalmartOrdersAnalysis';
+import WalmartMappings from './pages/WalmartMappings';
 import Reviews from './pages/Reviews';
 import Ads from './pages/Ads';
 import InventoryAging from './pages/InventoryAging';
@@ -39,6 +42,7 @@ axios.interceptors.response.use(
 
 const AMAZON_PATHS = ['/orders', '/inventory', '/inventory-aging', '/sales-analysis', '/inventory-analysis', '/reviews', '/ads'];
 const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders-analysis', '/wayfair/inventory-analysis', '/wayfair/mappings'];
+const WALMART_PATHS = ['/walmart/orders', '/walmart/orders-analysis', '/walmart/mappings'];
 
 function UserMenu() {
   const { user, logout } = useAuth();
@@ -81,6 +85,7 @@ function Nav() {
   const location = useLocation();
   const isAmazon = AMAZON_PATHS.some(p => location.pathname.startsWith(p));
   const isWayfair = WAYFAIR_PATHS.some(p => location.pathname.startsWith(p));
+  const isWalmart = WALMART_PATHS.some(p => location.pathname.startsWith(p));
 
   const topCls = (active: boolean) =>
     `px-4 py-2 rounded-md text-sm no-underline ${active ? 'text-white bg-slate-700' : 'text-slate-400'}`;
@@ -104,6 +109,10 @@ function Nav() {
 
         <NavLink to="/wayfair/orders" className={topCls(isWayfair)}>
           Wayfair
+        </NavLink>
+
+        <NavLink to="/walmart/orders" className={topCls(isWalmart)}>
+          Walmart
         </NavLink>
 
         <NavLink to="/nj-warehouse" className={({ isActive }) => topCls(isActive)}>
@@ -148,6 +157,15 @@ function Nav() {
           <NavLink to="/wayfair/mappings" className={subCls}>Mappings</NavLink>
         </nav>
       )}
+
+      {/* Walmart sub-nav */}
+      {isWalmart && (
+        <nav aria-label="Walmart sections" className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+          <NavLink to="/walmart/orders" className={subCls}>Orders</NavLink>
+          <NavLink to="/walmart/orders-analysis" className={subCls}>Orders Analysis</NavLink>
+          <NavLink to="/walmart/mappings" className={subCls}>Mappings</NavLink>
+        </nav>
+      )}
     </header>
   );
 }
@@ -182,6 +200,9 @@ export default function App() {
                   <Route path="/wayfair/orders-analysis" element={<WayfairOrdersAnalysis />} />
                   <Route path="/wayfair/inventory-analysis" element={<WayfairInventoryAnalysis />} />
                   <Route path="/wayfair/mappings" element={<WayfairMappings />} />
+                  <Route path="/walmart/orders" element={<WalmartOrders />} />
+                  <Route path="/walmart/orders-analysis" element={<WalmartOrdersAnalysis />} />
+                  <Route path="/walmart/mappings" element={<WalmartMappings />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/ads" element={<Ads />} />
                   <Route path="/logs" element={<Logs />} />
