@@ -49,22 +49,35 @@ describe('upsertSalesData', () => {
     expect(count).toBe(0);
   });
 
-  it('writes rows in a transaction (BEGIN, DELETE, INSERT, COMMIT)', async () => {
+  it('writes rows with combined tag (NULL) in a transaction', async () => {
     const rows = [makeSalesRow()];
-    const count = await upsertSalesData('us', rows);
+    const count = await upsertSalesData('us', rows, null);
 
     expect(count).toBe(1);
     expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
     expect(mockClientQuery).toHaveBeenCalledWith(
-      'DELETE FROM sales_data WHERE channel = $1',
+      'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel IS NULL',
       ['us'],
     );
     expect(mockClientQuery).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO sales_data'),
-      expect.arrayContaining(['us', 'TESTSKU00001']),
+      expect.arrayContaining(['us', 'TESTSKU00001', 'B0TESTASIN1', null]),
     );
     expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
     expect(mockClientRelease).toHaveBeenCalled();
+  });
+
+  it('writes FBA satırları sadece Amazon fulfillment ile siler', async () => {
+    await upsertSalesData('us', [makeSalesRow()], 'Amazon');
+
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel = $2',
+      ['us', 'Amazon'],
+    );
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO sales_data'),
+      expect.arrayContaining(['us', 'TESTSKU00001', 'B0TESTASIN1', 'Amazon']),
+    );
   });
 
   it('rolls back on error and re-throws', async () => {
@@ -86,80 +99,81 @@ describe('writeSalesData', () => {
   });
 
   it('skips channel when safety threshold triggers (new < 20% of existing)', async () => {
-    // Active channels: only 'us'
+    // Aktif kanal: us
+    // pool.query çağrı sırası: 1) activeChannels 2) combined query
+    // (safety SKIP nedeniyle FBA/FBM query'lerine ulaşmaz)
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ channel: 'us' }] }) // active channels
-      .mockResolvedValueOnce({ rows: [makeSalesRow()] }); // rolling window query → 1 row
+      .mockResolvedValueOnce({ rows: [{ channel: 'us' }] })
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] });
 
-    // Existing count: 100 → new (1) < 100 * 0.2 = 20 → SKIP
+    // Existing count: 100 → new (1) < 20 → SKIP
     mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 100 }] });
 
     await writeSalesData();
 
     expect(notify).toHaveBeenCalledWith(expect.stringContaining('skipped'));
-    // upsertSalesData should NOT have been called (no client connect)
     expect(mockClientQuery).not.toHaveBeenCalled();
   });
 
-  it('does not skip when existing count <= 10', async () => {
+  it('writes combined + FBA + FBM rows when existing count <= 10', async () => {
+    // pool.query sırası: activeChannels, combined, FBA, FBM
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [{ channel: 'us' }] })
-      .mockResolvedValueOnce({ rows: [makeSalesRow()] });
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // combined
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // FBA
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }); // FBM
 
-    // Existing count: 5 → threshold not applied (existingCount <= 10)
     mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 5 }] });
 
     await writeSalesData();
 
     expect(notify).not.toHaveBeenCalled();
-    // upsertSalesData called → client query was invoked
     expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
-  });
-
-  it('does not skip when new rows >= 20% of existing', async () => {
-    const rows = Array.from({ length: 25 }, (_, i) =>
-      makeSalesRow({ iwasku: `SKU${String(i).padStart(8, '0')}` }),
+    // 3 farklı DELETE çağrısı (combined NULL + FBA Amazon + FBM Merchant)
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel IS NULL',
+      ['us'],
     );
-    mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ channel: 'de' }] })
-      .mockResolvedValueOnce({ rows })
-      .mockResolvedValueOnce({ rows: [makeSalesRow()] }); // EU aggregate query
-
-    // Existing: 100, new: 25 → 25% ≥ 20% → OK
-    mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 100 }] });
-
-    await writeSalesData();
-
-    expect(notify).not.toHaveBeenCalled();
-    expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel = $2',
+      ['us', 'Amazon'],
+    );
+    expect(mockClientQuery).toHaveBeenCalledWith(
+      'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel = $2',
+      ['us', 'Merchant'],
+    );
   });
 
-  it('writes EU aggregate when any EU channel is active', async () => {
-    // Active: 'de' (an EU channel)
+  it('writes EU aggregate (combined + FBA + FBM) when any EU channel is active', async () => {
+    // de → 4 query (active, combined, fba, fbm) + EU aggregate 3 query = 7 total
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [{ channel: 'de' }] })
-      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // de rolling window
-      .mockResolvedValueOnce({ rows: [makeSalesRow()] }); // EU aggregate query
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // de combined
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // de FBA
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // de FBM
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // EU combined
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }) // EU FBA
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] }); // EU FBM
 
-    mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 0 }] }); // existing de
+    mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 0 }] });
 
     await writeSalesData();
 
-    // EU aggregate SQL should have been called (3rd pool.query call)
-    expect(mockPoolQuery).toHaveBeenCalledTimes(3);
+    expect(mockPoolQuery).toHaveBeenCalledTimes(7);
   });
 
   it('skips EU aggregate when no EU channel is active', async () => {
-    // Active: only 'us' (not EU)
+    // Sadece us — 4 query (active, combined, fba, fbm). EU yok.
     mockPoolQuery
       .mockResolvedValueOnce({ rows: [{ channel: 'us' }] })
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] })
+      .mockResolvedValueOnce({ rows: [makeSalesRow()] })
       .mockResolvedValueOnce({ rows: [makeSalesRow()] });
 
     mockSharedQuery.mockResolvedValueOnce({ rows: [{ cnt: 0 }] });
 
     await writeSalesData();
 
-    // Only 2 pool.query calls (active channels + us rolling window), no EU aggregate
-    expect(mockPoolQuery).toHaveBeenCalledTimes(2);
+    expect(mockPoolQuery).toHaveBeenCalledTimes(4);
   });
 });

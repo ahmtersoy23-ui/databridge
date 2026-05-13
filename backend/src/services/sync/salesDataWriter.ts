@@ -5,54 +5,20 @@ import { notify } from '../../utils/notify';
 const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'others'];
 const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
 
-// Aggregate per iwasku (not per iwasku+asin) since sales_data has UNIQUE(iwasku, channel)
-// Uses CTE to first aggregate per (iwasku, asin), then merges by iwasku picking best ASIN
-const ROLLING_WINDOW_SQL = `
-  WITH per_sku AS (
-    SELECT
-      COALESCE(o.iwasku, o.sku) as iwasku,
-      o.asin,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 3 THEN o.quantity END), 0)::int as last3,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::int as last7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::int as last30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::int as last90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 180 THEN o.quantity END), 0)::int as last180,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 366 THEN o.quantity END), 0)::int as last366,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 7 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 30 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 90 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 180 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last180,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 365 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last365,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 7 THEN o.quantity END), 0)::int as pre_year_next7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 30 THEN o.quantity END), 0)::int as pre_year_next30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::int as pre_year_next90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::int as pre_year_next180
-    FROM raw_orders o
-    WHERE o.channel = $1
-      AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
-      AND o.sku NOT LIKE 'amzn.gr.%'
-      AND o.item_price > 0
-    GROUP BY COALESCE(o.iwasku, o.sku), o.asin
-  )
-  SELECT
-    iwasku,
-    (array_agg(asin ORDER BY last30 DESC))[1] as asin,
-    SUM(last3)::int as last3,
-    SUM(last7)::int as last7, SUM(last30)::int as last30,
-    SUM(last90)::int as last90, SUM(last180)::int as last180,
-    SUM(last366)::int as last366,
-    SUM(pre_year_last7)::int as pre_year_last7, SUM(pre_year_last30)::int as pre_year_last30,
-    SUM(pre_year_last90)::int as pre_year_last90, SUM(pre_year_last180)::int as pre_year_last180,
-    SUM(pre_year_last365)::int as pre_year_last365,
-    SUM(pre_year_next7)::int as pre_year_next7, SUM(pre_year_next30)::int as pre_year_next30,
-    SUM(pre_year_next90)::int as pre_year_next90, SUM(pre_year_next180)::int as pre_year_next180
-  FROM per_sku
-  GROUP BY iwasku
-  ORDER BY iwasku
-`;
+// 'combined' = NULL fulfillment (eski format, tüm Amazon dahil)
+// 'Amazon'   = FBA (raw_orders.fulfillment_channel='Amazon')
+// 'Merchant' = FBM (raw_orders.fulfillment_channel='Merchant')
+// Global toggle filtreleri bu üç satırdan birini seçer.
+export type FulfillmentTag = null | 'Amazon' | 'Merchant' | 'Wayfair';
 
-// EU aggregate: sum across de/fr/it/es, pick ASIN with highest last30
-const EU_AGGREGATE_SQL = `
+function buildRollingSql(opts: { filterByFulfillment: boolean; euAggregate: boolean }): string {
+  const channelClause = opts.euAggregate
+    ? `o.channel IN ('de', 'fr', 'it', 'es', 'others')`
+    : `o.channel = $1`;
+  const fulfillmentClause = opts.filterByFulfillment
+    ? `AND o.fulfillment_channel = $${opts.euAggregate ? 1 : 2}`
+    : '';
+  return `
   WITH per_sku AS (
     SELECT
       COALESCE(o.iwasku, o.sku) as iwasku,
@@ -73,10 +39,11 @@ const EU_AGGREGATE_SQL = `
       COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::int as pre_year_next90,
       COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::int as pre_year_next180
     FROM raw_orders o
-    WHERE o.channel IN ('de', 'fr', 'it', 'es', 'others')
+    WHERE ${channelClause}
       AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
       AND o.sku NOT LIKE 'amzn.gr.%'
       AND o.item_price > 0
+      ${fulfillmentClause}
     GROUP BY COALESCE(o.iwasku, o.sku), o.asin
   )
   SELECT
@@ -94,7 +61,13 @@ const EU_AGGREGATE_SQL = `
   FROM per_sku
   GROUP BY iwasku
   ORDER BY iwasku
-`;
+  `;
+}
+
+const ROLLING_WINDOW_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: false });
+const ROLLING_WINDOW_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: false });
+const EU_AGGREGATE_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: true });
+const EU_AGGREGATE_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: true });
 
 export interface SalesRow {
   iwasku: string;
@@ -118,16 +91,41 @@ export interface SalesRow {
 
 const BATCH_SIZE = 500;
 
-export async function upsertSalesData(channel: string, rows: SalesRow[]): Promise<number> {
+/**
+ * upsertSalesData — bir channel için satırları yazar.
+ *
+ * @param channel sales_data.channel (us/uk/de/...)
+ * @param rows aggregated rows
+ * @param fulfillmentTag null=combined (eski format), 'Amazon'=FBA, 'Merchant'=FBM, 'Wayfair'=Wayfair
+ *
+ * DELETE: channel + fulfillment_channel kombosu siler (combined yazımı sadece NULL
+ * satırları siler, FBA yazımı sadece Amazon satırlarını). Yeni unique index
+ * (channel, iwasku, COALESCE(fulfillment_channel, '')) sayesinde 3 farklı satır
+ * yan yana durabilir.
+ */
+export async function upsertSalesData(
+  channel: string,
+  rows: SalesRow[],
+  fulfillmentTag: FulfillmentTag = null,
+): Promise<number> {
   if (rows.length === 0) return 0;
 
   const client = await sharedPool.connect();
   try {
     await client.query('BEGIN');
 
-    // Delete all existing rows for this channel first — cleans up orphaned rows
-    // (e.g. _Fba rows from before the 12-char iwasku normalization was applied retroactively)
-    await client.query('DELETE FROM sales_data WHERE channel = $1', [channel]);
+    // Bu channel + fulfillment kombosunu sil — diğer fulfillment satırları korunur
+    if (fulfillmentTag === null) {
+      await client.query(
+        'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel IS NULL',
+        [channel],
+      );
+    } else {
+      await client.query(
+        'DELETE FROM sales_data WHERE channel = $1 AND fulfillment_channel = $2',
+        [channel, fulfillmentTag],
+      );
+    }
 
     let written = 0;
 
@@ -137,11 +135,11 @@ export async function upsertSalesData(channel: string, rows: SalesRow[]): Promis
       const params: any[] = [];
 
       batch.forEach((row, idx) => {
-        const offset = idx * 18;
-        const placeholders = Array.from({ length: 18 }, (_, j) => `$${offset + j + 1}`);
+        const offset = idx * 19;
+        const placeholders = Array.from({ length: 19 }, (_, j) => `$${offset + j + 1}`);
         values.push(`(${placeholders.join(', ')})`);
         params.push(
-          channel, row.iwasku, row.asin || null,
+          channel, row.iwasku, row.asin || null, fulfillmentTag,
           row.last3, row.last7, row.last30, row.last90, row.last180, row.last366,
           row.pre_year_last7, row.pre_year_last30, row.pre_year_last90,
           row.pre_year_last180, row.pre_year_last365,
@@ -150,12 +148,12 @@ export async function upsertSalesData(channel: string, rows: SalesRow[]): Promis
       });
 
       await client.query(`
-        INSERT INTO sales_data (channel, iwasku, asin,
+        INSERT INTO sales_data (channel, iwasku, asin, fulfillment_channel,
           last3, last7, last30, last90, last180, last366,
           pre_year_last7, pre_year_last30, pre_year_last90, pre_year_last180, pre_year_last365,
           pre_year_next7, pre_year_next30, pre_year_next90, pre_year_next180)
         VALUES ${values.join(', ')}
-        ON CONFLICT (iwasku, channel) DO NOTHING
+        ON CONFLICT (channel, iwasku, COALESCE(fulfillment_channel, '')) DO NOTHING
       `, params);
 
       written += batch.length;
@@ -185,29 +183,59 @@ export async function writeSalesData(): Promise<void> {
   const activeChannels = channelResult.rows.map((r: { channel: string }) => r.channel);
   logger.info(`[SalesData] Active channels: ${activeChannels.join(', ')}`);
 
-  // 2. Write individual channels (with safety check)
+  // 2. Write individual channels — 3 satır yazımı: combined + FBA + FBM
   for (const ch of activeChannels) {
-    const result = await pool.query(ROLLING_WINDOW_SQL, [ch]);
-    // Safety: don't wipe existing data if new query returns suspiciously few rows
-    const existing = await sharedPool.query('SELECT COUNT(*)::int as cnt FROM sales_data WHERE channel = $1', [ch]);
+    // Combined (eski format, fulfillment_channel=NULL)
+    const combined = await pool.query(ROLLING_WINDOW_SQL, [ch]);
+    const existing = await sharedPool.query(
+      "SELECT COUNT(*)::int as cnt FROM sales_data WHERE channel = $1 AND fulfillment_channel IS NULL",
+      [ch],
+    );
     const existingCount = existing.rows[0].cnt;
-    if (existingCount > 10 && result.rows.length < existingCount * 0.2) {
-      logger.error(`[SalesData] ${ch}: SKIPPED — new ${result.rows.length} vs existing ${existingCount} (safety threshold)`);
-      await notify(`⚠️ [SalesData] ${ch} skipped: ${result.rows.length} rows vs ${existingCount} existing`);
+    if (existingCount > 10 && combined.rows.length < existingCount * 0.2) {
+      logger.error(`[SalesData] ${ch}: SKIPPED — new ${combined.rows.length} vs existing ${existingCount} (safety threshold)`);
+      await notify(`⚠️ [SalesData] ${ch} skipped: ${combined.rows.length} rows vs ${existingCount} existing`);
       continue;
     }
-    const count = await upsertSalesData(ch, result.rows);
-    totalRows += count;
-    logger.info(`[SalesData] ${ch}: ${count} rows`);
+    const combinedCount = await upsertSalesData(ch, combined.rows, null);
+    totalRows += combinedCount;
+    logger.info(`[SalesData] ${ch} combined: ${combinedCount} rows`);
+
+    // FBA (fulfillment_channel='Amazon')
+    const fba = await pool.query(ROLLING_WINDOW_FBA_SQL, [ch, 'Amazon']);
+    if (fba.rows.length > 0) {
+      const fbaCount = await upsertSalesData(ch, fba.rows, 'Amazon');
+      totalRows += fbaCount;
+      logger.info(`[SalesData] ${ch} FBA: ${fbaCount} rows`);
+    }
+
+    // FBM (fulfillment_channel='Merchant')
+    const fbm = await pool.query(ROLLING_WINDOW_FBA_SQL, [ch, 'Merchant']);
+    if (fbm.rows.length > 0) {
+      const fbmCount = await upsertSalesData(ch, fbm.rows, 'Merchant');
+      totalRows += fbmCount;
+      logger.info(`[SalesData] ${ch} FBM: ${fbmCount} rows`);
+    }
   }
 
-  // 3. Write aggregated "eu" channel (de+fr+it+es)
+  // 3. Write aggregated "eu" channel — combined + FBA + FBM
   const hasEuData = activeChannels.some((ch: string) => EU_CHANNELS.includes(ch));
   if (hasEuData) {
-    const euResult = await pool.query(EU_AGGREGATE_SQL);
-    const euCount = await upsertSalesData('eu', euResult.rows);
-    totalRows += euCount;
-    logger.info(`[SalesData] eu (aggregate): ${euCount} rows`);
+    const euCombined = await pool.query(EU_AGGREGATE_SQL);
+    totalRows += await upsertSalesData('eu', euCombined.rows, null);
+    logger.info(`[SalesData] eu combined: ${euCombined.rows.length} rows`);
+
+    const euFba = await pool.query(EU_AGGREGATE_FBA_SQL, ['Amazon']);
+    if (euFba.rows.length > 0) {
+      totalRows += await upsertSalesData('eu', euFba.rows, 'Amazon');
+      logger.info(`[SalesData] eu FBA: ${euFba.rows.length} rows`);
+    }
+
+    const euFbm = await pool.query(EU_AGGREGATE_FBA_SQL, ['Merchant']);
+    if (euFbm.rows.length > 0) {
+      totalRows += await upsertSalesData('eu', euFbm.rows, 'Merchant');
+      logger.info(`[SalesData] eu FBM: ${euFbm.rows.length} rows`);
+    }
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

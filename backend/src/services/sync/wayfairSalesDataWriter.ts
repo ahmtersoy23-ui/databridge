@@ -49,7 +49,10 @@ const WAYFAIR_ROLLING_WINDOW_SQL = `
 
 export async function writeWayfairSalesData(account: WayfairAccount): Promise<number> {
   const result = await pool.query<SalesRow>(WAYFAIR_ROLLING_WINDOW_SQL, [account.id]);
-  const count = await upsertSalesData(account.channel, result.rows);
-  logger.info(`[WayfairSalesData] Wrote ${count} rows to sales_data (channel=${account.channel})`);
-  return count;
+  // Hem combined (NULL) hem Wayfair tag'li satır yaz — Global toggle ile FBA hariç
+  // tutulduğunda Wayfair satışları görülebilsin.
+  const combinedCount = await upsertSalesData(account.channel, result.rows, null);
+  const wfCount = await upsertSalesData(account.channel, result.rows, 'Wayfair');
+  logger.info(`[WayfairSalesData] ${account.channel}: ${combinedCount} combined + ${wfCount} Wayfair tagged`);
+  return combinedCount + wfCount;
 }
