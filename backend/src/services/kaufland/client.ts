@@ -51,12 +51,14 @@ function recordFailure(accountId: number): void {
 // -- Storefront helpers ----------------------------------------------------
 
 /**
- * Kaufland API endpoints expect storefront as 2-letter country code (lowercase):
- * `de`, `cz`, `sk`, `pl`, `at`. The DB stores the full locale (`de_DE`, `cs_CZ`)
- * for clarity, so we normalize at call time.
+ * Kaufland API endpoints expect storefront as 2-letter COUNTRY code (lowercase):
+ *   de_DE → 'de', cs_CZ → 'cz', sk_SK → 'sk', pl_PL → 'pl', de_AT → 'at'.
+ * Note: locale prefix is the LANGUAGE (cs/de), not the country — we need the
+ * suffix. Fallback to prefix only when there's no underscore.
  */
 export function storefrontCode(account: KauflandAccount): string {
-  return account.storefront.split('_')[0].toLowerCase();
+  const parts = account.storefront.split('_');
+  return (parts[1] ?? parts[0]).toLowerCase();
 }
 
 // -- Account helpers -------------------------------------------------------
