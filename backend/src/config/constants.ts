@@ -44,6 +44,10 @@ export const SYNC_BOL_ORDERS_CRON = '15 4 * * *';                 // 04:15 UTC (
 
 // Takealot Seller API (single account ZA). API key auth, /v2/sales + /v2/offers.
 export const SYNC_TAKEALOT_CRON = '45 4 * * *';                   // 04:45 UTC (Bol'dan 30dk sonra)
+
+// Kaufland Marketplace Seller API (HMAC-SHA256 auth, /v2/orders + /v2/units).
+// Detail-per-order pattern (~600ms throttle), modest volume.
+export const SYNC_KAUFLAND_CRON = '0 5 * * *';                    // 05:00 UTC (Takealot'tan 15dk sonra)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 // Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)

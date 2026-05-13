@@ -48,6 +48,17 @@ interface TakealotAccount {
   updated_at: string;
 }
 
+interface KauflandAccount {
+  id: number;
+  label: string;
+  client_key: string;
+  storefront: string;
+  channel: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -65,9 +76,10 @@ const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sand
 const emptyWalmartForm = { label: 'us-main', client_id: '', client_secret: '', use_sandbox: false };
 const emptyBolForm = { label: '', client_id: '', client_secret: '', channel: '' };
 const emptyTakealotForm = { label: 'za-main', api_key: '' };
+const emptyKauflandForm = { label: 'de-main', client_key: '', secret_key: '', storefront: 'de_DE', channel: 'kaufland_de' };
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'takealot' | 'wisersell' | 'ads'>('amazon');
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'takealot' | 'kaufland' | 'wisersell' | 'ads'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -111,6 +123,14 @@ export default function Settings() {
   const [takealotMessage, setTakealotMessage] = useState('');
   const [takealotTesting, setTakealotTesting] = useState<number | null>(null);
   const [takealotDeleting, setTakealotDeleting] = useState<number | null>(null);
+
+  const [kauflandAccounts, setKauflandAccounts] = useState<KauflandAccount[]>([]);
+  const [kauflandForm, setKauflandForm] = useState(emptyKauflandForm);
+  const [kauflandEditingId, setKauflandEditingId] = useState<number | null>(null);
+  const [kauflandSaving, setKauflandSaving] = useState(false);
+  const [kauflandMessage, setKauflandMessage] = useState('');
+  const [kauflandTesting, setKauflandTesting] = useState<number | null>(null);
+  const [kauflandDeleting, setKauflandDeleting] = useState<number | null>(null);
 
   // Ads state
   const [adsCredentials, setAdsCredentials] = useState<Array<{ id: number; region: string; account_name: string; is_active: boolean; has_ads_token: boolean }>>([]);
@@ -168,6 +188,15 @@ export default function Settings() {
     }
   };
 
+  const fetchKauflandAccounts = async () => {
+    try {
+      const res = await axios.get('/api/v1/kaufland/settings');
+      setKauflandAccounts(res.data.accounts || []);
+    } catch (err) {
+      console.error('Failed to fetch Kaufland accounts:', err);
+    }
+  };
+
   const fetchTakealotAccounts = async () => {
     try {
       const res = await axios.get('/api/v1/takealot/settings');
@@ -191,7 +220,7 @@ export default function Settings() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchBolAccounts(); fetchTakealotAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchBolAccounts(); fetchTakealotAccounts(); fetchKauflandAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -571,6 +600,87 @@ export default function Settings() {
     }
   };
 
+  // --- Kaufland handlers ---------------------------------------------------
+
+  const handleKauflandEdit = (a: KauflandAccount) => {
+    setKauflandEditingId(a.id);
+    setKauflandForm({ label: a.label, client_key: a.client_key, secret_key: '', storefront: a.storefront, channel: a.channel });
+    setKauflandMessage('');
+  };
+
+  const handleKauflandCancelEdit = () => {
+    setKauflandEditingId(null);
+    setKauflandForm(emptyKauflandForm);
+    setKauflandMessage('');
+  };
+
+  const handleKauflandSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setKauflandSaving(true);
+    setKauflandMessage('');
+    try {
+      if (kauflandEditingId) {
+        const updates: Record<string, unknown> = {};
+        if (kauflandForm.label) updates.label = kauflandForm.label;
+        if (kauflandForm.client_key) updates.client_key = kauflandForm.client_key;
+        if (kauflandForm.secret_key) updates.secret_key = kauflandForm.secret_key;
+        if (kauflandForm.storefront) updates.storefront = kauflandForm.storefront;
+        if (kauflandForm.channel) updates.channel = kauflandForm.channel;
+        await axios.put(`/api/v1/kaufland/settings/${kauflandEditingId}`, updates);
+        setKauflandMessage('Updated successfully!');
+        setKauflandEditingId(null);
+      } else {
+        await axios.post('/api/v1/kaufland/settings', {
+          label: kauflandForm.label,
+          client_key: kauflandForm.client_key,
+          secret_key: kauflandForm.secret_key,
+          storefront: kauflandForm.storefront,
+          channel: kauflandForm.channel,
+        });
+        setKauflandMessage('Account added successfully!');
+      }
+      setKauflandForm(emptyKauflandForm);
+      fetchKauflandAccounts();
+    } catch (err: any) {
+      setKauflandMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setKauflandSaving(false);
+    }
+  };
+
+  const handleKauflandTest = async (id: number) => {
+    setKauflandTesting(id);
+    setKauflandMessage('');
+    try {
+      const res = await axios.post(`/api/v1/kaufland/settings/${id}/test`);
+      setKauflandMessage(res.data.message);
+    } catch (err: any) {
+      setKauflandMessage(err.response?.data?.error || 'Connection failed');
+    } finally {
+      setKauflandTesting(null);
+    }
+  };
+
+  const handleKauflandToggle = async (id: number, currentActive: boolean) => {
+    try {
+      await axios.put(`/api/v1/kaufland/settings/${id}`, { is_active: !currentActive });
+      fetchKauflandAccounts();
+    } catch { /* ignore */ }
+  };
+
+  const handleKauflandDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete Kaufland account "${label}"?`)) return;
+    setKauflandDeleting(id);
+    try {
+      await axios.delete(`/api/v1/kaufland/settings/${id}`);
+      fetchKauflandAccounts();
+    } catch (err: any) {
+      setKauflandMessage(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setKauflandDeleting(null);
+    }
+  };
+
   const handleWayfairDelete = async (id: number, label: string) => {
     if (!confirm(`Delete Wayfair account "${label}"?`)) return;
     setWayfairDeleting(id);
@@ -642,7 +752,7 @@ export default function Settings() {
 
       {/* Tab bar */}
       <div className="flex gap-1 mb-6 border-b-2 border-slate-200">
-        {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'takealot', 'wisersell'] as const).map(t => {
+        {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'wisersell'] as const).map(t => {
           const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', takealot: 'Takealot', wisersell: 'Wisersell' };
           return (
             <button
@@ -1193,6 +1303,131 @@ export default function Settings() {
             <button type="submit" disabled={takealotSaving}
               className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${takealotEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
               {takealotSaving ? 'Saving...' : takealotEditingId ? 'Update Account' : 'Add Account'}
+            </button>
+          </form>
+        </div>
+      </>}
+
+      {activeTab === 'kaufland' && <>
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <h2 className="mb-4">Kaufland Accounts</h2>
+          {kauflandMessage && (
+            <p className={`mb-3 ${kauflandMessage.includes('OK') || kauflandMessage.includes('success') || kauflandMessage.includes('Updated') || kauflandMessage.includes('added') ? 'text-emerald-600' : 'text-red-600'}`}>
+              {kauflandMessage}
+            </p>
+          )}
+          {kauflandAccounts.length === 0 ? (
+            <p className="text-slate-500">No Kaufland accounts configured yet.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">Account</th>
+                  <th className="text-left p-2">Storefront</th>
+                  <th className="text-left p-2">Channel</th>
+                  <th className="text-left p-2">Status</th>
+                  <th className="text-left p-2">Updated</th>
+                  <th className="text-left p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {kauflandAccounts.map(a => (
+                  <tr key={a.id} className={`border-b border-slate-200 ${kauflandEditingId === a.id ? 'bg-[#eff6ff]' : ''}`}>
+                    <td className="p-2 font-semibold">{a.label}</td>
+                    <td className="p-2 text-sm">{a.storefront}</td>
+                    <td className="p-2 font-mono text-xs">{a.channel}</td>
+                    <td className="p-2">
+                      <span className={a.is_active ? 'text-emerald-600' : 'text-gray-400'}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-2 text-sm text-slate-500">
+                      {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="p-2 whitespace-nowrap">
+                      <button onClick={() => handleKauflandTest(a.id)} disabled={kauflandTesting === a.id}
+                        className="px-3 py-1 bg-[#6366f1] text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {kauflandTesting === a.id ? '...' : 'Test'}
+                      </button>
+                      <button onClick={() => handleKauflandToggle(a.id, a.is_active)}
+                        className={`px-3 py-1 text-white border-none rounded cursor-pointer text-xs mr-1 ${a.is_active ? 'bg-amber-600' : 'bg-emerald-600'}`}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleKauflandEdit(a)}
+                        className="px-3 py-1 bg-blue-600 text-white border-none rounded cursor-pointer text-xs mr-1">Edit</button>
+                      <button onClick={() => handleKauflandDelete(a.id, a.label)} disabled={kauflandDeleting === a.id}
+                        className="px-3 py-1 bg-red-600 text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {kauflandDeleting === a.id ? '...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2>{kauflandEditingId ? `Edit — ${kauflandForm.label}` : 'Add Kaufland Account'}</h2>
+            {kauflandEditingId && (
+              <button onClick={handleKauflandCancelEdit}
+                className="px-4 py-1 bg-gray-500 text-white border-none rounded cursor-pointer text-sm">Cancel</button>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Kaufland Seller Portal → API → Client Key (32 char) + Secret Key (64 char).
+            HMAC-SHA256 imzalı request. Günlük 05:00 UTC sync (sipariş + stok).
+          </p>
+          <form onSubmit={handleKauflandSubmit}>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>
+                <label htmlFor="kf-label" className="block mb-1 font-medium">Account Label</label>
+                <input id="kf-label" type="text" placeholder="e.g. de-main" value={kauflandForm.label}
+                  onChange={e => setKauflandForm({ ...kauflandForm, label: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+              </div>
+              <div>
+                <label htmlFor="kf-storefront" className="block mb-1 font-medium">Storefront</label>
+                <select id="kf-storefront" value={kauflandForm.storefront}
+                  onChange={e => {
+                    const sf = e.target.value;
+                    const suffix = sf.split('_')[0].toLowerCase();
+                    setKauflandForm({ ...kauflandForm, storefront: sf, channel: `kaufland_${suffix}` });
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3">
+                  <option value="de_DE">de_DE (Germany)</option>
+                  <option value="cs_CZ">cs_CZ (Czech Republic)</option>
+                  <option value="sk_SK">sk_SK (Slovakia)</option>
+                  <option value="pl_PL">pl_PL (Poland)</option>
+                  <option value="de_AT">de_AT (Austria)</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="kf-channel" className="block mb-1 font-medium">Sales Channel Code</label>
+                <input id="kf-channel" type="text" placeholder="kaufland_de" value={kauflandForm.channel}
+                  onChange={e => setKauflandForm({ ...kauflandForm, channel: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+              </div>
+              <div>
+                <label htmlFor="kf-ckey" className="block mb-1 font-medium">Client Key (32 char)</label>
+                <input id="kf-ckey" type="text" placeholder="32-char public key"
+                  value={kauflandForm.client_key}
+                  onChange={e => setKauflandForm({ ...kauflandForm, client_key: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3 font-mono" required={!kauflandEditingId} />
+              </div>
+              <div className="col-span-2">
+                <label htmlFor="kf-skey" className="block mb-1 font-medium">Secret Key (64 char)</label>
+                <input id="kf-skey" type="password"
+                  placeholder={kauflandEditingId ? 'Leave blank to keep current' : '64-char secret'}
+                  value={kauflandForm.secret_key}
+                  onChange={e => setKauflandForm({ ...kauflandForm, secret_key: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3 font-mono" required={!kauflandEditingId} />
+              </div>
+            </div>
+            <button type="submit" disabled={kauflandSaving}
+              className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${kauflandEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+              {kauflandSaving ? 'Saving...' : kauflandEditingId ? 'Update Account' : 'Add Account'}
             </button>
           </form>
         </div>

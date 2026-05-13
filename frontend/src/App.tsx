@@ -26,6 +26,9 @@ import BolMappings from './pages/BolMappings';
 import TakealotOrders from './pages/TakealotOrders';
 import TakealotOrdersAnalysis from './pages/TakealotOrdersAnalysis';
 import TakealotMappings from './pages/TakealotMappings';
+import KauflandOrders from './pages/KauflandOrders';
+import KauflandOrdersAnalysis from './pages/KauflandOrdersAnalysis';
+import KauflandMappings from './pages/KauflandMappings';
 import Reviews from './pages/Reviews';
 import Ads from './pages/Ads';
 import InventoryAging from './pages/InventoryAging';
@@ -51,6 +54,7 @@ const WAYFAIR_PATHS = ['/wayfair/orders', '/wayfair/inventory', '/wayfair/orders
 const WALMART_PATHS = ['/walmart/orders', '/walmart/orders-analysis', '/walmart/mappings'];
 const BOL_PATHS = ['/bol/orders', '/bol/orders-analysis', '/bol/mappings'];
 const TAKEALOT_PATHS = ['/takealot/orders', '/takealot/orders-analysis', '/takealot/mappings'];
+const KAUFLAND_PATHS = ['/kaufland/orders', '/kaufland/orders-analysis', '/kaufland/mappings'];
 
 function UserMenu() {
   const { user, logout } = useAuth();
@@ -96,6 +100,7 @@ function Nav() {
   const isWalmart = WALMART_PATHS.some(p => location.pathname.startsWith(p));
   const isBol = BOL_PATHS.some(p => location.pathname.startsWith(p));
   const isTakealot = TAKEALOT_PATHS.some(p => location.pathname.startsWith(p));
+  const isKaufland = KAUFLAND_PATHS.some(p => location.pathname.startsWith(p));
 
   const topCls = (active: boolean) =>
     `px-4 py-2 rounded-md text-sm no-underline ${active ? 'text-white bg-slate-700' : 'text-slate-400'}`;
@@ -131,6 +136,10 @@ function Nav() {
 
         <NavLink to="/takealot/orders" className={topCls(isTakealot)}>
           Takealot
+        </NavLink>
+
+        <NavLink to="/kaufland/orders" className={topCls(isKaufland)}>
+          Kaufland
         </NavLink>
 
         <NavLink to="/nj-warehouse" className={({ isActive }) => topCls(isActive)}>
@@ -202,6 +211,15 @@ function Nav() {
           <NavLink to="/takealot/mappings" className={subCls}>Mappings</NavLink>
         </nav>
       )}
+
+      {/* Kaufland sub-nav */}
+      {isKaufland && (
+        <nav aria-label="Kaufland sections" className="flex gap-1 px-8 py-2 bg-slate-900 border-b border-slate-800">
+          <NavLink to="/kaufland/orders" className={subCls}>Orders</NavLink>
+          <NavLink to="/kaufland/orders-analysis" className={subCls}>Orders Analysis</NavLink>
+          <NavLink to="/kaufland/mappings" className={subCls}>Mappings</NavLink>
+        </nav>
+      )}
     </header>
   );
 }
@@ -245,6 +263,9 @@ export default function App() {
                   <Route path="/takealot/orders" element={<TakealotOrders />} />
                   <Route path="/takealot/orders-analysis" element={<TakealotOrdersAnalysis />} />
                   <Route path="/takealot/mappings" element={<TakealotMappings />} />
+                  <Route path="/kaufland/orders" element={<KauflandOrders />} />
+                  <Route path="/kaufland/orders-analysis" element={<KauflandOrdersAnalysis />} />
+                  <Route path="/kaufland/mappings" element={<KauflandMappings />} />
                   <Route path="/reviews" element={<Reviews />} />
                   <Route path="/ads" element={<Ads />} />
                   <Route path="/logs" element={<Logs />} />
