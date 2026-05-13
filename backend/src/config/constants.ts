@@ -33,6 +33,10 @@ export const SYNC_FEDEX_TRACK_CRON         = '0 5,11,17,23 * * *'; // 05/11/17/2
 export const SYNC_WISERSELL_ORDERS_CRON   = '0 9 * * *';          // 09:00 UTC (12:00 TR) — ABD gecesi, son 14 gün rolling
 // Pending sync (open + ready_to_ship) — closed sync'in 15 dk arkasından. Stok istatistiği için günde 1 snapshot yeterli.
 export const SYNC_WISERSELL_PENDING_CRON  = '15 9 * * *';         // 09:15 UTC (12:15 TR) — closed sync 09:00'da bitince
+
+// Walmart Marketplace orders sync — daily after Amazon sales window.
+// Token TTL 15 dk, max 200 limit/page, son 30 gün rolling (kullanıcı tercihi).
+export const SYNC_WALMART_ORDERS_CRON = '0 4 * * *';              // 04:00 UTC (Amazon sales 03:00'ten sonra)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 // Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)

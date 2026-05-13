@@ -20,6 +20,16 @@ interface WayfairAccount {
   updated_at: string;
 }
 
+interface WalmartAccount {
+  id: number;
+  label: string;
+  client_id: string;
+  use_sandbox: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -34,9 +44,10 @@ interface Credential {
 const emptyForm = { region: 'NA', seller_id: '', refresh_token: '', client_id: '', client_secret: '', account_name: '' };
 const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
 const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sandbox: false, supplier_id: '', channel: '', warehouse: '' };
+const emptyWalmartForm = { label: 'us-main', client_id: '', client_secret: '', use_sandbox: false };
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'wisersell' | 'ads'>('amazon');
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'wisersell' | 'ads'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -56,6 +67,14 @@ export default function Settings() {
   const [wayfairMessage, setWayfairMessage] = useState('');
   const [wayfairTesting, setWayfairTesting] = useState<number | null>(null);
   const [wayfairDeleting, setWayfairDeleting] = useState<number | null>(null);
+
+  const [walmartAccounts, setWalmartAccounts] = useState<WalmartAccount[]>([]);
+  const [walmartForm, setWalmartForm] = useState(emptyWalmartForm);
+  const [walmartEditingId, setWalmartEditingId] = useState<number | null>(null);
+  const [walmartSaving, setWalmartSaving] = useState(false);
+  const [walmartMessage, setWalmartMessage] = useState('');
+  const [walmartTesting, setWalmartTesting] = useState<number | null>(null);
+  const [walmartDeleting, setWalmartDeleting] = useState<number | null>(null);
 
   // Ads state
   const [adsCredentials, setAdsCredentials] = useState<Array<{ id: number; region: string; account_name: string; is_active: boolean; has_ads_token: boolean }>>([]);
@@ -95,6 +114,15 @@ export default function Settings() {
     }
   };
 
+  const fetchWalmartAccounts = async () => {
+    try {
+      const res = await axios.get('/api/v1/walmart/settings');
+      setWalmartAccounts(res.data.accounts || []);
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchAdsCredentials = async () => {
     try {
       const res = await axios.get('/api/v1/ads/credentials');
@@ -109,7 +137,7 @@ export default function Settings() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -259,6 +287,82 @@ export default function Settings() {
     } catch { /* ignore */ }
   };
 
+  const handleWalmartEdit = (a: WalmartAccount) => {
+    setWalmartEditingId(a.id);
+    setWalmartForm({ label: a.label, client_id: a.client_id, client_secret: '', use_sandbox: a.use_sandbox });
+    setWalmartMessage('');
+  };
+
+  const handleWalmartCancelEdit = () => {
+    setWalmartEditingId(null);
+    setWalmartForm(emptyWalmartForm);
+    setWalmartMessage('');
+  };
+
+  const handleWalmartSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWalmartSaving(true);
+    setWalmartMessage('');
+    try {
+      if (walmartEditingId) {
+        const updates: Record<string, unknown> = { use_sandbox: walmartForm.use_sandbox };
+        if (walmartForm.label) updates.label = walmartForm.label;
+        if (walmartForm.client_id) updates.client_id = walmartForm.client_id;
+        if (walmartForm.client_secret) updates.client_secret = walmartForm.client_secret;
+        await axios.put(`/api/v1/walmart/settings/${walmartEditingId}`, updates);
+        setWalmartMessage('Updated successfully!');
+        setWalmartEditingId(null);
+      } else {
+        await axios.post('/api/v1/walmart/settings', {
+          label: walmartForm.label,
+          client_id: walmartForm.client_id,
+          client_secret: walmartForm.client_secret,
+          use_sandbox: walmartForm.use_sandbox,
+        });
+        setWalmartMessage('Account added successfully!');
+      }
+      setWalmartForm(emptyWalmartForm);
+      fetchWalmartAccounts();
+    } catch (err: any) {
+      setWalmartMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setWalmartSaving(false);
+    }
+  };
+
+  const handleWalmartTest = async (id: number) => {
+    setWalmartTesting(id);
+    setWalmartMessage('');
+    try {
+      const res = await axios.post(`/api/v1/walmart/settings/${id}/test`);
+      setWalmartMessage(`Connection OK — ${res.data.sandbox ? 'Sandbox' : 'Production'} (${res.data.message})`);
+    } catch (err: any) {
+      setWalmartMessage(err.response?.data?.error || 'Connection failed');
+    } finally {
+      setWalmartTesting(null);
+    }
+  };
+
+  const handleWalmartToggle = async (id: number, currentActive: boolean) => {
+    try {
+      await axios.put(`/api/v1/walmart/settings/${id}`, { is_active: !currentActive });
+      fetchWalmartAccounts();
+    } catch { /* ignore */ }
+  };
+
+  const handleWalmartDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete Walmart account "${label}"?`)) return;
+    setWalmartDeleting(id);
+    try {
+      await axios.delete(`/api/v1/walmart/settings/${id}`);
+      fetchWalmartAccounts();
+    } catch (err: any) {
+      setWalmartMessage(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setWalmartDeleting(null);
+    }
+  };
+
   const handleWayfairDelete = async (id: number, label: string) => {
     if (!confirm(`Delete Wayfair account "${label}"?`)) return;
     setWayfairDeleting(id);
@@ -330,8 +434,8 @@ export default function Settings() {
 
       {/* Tab bar */}
       <div className="flex gap-1 mb-6 border-b-2 border-slate-200">
-        {(['amazon', 'ads', 'wayfair', 'wisersell'] as const).map(t => {
-          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', wisersell: 'Wisersell' };
+        {(['amazon', 'ads', 'wayfair', 'walmart', 'wisersell'] as const).map(t => {
+          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', wisersell: 'Wisersell' };
           return (
             <button
               key={t}
@@ -574,6 +678,111 @@ export default function Settings() {
             <button type="submit" disabled={wayfairSaving}
               className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${wayfairEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
               {wayfairSaving ? 'Saving...' : wayfairEditingId ? 'Update Account' : 'Add Account'}
+            </button>
+          </form>
+        </div>
+      </>}
+
+      {/* Walmart tab */}
+      {activeTab === 'walmart' && <>
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <h2 className="mb-4">Walmart Accounts</h2>
+          {walmartMessage && (
+            <p className={`mb-3 ${walmartMessage.includes('OK') || walmartMessage.includes('success') || walmartMessage.includes('Updated') || walmartMessage.includes('added') ? 'text-emerald-600' : 'text-red-600'}`}>
+              {walmartMessage}
+            </p>
+          )}
+          {walmartAccounts.length === 0 ? (
+            <p className="text-slate-500">No Walmart accounts configured yet.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">Account</th>
+                  <th className="text-left p-2">Client ID</th>
+                  <th className="text-left p-2">Mode</th>
+                  <th className="text-left p-2">Status</th>
+                  <th className="text-left p-2">Updated</th>
+                  <th className="text-left p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {walmartAccounts.map(a => (
+                  <tr key={a.id} className={`border-b border-slate-200 ${walmartEditingId === a.id ? 'bg-[#eff6ff]' : ''}`}>
+                    <td className="p-2 font-semibold">{a.label}</td>
+                    <td className="p-2 font-mono text-sm">{a.client_id.slice(0, 8)}...{a.client_id.slice(-4)}</td>
+                    <td className="p-2">{a.use_sandbox ? 'Sandbox' : 'Production'}</td>
+                    <td className="p-2">
+                      <span className={a.is_active ? 'text-emerald-600' : 'text-gray-400'}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-2 text-sm text-slate-500">
+                      {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="p-2 whitespace-nowrap">
+                      <button onClick={() => handleWalmartTest(a.id)} disabled={walmartTesting === a.id} className="px-3 py-1 bg-[#6366f1] text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {walmartTesting === a.id ? '...' : 'Test'}
+                      </button>
+                      <button onClick={() => handleWalmartToggle(a.id, a.is_active)} className={`px-3 py-1 text-white border-none rounded cursor-pointer text-xs mr-1 ${a.is_active ? 'bg-amber-600' : 'bg-emerald-600'}`}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleWalmartEdit(a)} className="px-3 py-1 bg-blue-600 text-white border-none rounded cursor-pointer text-xs mr-1">Edit</button>
+                      <button onClick={() => handleWalmartDelete(a.id, a.label)} disabled={walmartDeleting === a.id} className="px-3 py-1 bg-red-600 text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {walmartDeleting === a.id ? '...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2>{walmartEditingId ? `Edit — ${walmartForm.label}` : 'Add Walmart Account'}</h2>
+            {walmartEditingId && (
+              <button onClick={handleWalmartCancelEdit} className="px-4 py-1 bg-gray-500 text-white border-none rounded cursor-pointer text-sm">
+                Cancel
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Walmart Marketplace US (seller-fulfilled). Token TTL 15 min, son 30 gün siparişleri günlük 04:00 UTC çekilir.
+          </p>
+          <form onSubmit={handleWalmartSubmit}>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>
+                <label htmlFor="walmart-label" className="block mb-1 font-medium">Account Label</label>
+                <input id="walmart-label" type="text" placeholder="e.g. us-main" value={walmartForm.label}
+                  onChange={e => setWalmartForm({ ...walmartForm, label: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+              </div>
+              <div className="flex items-end mb-3">
+                <label htmlFor="walmart-sandbox" className="flex items-center gap-2 cursor-pointer">
+                  <input id="walmart-sandbox" type="checkbox" checked={walmartForm.use_sandbox}
+                    onChange={e => setWalmartForm({ ...walmartForm, use_sandbox: e.target.checked })} />
+                  <span>Use Sandbox</span>
+                </label>
+              </div>
+              <div>
+                <label htmlFor="walmart-client-id" className="block mb-1 font-medium">Client ID</label>
+                <input id="walmart-client-id" type="text" placeholder="Walmart Client ID" value={walmartForm.client_id}
+                  onChange={e => setWalmartForm({ ...walmartForm, client_id: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!walmartEditingId} />
+              </div>
+              <div>
+                <label htmlFor="walmart-client-secret" className="block mb-1 font-medium">Client Secret</label>
+                <input id="walmart-client-secret" type="password" placeholder={walmartEditingId ? 'Leave blank to keep current' : 'Client Secret'}
+                  value={walmartForm.client_secret}
+                  onChange={e => setWalmartForm({ ...walmartForm, client_secret: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!walmartEditingId} />
+              </div>
+            </div>
+            <button type="submit" disabled={walmartSaving}
+              className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${walmartEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+              {walmartSaving ? 'Saving...' : walmartEditingId ? 'Update Account' : 'Add Account'}
             </button>
           </form>
         </div>
