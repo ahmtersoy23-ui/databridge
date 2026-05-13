@@ -37,6 +37,14 @@ const STOREFRONT_COUNTRY: Record<string, string> = {
   de_AT: 'Austria',
 };
 
+const STOREFRONT_CURRENCY: Record<string, string> = {
+  de_DE: 'EUR',
+  cs_CZ: 'CZK',
+  sk_SK: 'EUR',
+  pl_PL: 'PLN',
+  de_AT: 'EUR',
+};
+
 type SortKey = keyof AggRow;
 const RANGES = [7, 30, 90, 180];
 
@@ -97,10 +105,12 @@ export default function KauflandOrdersAnalysis() {
     });
   }, [rows, search, sortKey, sortAsc]);
 
+  const currentAccount = accounts.find(a => a.id === selectedAccountId);
+  const currency = currentAccount ? STOREFRONT_CURRENCY[currentAccount.storefront] ?? '' : '';
   const summaryCards = [
     { label: 'SKUs', value: summary.totalSkus.toLocaleString(), color: 'text-slate-700' },
     { label: 'Total Qty', value: summary.totalQty.toLocaleString(), color: 'text-emerald-600' },
-    { label: 'Total Revenue', value: `${summary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`, color: 'text-blue-600' },
+    { label: 'Total Revenue', value: `${summary.totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`, color: 'text-blue-600' },
     { label: 'Matched', value: `${summary.matched} / ${summary.totalSkus}`, color: summary.unmatched > 0 ? 'text-amber-600' : 'text-emerald-600' },
   ];
 
@@ -170,8 +180,8 @@ export default function KauflandOrdersAnalysis() {
                 <th onClick={() => handleSort('iwasku')} className="text-left p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">IWASKU {sortIcon('iwasku')}</th>
                 <th onClick={() => handleSort('product_title')} className="text-left p-2 cursor-pointer select-none text-xs font-semibold">Product {sortIcon('product_title')}</th>
                 <th onClick={() => handleSort('total_qty')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Qty {sortIcon('total_qty')}</th>
-                <th onClick={() => handleSort('avg_unit_price')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Avg {sortIcon('avg_unit_price')}</th>
-                <th onClick={() => handleSort('total_revenue')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Revenue {sortIcon('total_revenue')}</th>
+                <th onClick={() => handleSort('avg_unit_price')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Avg {currency && `(${currency})`} {sortIcon('avg_unit_price')}</th>
+                <th onClick={() => handleSort('total_revenue')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Revenue {currency && `(${currency})`} {sortIcon('total_revenue')}</th>
                 <th onClick={() => handleSort('order_count')} className="text-right p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Orders {sortIcon('order_count')}</th>
                 <th onClick={() => handleSort('last_order_date')} className="text-left p-2 cursor-pointer select-none whitespace-nowrap text-xs font-semibold">Last {sortIcon('last_order_date')}</th>
               </tr>

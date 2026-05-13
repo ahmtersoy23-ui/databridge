@@ -38,7 +38,7 @@ const STOREFRONT_COUNTRY: Record<string, string> = {
 
 export default function KauflandMappings() {
   const [accounts, setAccounts] = useState<KauflandAccount[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState<number | ''>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<number | 'all' | ''>('all');
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ total: 0, page: 1, limit: 50, pages: 1 });
   const [loading, setLoading] = useState(true);
@@ -55,7 +55,6 @@ export default function KauflandMappings() {
     axios.get('/api/v1/kaufland/settings').then(r => {
       const active = (r.data.accounts || []).filter((a: KauflandAccount) => a.is_active);
       setAccounts(active);
-      if (active.length > 0 && !selectedAccountId) setSelectedAccountId(active[0].id);
     }).catch(() => {});
   }, []);
 
@@ -64,7 +63,11 @@ export default function KauflandMappings() {
     setLoading(true);
     try {
       const res = await axios.get('/api/v1/kaufland/mappings', {
-        params: { filter, page, limit: pagination.limit, search, accountId: selectedAccountId },
+        params: {
+          filter, page, limit: pagination.limit, search,
+          // Backend treats missing accountId as 'all storefronts'.
+          ...(selectedAccountId === 'all' ? {} : { accountId: selectedAccountId }),
+        },
       });
       setRows(res.data.data);
       setPagination(res.data.pagination);
@@ -119,7 +122,7 @@ export default function KauflandMappings() {
   };
 
   const handleExport = () => {
-    const accountParam = selectedAccountId ? `?accountId=${selectedAccountId}` : '';
+    const accountParam = selectedAccountId && selectedAccountId !== 'all' ? `?accountId=${selectedAccountId}` : '';
     window.location.href = `/api/v1/kaufland/mappings/export${accountParam}`;
   };
 
@@ -136,8 +139,9 @@ export default function KauflandMappings() {
       const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
 
       const mappings: Array<{ account_id: number; marketplace_sku: string; iwasku: string }> = [];
+      const defaultAccountId = selectedAccountId === 'all' ? null : selectedAccountId;
       for (const row of rawRows) {
-        const accountId = Number(row['account_id'] || selectedAccountId);
+        const accountId = Number(row['account_id'] || defaultAccountId);
         const mpSku = String(row['marketplace_sku'] ?? row['sku'] ?? row['ean'] ?? '').trim();
         const iwasku = String(row['iwasku'] ?? '').trim();
         if (accountId && mpSku && iwasku) mappings.push({ account_id: accountId, marketplace_sku: mpSku, iwasku });
@@ -165,8 +169,14 @@ export default function KauflandMappings() {
     <div>
       <h1 className="mb-4">Kaufland Mappings</h1>
 
-      {accounts.length > 1 && (
+      {accounts.length > 0 && (
         <div className="flex gap-2 mb-4">
+          <button onClick={() => setSelectedAccountId('all')}
+            className={`px-4 py-1.5 rounded-md cursor-pointer text-sm font-semibold border-2 ${
+              selectedAccountId === 'all' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white text-slate-700 border-gray-300'
+            }`}>
+            All
+          </button>
           {accounts.map(a => (
             <button key={a.id} onClick={() => setSelectedAccountId(a.id)}
               className={`px-4 py-1.5 rounded-md cursor-pointer text-sm font-semibold border-2 ${
