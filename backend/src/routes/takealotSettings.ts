@@ -83,7 +83,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
     const today = new Date().toISOString().slice(0, 10);
     interface Probe { sales?: unknown[]; page_summary?: { total?: number } }
     const resp = await takealotGet<Probe>(account, '/v2/sales', {
-      params: { filters: `start_date:${today};end_date:${today}`, page_size: 1 },
+      params: { filters: `start_date:${today},end_date:${today}`, page_size: 1 },
     });
     const total = resp.page_summary?.total ?? resp.sales?.length ?? 0;
     res.json({
