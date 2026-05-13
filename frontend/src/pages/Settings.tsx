@@ -30,6 +30,16 @@ interface WalmartAccount {
   updated_at: string;
 }
 
+interface BolAccount {
+  id: number;
+  label: string;
+  client_id: string;
+  channel: string;
+  use_sandbox: boolean;
+  is_active: boolean;
+  updated_at: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -45,9 +55,10 @@ const emptyForm = { region: 'NA', seller_id: '', refresh_token: '', client_id: '
 const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wisersell.com/restapi' };
 const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sandbox: false, supplier_id: '', channel: '', warehouse: '' };
 const emptyWalmartForm = { label: 'us-main', client_id: '', client_secret: '', use_sandbox: false };
+const emptyBolForm = { label: '', client_id: '', client_secret: '', channel: '' };
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'wisersell' | 'ads'>('amazon');
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'wisersell' | 'ads'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -75,6 +86,14 @@ export default function Settings() {
   const [walmartMessage, setWalmartMessage] = useState('');
   const [walmartTesting, setWalmartTesting] = useState<number | null>(null);
   const [walmartDeleting, setWalmartDeleting] = useState<number | null>(null);
+
+  const [bolAccounts, setBolAccounts] = useState<BolAccount[]>([]);
+  const [bolForm, setBolForm] = useState(emptyBolForm);
+  const [bolEditingId, setBolEditingId] = useState<number | null>(null);
+  const [bolSaving, setBolSaving] = useState(false);
+  const [bolMessage, setBolMessage] = useState('');
+  const [bolTesting, setBolTesting] = useState<number | null>(null);
+  const [bolDeleting, setBolDeleting] = useState<number | null>(null);
 
   // Ads state
   const [adsCredentials, setAdsCredentials] = useState<Array<{ id: number; region: string; account_name: string; is_active: boolean; has_ads_token: boolean }>>([]);
@@ -123,6 +142,15 @@ export default function Settings() {
     }
   };
 
+  const fetchBolAccounts = async () => {
+    try {
+      const res = await axios.get('/api/v1/bol/settings');
+      setBolAccounts(res.data.accounts || []);
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchAdsCredentials = async () => {
     try {
       const res = await axios.get('/api/v1/ads/credentials');
@@ -137,7 +165,7 @@ export default function Settings() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchBolAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -363,6 +391,85 @@ export default function Settings() {
     }
   };
 
+  // --- Bol handlers --------------------------------------------------------
+
+  const handleBolEdit = (a: BolAccount) => {
+    setBolEditingId(a.id);
+    setBolForm({ label: a.label, client_id: a.client_id, client_secret: '', channel: a.channel });
+    setBolMessage('');
+  };
+
+  const handleBolCancelEdit = () => {
+    setBolEditingId(null);
+    setBolForm(emptyBolForm);
+    setBolMessage('');
+  };
+
+  const handleBolSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBolSaving(true);
+    setBolMessage('');
+    try {
+      if (bolEditingId) {
+        const updates: Record<string, unknown> = {};
+        if (bolForm.label) updates.label = bolForm.label;
+        if (bolForm.client_id) updates.client_id = bolForm.client_id;
+        if (bolForm.client_secret) updates.client_secret = bolForm.client_secret;
+        if (bolForm.channel) updates.channel = bolForm.channel;
+        await axios.put(`/api/v1/bol/settings/${bolEditingId}`, updates);
+        setBolMessage('Updated successfully!');
+        setBolEditingId(null);
+      } else {
+        await axios.post('/api/v1/bol/settings', {
+          label: bolForm.label,
+          client_id: bolForm.client_id,
+          client_secret: bolForm.client_secret,
+          channel: bolForm.channel,
+        });
+        setBolMessage('Account added successfully!');
+      }
+      setBolForm(emptyBolForm);
+      fetchBolAccounts();
+    } catch (err: any) {
+      setBolMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setBolSaving(false);
+    }
+  };
+
+  const handleBolTest = async (id: number) => {
+    setBolTesting(id);
+    setBolMessage('');
+    try {
+      const res = await axios.post(`/api/v1/bol/settings/${id}/test`);
+      setBolMessage(res.data.message);
+    } catch (err: any) {
+      setBolMessage(err.response?.data?.error || 'Connection failed');
+    } finally {
+      setBolTesting(null);
+    }
+  };
+
+  const handleBolToggle = async (id: number, currentActive: boolean) => {
+    try {
+      await axios.put(`/api/v1/bol/settings/${id}`, { is_active: !currentActive });
+      fetchBolAccounts();
+    } catch { /* ignore */ }
+  };
+
+  const handleBolDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete Bol account "${label}"?`)) return;
+    setBolDeleting(id);
+    try {
+      await axios.delete(`/api/v1/bol/settings/${id}`);
+      fetchBolAccounts();
+    } catch (err: any) {
+      setBolMessage(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setBolDeleting(null);
+    }
+  };
+
   const handleWayfairDelete = async (id: number, label: string) => {
     if (!confirm(`Delete Wayfair account "${label}"?`)) return;
     setWayfairDeleting(id);
@@ -434,8 +541,8 @@ export default function Settings() {
 
       {/* Tab bar */}
       <div className="flex gap-1 mb-6 border-b-2 border-slate-200">
-        {(['amazon', 'ads', 'wayfair', 'walmart', 'wisersell'] as const).map(t => {
-          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', wisersell: 'Wisersell' };
+        {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'wisersell'] as const).map(t => {
+          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', wisersell: 'Wisersell' };
           return (
             <button
               key={t}
@@ -783,6 +890,115 @@ export default function Settings() {
             <button type="submit" disabled={walmartSaving}
               className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${walmartEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
               {walmartSaving ? 'Saving...' : walmartEditingId ? 'Update Account' : 'Add Account'}
+            </button>
+          </form>
+        </div>
+      </>}
+
+      {/* Bol tab */}
+      {activeTab === 'bol' && <>
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <h2 className="mb-4">Bol Accounts</h2>
+          {bolMessage && (
+            <p className={`mb-3 ${bolMessage.includes('OK') || bolMessage.includes('success') || bolMessage.includes('Updated') || bolMessage.includes('added') ? 'text-emerald-600' : 'text-red-600'}`}>
+              {bolMessage}
+            </p>
+          )}
+          {bolAccounts.length === 0 ? (
+            <p className="text-slate-500">No Bol accounts configured yet.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">Account</th>
+                  <th className="text-left p-2">Channel</th>
+                  <th className="text-left p-2">Client ID</th>
+                  <th className="text-left p-2">Status</th>
+                  <th className="text-left p-2">Updated</th>
+                  <th className="text-left p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {bolAccounts.map(a => (
+                  <tr key={a.id} className={`border-b border-slate-200 ${bolEditingId === a.id ? 'bg-[#eff6ff]' : ''}`}>
+                    <td className="p-2 font-semibold capitalize">{a.label}</td>
+                    <td className="p-2 font-mono text-sm text-slate-600">{a.channel}</td>
+                    <td className="p-2 font-mono text-sm">{a.client_id.slice(0, 8)}...{a.client_id.slice(-4)}</td>
+                    <td className="p-2">
+                      <span className={a.is_active ? 'text-emerald-600' : 'text-gray-400'}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-2 text-sm text-slate-500">
+                      {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="p-2 whitespace-nowrap">
+                      <button onClick={() => handleBolTest(a.id)} disabled={bolTesting === a.id}
+                        className="px-3 py-1 bg-[#6366f1] text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {bolTesting === a.id ? '...' : 'Test'}
+                      </button>
+                      <button onClick={() => handleBolToggle(a.id, a.is_active)}
+                        className={`px-3 py-1 text-white border-none rounded cursor-pointer text-xs mr-1 ${a.is_active ? 'bg-amber-600' : 'bg-emerald-600'}`}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleBolEdit(a)}
+                        className="px-3 py-1 bg-blue-600 text-white border-none rounded cursor-pointer text-xs mr-1">Edit</button>
+                      <button onClick={() => handleBolDelete(a.id, a.label)} disabled={bolDeleting === a.id}
+                        className="px-3 py-1 bg-red-600 text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {bolDeleting === a.id ? '...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2>{bolEditingId ? `Edit — ${bolForm.label}` : 'Add Bol Account'}</h2>
+            {bolEditingId && (
+              <button onClick={handleBolCancelEdit}
+                className="px-4 py-1 bg-gray-500 text-white border-none rounded cursor-pointer text-sm">Cancel</button>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Bol Retailer API (FBR). Token TTL 5dk, son 30 gün siparişleri günlük 04:15 UTC çekilir.
+            Channel kodu sales_data tablosunda kullanılır (örn. bol_pera, bol_onebv).
+          </p>
+          <form onSubmit={handleBolSubmit}>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>
+                <label htmlFor="bol-label" className="block mb-1 font-medium">Account Label</label>
+                <input id="bol-label" type="text" placeholder="e.g. pera, onebv" value={bolForm.label}
+                  onChange={e => setBolForm({ ...bolForm, label: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+              </div>
+              <div>
+                <label htmlFor="bol-channel" className="block mb-1 font-medium">Sales Channel</label>
+                <input id="bol-channel" type="text" placeholder="e.g. bol_pera, bol_onebv" value={bolForm.channel}
+                  onChange={e => setBolForm({ ...bolForm, channel: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!bolEditingId} />
+              </div>
+              <div>
+                <label htmlFor="bol-client-id" className="block mb-1 font-medium">Client ID</label>
+                <input id="bol-client-id" type="text" placeholder="Bol Client ID" value={bolForm.client_id}
+                  onChange={e => setBolForm({ ...bolForm, client_id: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!bolEditingId} />
+              </div>
+              <div>
+                <label htmlFor="bol-client-secret" className="block mb-1 font-medium">Client Secret</label>
+                <input id="bol-client-secret" type="password"
+                  placeholder={bolEditingId ? 'Leave blank to keep current' : 'Client Secret'}
+                  value={bolForm.client_secret}
+                  onChange={e => setBolForm({ ...bolForm, client_secret: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!bolEditingId} />
+              </div>
+            </div>
+            <button type="submit" disabled={bolSaving}
+              className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${bolEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+              {bolSaving ? 'Saving...' : bolEditingId ? 'Update Account' : 'Add Account'}
             </button>
           </form>
         </div>

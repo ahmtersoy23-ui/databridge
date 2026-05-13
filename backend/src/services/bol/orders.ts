@@ -1,0 +1,127 @@
+import logger from '../../config/logger';
+import { bolGet, type BolAccount } from './client';
+
+// -- Response types (subset of Bol /retailer/orders) -----------------------
+
+export interface BolOrderItem {
+  orderItemId: string;
+  ean?: string;
+  fulfilment?: { method?: 'FBR' | 'FBB'; latestDeliveryDate?: string };
+  offer?: { reference?: string };  // seller SKU
+  product?: { title?: string };
+  quantity: number;
+  unitPrice?: number;
+}
+
+export interface BolOrder {
+  orderId: string;
+  orderPlacedDateTime: string;     // ISO 8601 with timezone offset
+  orderItems: BolOrderItem[];
+}
+
+interface OrdersListResponse {
+  orders?: BolOrder[];
+}
+
+// -- Parsed row ready for insertion ---------------------------------------
+
+export interface BolParsedOrderLine {
+  account_id: number;
+  order_id: string;
+  order_item_id: string;
+  order_placed_at: Date;
+  order_date_local: string;        // YYYY-MM-DD
+  sku: string | null;
+  ean: string | null;
+  product_title: string | null;
+  quantity: number;
+  unit_price: number;
+  item_price: number;               // unit_price * quantity (line total)
+  currency: string;
+  fulfilment_method: string | null;
+}
+
+function parseOrder(account: BolAccount, order: BolOrder): BolParsedOrderLine[] {
+  const placed = new Date(order.orderPlacedDateTime);
+  const localDate = placed.toISOString().slice(0, 10);
+
+  return order.orderItems.map(item => {
+    const qty = Number(item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    return {
+      account_id: account.id,
+      order_id: order.orderId,
+      order_item_id: item.orderItemId,
+      order_placed_at: placed,
+      order_date_local: localDate,
+      sku: item.offer?.reference ?? null,
+      ean: item.ean ?? null,
+      product_title: item.product?.title ?? null,
+      quantity: qty,
+      unit_price: unitPrice,
+      item_price: unitPrice * qty,
+      currency: 'EUR',
+      fulfilment_method: item.fulfilment?.method ?? null,
+    };
+  });
+}
+
+// -- Fetch with page pagination -------------------------------------------
+
+export interface FetchBolOrdersOptions {
+  /** ISO date YYYY-MM-DD for latest-change-date filter (max 3 months back) */
+  latestChangeDate?: string;
+  /** ALL = OPEN + handled (default); OPEN = needs shipment */
+  status?: 'OPEN' | 'SHIPPED' | 'ALL';
+  /** FBR = self-fulfilled (default for IWA), FBB = Bol warehouse, ALL */
+  fulfilmentMethod?: 'FBR' | 'FBB' | 'ALL';
+  /** Hard stop on pages (safety) — default 500 (50k items) */
+  maxPages?: number;
+}
+
+export async function fetchOrders(
+  account: BolAccount,
+  opts: FetchBolOrdersOptions = {},
+): Promise<BolParsedOrderLine[]> {
+  const status = opts.status ?? 'ALL';
+  const fulfilmentMethod = opts.fulfilmentMethod ?? 'FBR';
+  const maxPages = opts.maxPages ?? 500;
+
+  const allRows: BolParsedOrderLine[] = [];
+  let page = 1;
+  let orderCount = 0;
+
+  while (page <= maxPages) {
+    const resp = await bolGet<OrdersListResponse>(account, '/orders', {
+      params: {
+        page,
+        status,
+        'fulfilment-method': fulfilmentMethod,
+        'latest-change-date': opts.latestChangeDate,
+      },
+    });
+
+    const orders = resp.orders ?? [];
+    if (orders.length === 0) {
+      logger.info(`[Bol] '${account.label}' page ${page}: empty, stopping`);
+      break;
+    }
+
+    for (const order of orders) {
+      allRows.push(...parseOrder(account, order));
+      orderCount++;
+    }
+
+    logger.info(
+      `[Bol] '${account.label}' page ${page}: ${orders.length} orders ` +
+      `(running total: ${orderCount})`
+    );
+    page++;
+  }
+
+  logger.info(
+    `[Bol] '${account.label}' fetched ${orderCount} orders across ${page - 1} pages ` +
+    `(${allRows.length} order items)`
+  );
+  return allRows;
+}

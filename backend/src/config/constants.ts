@@ -37,6 +37,10 @@ export const SYNC_WISERSELL_PENDING_CRON  = '15 9 * * *';         // 09:15 UTC (
 // Walmart Marketplace orders sync — daily after Amazon sales window.
 // Token TTL 15 dk, max 200 limit/page, son 30 gün rolling (kullanıcı tercihi).
 export const SYNC_WALMART_ORDERS_CRON = '0 4 * * *';              // 04:00 UTC (Amazon sales 03:00'ten sonra)
+
+// Bol.com Retailer orders sync (Pera + OneBV, FBR fulfilment).
+// Token TTL 299s, max 3 ay history, az volume (~3 siparis/gun toplam).
+export const SYNC_BOL_ORDERS_CRON = '15 4 * * *';                 // 04:15 UTC (Walmart'tan 15dk sonra)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 // Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)

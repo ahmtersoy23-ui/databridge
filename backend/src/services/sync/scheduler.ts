@@ -16,9 +16,10 @@ import { syncWisersellShipments } from './wisersellShipmentSync';
 import { syncWisersellOrders } from './wisersellOrderSync';
 import { syncWisersellPendingOrders } from './wisersellPendingSync';
 import { syncWalmartOrders } from './walmartOrdersSync';
+import { syncBolOrders } from './bolOrdersSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -491,6 +492,24 @@ async function runWalmartOrdersSync(): Promise<number> {
   }
 }
 
+let isBolOrdersSyncing = false;
+let bolOrdersTask: cron.ScheduledTask | null = null;
+async function runBolOrdersSync(): Promise<number> {
+  if (isBolOrdersSyncing) {
+    logger.warn('[Scheduler] Skipping Bol orders sync - already running');
+    return 0;
+  }
+  isBolOrdersSyncing = true;
+  try {
+    return await syncBolOrders();
+  } catch (err: any) {
+    logger.error('[Scheduler] Bol orders sync failed:', err.message);
+    return 0;
+  } finally {
+    isBolOrdersSyncing = false;
+  }
+}
+
 let isWisersellPendingSyncing = false;
 let wisersellPendingTask: cron.ScheduledTask | null = null;
 async function runWisersellPendingSync(): Promise<number> {
@@ -624,6 +643,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Walmart orders sync error:', err));
   });
 
+  bolOrdersTask = cron.schedule(SYNC_BOL_ORDERS_CRON, () => {
+    withSyncLog('bol-orders', () => runBolOrdersSync())
+      .catch(err => logger.error('[Scheduler] Bol orders sync error:', err));
+  });
+
   // Review tracking runs locally (Mac residential IP) via launchd — no server cron
 
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
@@ -647,6 +671,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Wisersell orders sync: ${SYNC_WISERSELL_ORDERS_CRON}`);
   logger.info(`[Scheduler] Wisersell pending sync: ${SYNC_WISERSELL_PENDING_CRON}`);
   logger.info(`[Scheduler] Walmart orders sync: ${SYNC_WALMART_ORDERS_CRON}`);
+  logger.info(`[Scheduler] Bol orders sync: ${SYNC_BOL_ORDERS_CRON}`);
   // No startup syncs — use manual Dashboard trigger or scheduled cron jobs
 }
 
@@ -671,7 +696,8 @@ export function stopScheduler(): void {
   wisersellShipmentTask?.stop();
   wisersellPendingTask?.stop();
   walmartOrdersTask?.stop();
+  bolOrdersTask?.stop();
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
