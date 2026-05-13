@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { syncFedexTrackings } from '../services/sync/fedexSync';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
@@ -179,6 +180,31 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     }
   } catch (err: any) {
     logger.error('[Sync] Trigger error:', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/sync/fedex-track-trackings { trackings: string[] }
+ * Verilen tracking listesini FedEx Track API'den çekip fedex_shipments'a UPSERT eder.
+ * Cron'dan bağımsız ad-hoc tetik — cargolens misafir gönderi backfill'i gibi
+ * use case'ler için. Senkron çalışır (response döner sonuçla).
+ */
+const fedexTrackTrackingsSchema = z.object({
+  trackings: z.array(z.string().min(1)).min(1).max(2000),
+});
+
+router.post('/fedex-track-trackings', validateBody(fedexTrackTrackingsSchema), async (req: Request, res: Response) => {
+  try {
+    const { trackings } = req.body as { trackings: string[] };
+    let result: Awaited<ReturnType<typeof syncFedexTrackings>> | null = null;
+    await withSyncLog('fedex-track-trackings', async () => {
+      result = await syncFedexTrackings(trackings);
+      return result.fetched;
+    });
+    res.json({ success: true, data: result });
+  } catch (err: any) {
+    logger.error('[Sync] FedEx track-trackings error:', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
