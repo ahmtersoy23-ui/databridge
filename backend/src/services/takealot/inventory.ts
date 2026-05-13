@@ -97,6 +97,10 @@ export async function fetchOffers(
 
     const serverTotal = resp.page_summary?.total;
     if (serverTotal != null && offerCount >= serverTotal) break;
+
+    // Stop if last page (fewer rows than page_size)
+    if (offers.length < pageSize) break;
+
     page++;
   }
 

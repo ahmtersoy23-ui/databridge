@@ -118,6 +118,9 @@ export async function fetchOrders(
     const serverTotal = resp.page_summary?.total;
     if (serverTotal != null && saleCount >= serverTotal) break;
 
+    // Stop if last page (fewer rows than page_size)
+    if (sales.length < pageSize) break;
+
     page++;
   }
 
