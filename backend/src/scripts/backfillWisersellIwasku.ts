@@ -9,6 +9,7 @@
  *   ssh -p 2222 root@78.47.117.36 'cd /var/www/databridge && \
  *     sudo -u iwaapps npx ts-node src/scripts/backfillWisersellIwasku.ts'
  */
+import 'dotenv/config';
 import { backfillResolution } from '../services/wisersell/iwaskuResolver';
 import { pool, sharedPool } from '../config/database';
 import logger from '../config/logger';
