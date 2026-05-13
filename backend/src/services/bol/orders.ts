@@ -192,39 +192,49 @@ export async function fetchShipments(
   const fulfilmentMethod = opts.fulfilmentMethod ?? 'FBR';
   const maxPages = opts.maxPages ?? 500;
 
-  const allRows: BolParsedOrderLine[] = [];
+  // 1) List endpoint → shipmentId'leri topla (slim data)
+  const shipmentIds: string[] = [];
   let page = 1;
-  let shipmentCount = 0;
 
   while (page <= maxPages) {
     const resp = await bolGet<ShipmentsListResponse>(account, '/shipments', {
-      params: {
-        page,
-        'fulfilment-method': fulfilmentMethod,
-      },
+      params: { page, 'fulfilment-method': fulfilmentMethod },
     });
-
-    const shipments = resp.shipments ?? [];
-    if (shipments.length === 0) {
-      logger.info(`[Bol] '${account.label}' shipments page ${page}: empty, stopping`);
+    const list = resp.shipments ?? [];
+    if (list.length === 0) {
+      logger.info(`[Bol] '${account.label}' shipments list page ${page}: empty, stopping`);
       break;
     }
-
-    for (const shipment of shipments) {
-      allRows.push(...parseShipment(account, shipment));
-      shipmentCount++;
-    }
-
+    for (const s of list) shipmentIds.push(s.shipmentId);
     logger.info(
-      `[Bol] '${account.label}' shipments page ${page}: ${shipments.length} shipments ` +
-      `(running total: ${shipmentCount})`
+      `[Bol] '${account.label}' shipments list page ${page}: ${list.length} IDs ` +
+      `(running total: ${shipmentIds.length})`,
     );
     page++;
   }
 
+  if (shipmentIds.length === 0) return [];
+
+  // 2) Detay endpoint → her shipmentId icin tam orderItem detayi
+  logger.info(`[Bol] '${account.label}' fetching detail for ${shipmentIds.length} shipments...`);
+  const allRows: BolParsedOrderLine[] = [];
+  let fetched = 0;
+  for (const id of shipmentIds) {
+    try {
+      const detail = await bolGet<BolShipment>(account, `/shipments/${id}`);
+      allRows.push(...parseShipment(account, detail));
+      fetched++;
+      if (fetched % 50 === 0) {
+        logger.info(`[Bol] '${account.label}' detail progress: ${fetched}/${shipmentIds.length}`);
+      }
+    } catch (err: any) {
+      logger.warn(`[Bol] '${account.label}' detail ${id} failed: ${err.message}`);
+    }
+  }
+
   logger.info(
-    `[Bol] '${account.label}' fetched ${shipmentCount} shipments across ${page - 1} pages ` +
-    `(${allRows.length} shipment items)`
+    `[Bol] '${account.label}' fetched ${fetched}/${shipmentIds.length} shipment details ` +
+    `(${allRows.length} order items)`,
   );
   return allRows;
 }
