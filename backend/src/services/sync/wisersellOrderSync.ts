@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
-import { downloadOrdersExcel, type OrderExcelOptions } from '../wisersell/webClient';
+import { downloadOrdersExcel } from '../wisersell/webClient';
+import { resolveBatch } from '../wisersell/iwaskuResolver';
 
 /**
  * Wisersell Kapalı Sipariş raporu sync.
@@ -156,6 +157,8 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
     hediye_notu: string | null;
     kullanici_notu: string | null;
     kisisellestirme_notu: string | null;
+    iwasku: string | null;
+    resolved_by: string | null;
     raw_row: unknown;
   };
   const parsed: Parsed[] = [];
@@ -190,8 +193,23 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
       hediye_notu: clean(getCell(row, 'hediye_notu')),
       kullanici_notu: clean(getCell(row, 'kullanici_notu')),
       kisisellestirme_notu: clean(getCell(row, 'kisisellestirme_notu')),
+      iwasku: null,
+      resolved_by: null,
       raw_row: row,
     });
+  }
+
+  // iwasku resolution — 4 katmanlı zincir (cache'li sözlüklerle batch)
+  if (parsed.length > 0) {
+    const resolutions = await resolveBatch(
+      parsed.map(p => ({ urun_kodu: p.urun_kodu, sku: p.sku, urun_basligi: p.urun_basligi })),
+    );
+    parsed.forEach((p, idx) => {
+      p.iwasku = resolutions[idx].iwasku;
+      p.resolved_by = resolutions[idx].resolved_by;
+    });
+    const matched = resolutions.filter(r => r.iwasku).length;
+    logger.info(`[WisersellOrderSync] iwasku resolution: ${matched}/${parsed.length} eşleşti`);
   }
   // Pre-dedupe: aynı (siparis_no, sku, varyant) için son satırı tut
   // (Wisersell Excel'de bazen aynı satır tekrarlanıyor — ON CONFLICT batch'i bozar)
@@ -225,9 +243,9 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
     const values: string[] = [];
     const params: unknown[] = [];
     slice.forEach((p, idx) => {
-      const o = idx * 23;
-      const placeholders = Array.from({ length: 23 }, (_, k) => `$${o + k + 1}`);
-      placeholders[22] = `${placeholders[22]}::jsonb`; // raw_row
+      const o = idx * 25;
+      const placeholders = Array.from({ length: 25 }, (_, k) => `$${o + k + 1}`);
+      placeholders[24] = `${placeholders[24]}::jsonb`; // raw_row son kolon
       values.push(`(${placeholders.join(',')})`);
       params.push(
         p.siparis_no, p.etiket_no, p.label_base, p.platform,
@@ -236,7 +254,8 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
         p.urun_id, p.urun_kodu, p.sku, p.urun_basligi, p.urun_adi, p.varyant,
         p.adet, p.musteri_notu, p.urun_aciklamalari, p.hediye_notu,
         p.kullanici_notu, p.kisisellestirme_notu,
-        JSON.stringify(p.raw_row).replace(/ /g, ''),
+        p.iwasku, p.resolved_by,
+        JSON.stringify(p.raw_row).replace(/ /g, ''),
       );
     });
 
@@ -250,6 +269,7 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
            urun_id, urun_kodu, sku, urun_basligi, urun_adi, varyant,
            adet, musteri_notu, urun_aciklamalari, hediye_notu,
            kullanici_notu, kisisellestirme_notu,
+           iwasku, resolved_by,
            raw_row
          ) VALUES ${values.join(',')}
          ON CONFLICT (siparis_no, sku, COALESCE(varyant, '')) DO UPDATE SET
@@ -272,6 +292,8 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
            hediye_notu = EXCLUDED.hediye_notu,
            kullanici_notu = EXCLUDED.kullanici_notu,
            kisisellestirme_notu = EXCLUDED.kisisellestirme_notu,
+           iwasku = EXCLUDED.iwasku,
+           resolved_by = EXCLUDED.resolved_by,
            raw_row = EXCLUDED.raw_row,
            synced_at = NOW()
          RETURNING (xmax = 0) AS inserted`,
