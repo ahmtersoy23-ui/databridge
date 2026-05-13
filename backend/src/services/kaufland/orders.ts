@@ -5,11 +5,11 @@ import { kauflandRequest, storefrontCode, type KauflandAccount } from './client'
 
 interface KauflandOrderListItem {
   id_order: string;
-  ts_created_iso: string;            // ISO 8601
+  ts_created_iso: string;
   ts_units_updated_iso?: string;
   storefront: string;
   order_units_count?: number;
-  is_marketplace_deemed_supplier?: boolean;
+  fulfillment_type?: string;
 }
 
 interface OrdersListResponse {
@@ -18,25 +18,28 @@ interface OrdersListResponse {
 }
 
 interface KauflandOrderUnit {
-  id_order_unit: string;
-  id_offer?: string;
-  ean?: string | null;
-  offer_sku?: string | null;
-  title?: string | null;
-  amount?: number;
-  unit_price?: number;
-  currency?: string;
+  id_order_unit: number;
+  id_offer?: string | null;          // seller offer/SKU (often iwasku-formatted)
   status?: string;
+  price?: number;                    // cents
+  revenue_gross?: number;
+  revenue_net?: number;
+  currency?: string;
   ts_created_iso?: string;
-  id_product_unit?: string;
+  product?: {
+    id_product?: number;
+    title?: string;
+    eans?: string[];
+  };
+  cancel_reason?: string | null;
 }
 
 interface KauflandOrderDetail {
   id_order: string;
   ts_created_iso: string;
   storefront: string;
-  status?: string;
-  units?: KauflandOrderUnit[];
+  order_units?: KauflandOrderUnit[];
+  fulfillment_type?: string;
 }
 
 interface OrderDetailResponse {
@@ -52,9 +55,9 @@ export interface KauflandParsedOrderLine {
   order_date: Date;
   order_date_local: string;
   ean: string | null;
-  offer_sku: string | null;
+  offer_sku: string | null;          // id_offer
   product_title: string | null;
-  product_id_unit: string | null;
+  product_id_unit: string | null;    // id_product (Kaufland's internal product ID)
   quantity: number;
   unit_price: number;
   item_price: number;
@@ -66,27 +69,32 @@ export interface KauflandParsedOrderLine {
 function parseDetail(detail: KauflandOrderDetail): KauflandParsedOrderLine[] {
   const orderDate = new Date(detail.ts_created_iso);
   const localDate = orderDate.toISOString().slice(0, 10);
-  const units = detail.units ?? [];
+  const units = detail.order_units ?? [];
 
   return units.map(u => {
-    const quantity = Number(u.amount ?? 1);
-    const unitPrice = Number(u.unit_price ?? 0);
-    const status = u.status ?? detail.status ?? null;
+    // Kaufland order_units are per-item; each row = 1 unit.
+    const quantity = 1;
+    // Prices in cents (integer). Use revenue_gross (post-fees, what we actually receive)
+    // if present, else fall back to price; convert cents → currency.
+    const unitPriceCents = u.revenue_gross ?? u.price ?? 0;
+    const unitPrice = +(unitPriceCents / 100).toFixed(2);
+    const status = u.status ?? null;
     return {
       id_order: detail.id_order,
-      id_order_unit: u.id_order_unit,
+      id_order_unit: String(u.id_order_unit),
       storefront: detail.storefront,
       order_date: orderDate,
       order_date_local: localDate,
-      ean: u.ean ?? null,
-      offer_sku: u.offer_sku ?? null,
-      product_title: u.title ?? null,
-      product_id_unit: u.id_product_unit ?? null,
+      ean: u.product?.eans?.[0] ?? null,
+      offer_sku: u.id_offer ?? null,
+      product_title: u.product?.title ?? null,
+      product_id_unit: u.product?.id_product != null ? String(u.product.id_product) : null,
       quantity,
       unit_price: unitPrice,
-      item_price: +(unitPrice * quantity).toFixed(2),
+      item_price: unitPrice,           // quantity is always 1, so item = unit
       currency: u.currency ?? 'EUR',
       status,
+      // 'cancelled' is the explicit cancellation status; 'sent'/'shipped'/'open' are not cancelled.
       is_cancelled: typeof status === 'string' && /cancel/i.test(status),
     };
   });
@@ -107,7 +115,7 @@ export interface FetchOrdersOptions {
 
 /**
  * Fetch all orders since `tsFrom` for this account/storefront, then expand each
- * order via /orders/{id} to get line items (units). Returns flattened lines.
+ * order via /orders/{id} (no embed param — order_units come in default response).
  */
 export async function fetchOrdersWithUnits(
   account: KauflandAccount,
@@ -146,7 +154,7 @@ export async function fetchOrdersWithUnits(
 
   logger.info(`[Kaufland] '${account.label}' collected ${listIds.length} order IDs, fetching details…`);
 
-  // 2) Detail per order (rate-limit-friendly)
+  // 2) Detail per order (no embed param — order_units present in default response)
   const allRows: KauflandParsedOrderLine[] = [];
   let detailFails = 0;
 
@@ -157,13 +165,12 @@ export async function fetchOrdersWithUnits(
         account,
         'GET',
         `/orders/${encodeURIComponent(id)}`,
-        { query: { embedded: 'units' }, skipCircuitBreaker: true }
+        { skipCircuitBreaker: true }
       );
       if (resp.data) allRows.push(...parseDetail(resp.data));
     } catch (err: any) {
       detailFails++;
       const msg = err.message ?? '';
-      // Hit rate limit? back off harder.
       if (/429/.test(msg)) {
         logger.warn(`[Kaufland] 429 on '${id}', sleeping 5s`);
         await new Promise(r => setTimeout(r, 5000));

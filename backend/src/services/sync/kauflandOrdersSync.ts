@@ -25,8 +25,8 @@ function collectLookupKeys(rows: KauflandParsedOrderLine[]): string[] {
 function collectUnitKeys(rows: ParsedUnit[]): string[] {
   const s = new Set<string>();
   for (const r of rows) {
-    if (r.ean) s.add(r.ean);
     if (r.offer_sku) s.add(r.offer_sku);
+    if (r.id_product) s.add(r.id_product);
   }
   return [...s];
 }
@@ -179,7 +179,7 @@ async function upsertInventory(
         row.reserved_amount,
         row.price,
         row.status,
-        resolveIwasku(row.ean, row.offer_sku, null, iwaskuMap),
+        resolveIwasku(row.ean, row.offer_sku, row.id_product, iwaskuMap),
       );
     });
     const sql = `
@@ -216,7 +216,7 @@ export async function syncKauflandForAccount(
   }
   let invResolved = 0;
   for (const r of inventoryRows) {
-    if (resolveIwasku(r.ean, r.offer_sku, null, iwaskuMap)) invResolved++;
+    if (resolveIwasku(r.ean, r.offer_sku, r.id_product, iwaskuMap)) invResolved++;
   }
   logger.info(
     `[Kaufland] '${account.label}' iwasku resolved: ` +
