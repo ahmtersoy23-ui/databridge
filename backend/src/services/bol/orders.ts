@@ -1,7 +1,7 @@
 import logger from '../../config/logger';
 import { bolGet, type BolAccount } from './client';
 
-// -- Response types (subset of Bol /retailer/orders) -----------------------
+// -- /orders response types ------------------------------------------------
 
 export interface BolOrderItem {
   orderItemId: string;
@@ -21,6 +21,31 @@ export interface BolOrder {
 
 interface OrdersListResponse {
   orders?: BolOrder[];
+}
+
+// -- /shipments response types ---------------------------------------------
+
+export interface BolShipmentItem {
+  orderItemId: string;
+  ean?: string;
+  fulfilmentMethod?: 'FBR' | 'FBB';
+  offer?: { reference?: string };  // seller SKU
+  product?: { title?: string };
+  quantity?: number;
+  quantityShipped?: number;
+  unitPrice?: number;
+}
+
+export interface BolShipment {
+  shipmentId: string;
+  shipmentDate?: string;            // ISO 8601
+  shipmentReference?: string;
+  order?: { orderId: string; orderPlacedDateTime?: string };
+  shipmentItems: BolShipmentItem[];
+}
+
+interface ShipmentsListResponse {
+  shipments?: BolShipment[];
 }
 
 // -- Parsed row ready for insertion ---------------------------------------
@@ -62,6 +87,33 @@ function parseOrder(account: BolAccount, order: BolOrder): BolParsedOrderLine[] 
       item_price: unitPrice * qty,
       currency: 'EUR',
       fulfilment_method: item.fulfilment?.method ?? null,
+    };
+  });
+}
+
+function parseShipment(account: BolAccount, shipment: BolShipment): BolParsedOrderLine[] {
+  // Prefer orderPlacedDateTime; fall back to shipmentDate if order info absent
+  const placed = new Date(shipment.order?.orderPlacedDateTime || shipment.shipmentDate || Date.now());
+  const localDate = placed.toISOString().slice(0, 10);
+  const orderId = shipment.order?.orderId || shipment.shipmentId;
+
+  return shipment.shipmentItems.map(item => {
+    const qty = Number(item.quantityShipped ?? item.quantity) || 0;
+    const unitPrice = Number(item.unitPrice) || 0;
+    return {
+      account_id: account.id,
+      order_id: orderId,
+      order_item_id: item.orderItemId,
+      order_placed_at: placed,
+      order_date_local: localDate,
+      sku: item.offer?.reference ?? null,
+      ean: item.ean ?? null,
+      product_title: item.product?.title ?? null,
+      quantity: qty,
+      unit_price: unitPrice,
+      item_price: unitPrice * qty,
+      currency: 'EUR',
+      fulfilment_method: item.fulfilmentMethod ?? null,
     };
   });
 }
@@ -122,6 +174,57 @@ export async function fetchOrders(
   logger.info(
     `[Bol] '${account.label}' fetched ${orderCount} orders across ${page - 1} pages ` +
     `(${allRows.length} order items)`
+  );
+  return allRows;
+}
+
+// -- /shipments fetch (3 ay historical data, /orders'in 48h sinirina alternatif) --
+
+export interface FetchBolShipmentsOptions {
+  fulfilmentMethod?: 'FBR' | 'FBB';
+  maxPages?: number;
+}
+
+export async function fetchShipments(
+  account: BolAccount,
+  opts: FetchBolShipmentsOptions = {},
+): Promise<BolParsedOrderLine[]> {
+  const fulfilmentMethod = opts.fulfilmentMethod ?? 'FBR';
+  const maxPages = opts.maxPages ?? 500;
+
+  const allRows: BolParsedOrderLine[] = [];
+  let page = 1;
+  let shipmentCount = 0;
+
+  while (page <= maxPages) {
+    const resp = await bolGet<ShipmentsListResponse>(account, '/shipments', {
+      params: {
+        page,
+        'fulfilment-method': fulfilmentMethod,
+      },
+    });
+
+    const shipments = resp.shipments ?? [];
+    if (shipments.length === 0) {
+      logger.info(`[Bol] '${account.label}' shipments page ${page}: empty, stopping`);
+      break;
+    }
+
+    for (const shipment of shipments) {
+      allRows.push(...parseShipment(account, shipment));
+      shipmentCount++;
+    }
+
+    logger.info(
+      `[Bol] '${account.label}' shipments page ${page}: ${shipments.length} shipments ` +
+      `(running total: ${shipmentCount})`
+    );
+    page++;
+  }
+
+  logger.info(
+    `[Bol] '${account.label}' fetched ${shipmentCount} shipments across ${page - 1} pages ` +
+    `(${allRows.length} shipment items)`
   );
   return allRows;
 }

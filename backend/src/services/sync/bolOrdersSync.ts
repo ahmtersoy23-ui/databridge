@@ -2,7 +2,7 @@ import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type BolAccount } from '../bol/client';
-import { fetchOrders, type BolParsedOrderLine } from '../bol/orders';
+import { fetchOrders, fetchShipments, type BolParsedOrderLine } from '../bol/orders';
 import { writeBolSalesData } from './bolSalesDataWriter';
 
 // Rolling window — Bol allows max 3 months via latest-change-date.
@@ -120,33 +120,46 @@ async function upsertOrderLines(
   return inserted;
 }
 
+/**
+ * Per-account sync. Default mode='shipments' (3 ay historical, /shipments endpoint).
+ * mode='orders-recent' = /orders status=ALL (son 48h shipped + tum OPEN), gunluk cron icin.
+ */
 export async function syncBolOrdersForAccount(
   account: BolAccount,
   days: number = BOL_ROLLING_DAYS,
+  mode: 'shipments' | 'orders-recent' = 'shipments',
 ): Promise<number> {
-  const cappedDays = Math.min(days, BOL_MAX_HISTORY_DAYS);
-  const latestChangeDate = dateNDaysAgo(cappedDays);
+  let rows: BolParsedOrderLine[];
+  let label: string;
 
-  logger.info(
-    `[Bol] '${account.label}' fetching orders since ${latestChangeDate} (${cappedDays} days)`
-  );
-
-  const rows = await fetchOrders(account, {
-    status: 'ALL',
-    fulfilmentMethod: 'FBR',
-    latestChangeDate,
-  });
+  if (mode === 'shipments') {
+    label = `${account.label} (shipments, last ~3 months)`;
+    logger.info(`[Bol] '${account.label}' fetching shipments (FBR, all pages)`);
+    rows = await fetchShipments(account, { fulfilmentMethod: 'FBR' });
+  } else {
+    const cappedDays = Math.min(days, BOL_MAX_HISTORY_DAYS);
+    const latestChangeDate = dateNDaysAgo(cappedDays);
+    label = `${account.label} (orders, ${cappedDays} days)`;
+    logger.info(`[Bol] '${account.label}' fetching orders since ${latestChangeDate}`);
+    rows = await fetchOrders(account, {
+      status: 'ALL',
+      fulfilmentMethod: 'FBR',
+      latestChangeDate,
+    });
+  }
+  logger.info(`[Bol] ${label} → ${rows.length} items`);
 
   if (rows.length === 0) {
     logger.info(`[Bol] '${account.label}' no orders in window`);
     return 0;
   }
 
-  // Safety threshold
+  // Safety threshold — son 100 gun pencere (3 ay shipments + biraz buffer)
+  const compareSince = dateNDaysAgo(100);
   const existing = await pool.query<{ cnt: string }>(
     `SELECT COUNT(*)::text AS cnt FROM bol_raw_orders
      WHERE account_id = $1 AND order_date_local >= $2::date`,
-    [account.id, latestChangeDate],
+    [account.id, compareSince],
   );
   const existingCount = parseInt(existing.rows[0].cnt, 10);
   if (existingCount > 10 && rows.length < existingCount * 0.2) {
@@ -173,7 +186,10 @@ export async function syncBolOrdersForAccount(
   return inserted;
 }
 
-export async function syncBolOrders(days?: number): Promise<number> {
+export async function syncBolOrders(
+  days?: number,
+  mode: 'shipments' | 'orders-recent' = 'shipments',
+): Promise<number> {
   const accounts = await getActiveAccounts();
   if (accounts.length === 0) {
     logger.info('[Bol] No active accounts, skipping');
@@ -183,7 +199,7 @@ export async function syncBolOrders(days?: number): Promise<number> {
   let total = 0;
   for (const account of accounts) {
     try {
-      total += await syncBolOrdersForAccount(account, days);
+      total += await syncBolOrdersForAccount(account, days, mode);
     } catch (err: any) {
       logger.error(`[Bol] '${account.label}' sync failed: ${err.message}`);
     }
