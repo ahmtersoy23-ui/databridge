@@ -41,6 +41,9 @@ export const SYNC_WALMART_ORDERS_CRON = '0 4 * * *';              // 04:00 UTC (
 // Bol.com Retailer orders sync (Pera + OneBV, FBR fulfilment).
 // Token TTL 299s, max 3 ay history, az volume (~3 siparis/gun toplam).
 export const SYNC_BOL_ORDERS_CRON = '15 4 * * *';                 // 04:15 UTC (Walmart'tan 15dk sonra)
+
+// Takealot Seller API (single account ZA). API key auth, /v2/sales + /v2/offers.
+export const SYNC_TAKEALOT_CRON = '45 4 * * *';                   // 04:45 UTC (Bol'dan 30dk sonra)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 // Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)

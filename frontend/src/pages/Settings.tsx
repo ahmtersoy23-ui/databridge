@@ -40,6 +40,14 @@ interface BolAccount {
   updated_at: string;
 }
 
+interface TakealotAccount {
+  id: number;
+  label: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface Credential {
   id: number;
   region: string;
@@ -56,9 +64,10 @@ const emptyWisersellForm = { email: '', password: '', api_url: 'https://dev2.wis
 const emptyWayfairForm = { label: '', client_id: '', client_secret: '', use_sandbox: false, supplier_id: '', channel: '', warehouse: '' };
 const emptyWalmartForm = { label: 'us-main', client_id: '', client_secret: '', use_sandbox: false };
 const emptyBolForm = { label: '', client_id: '', client_secret: '', channel: '' };
+const emptyTakealotForm = { label: 'za-main', api_key: '' };
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'wisersell' | 'ads'>('amazon');
+  const [activeTab, setActiveTab] = useState<'amazon' | 'wayfair' | 'walmart' | 'bol' | 'takealot' | 'wisersell' | 'ads'>('amazon');
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -94,6 +103,14 @@ export default function Settings() {
   const [bolMessage, setBolMessage] = useState('');
   const [bolTesting, setBolTesting] = useState<number | null>(null);
   const [bolDeleting, setBolDeleting] = useState<number | null>(null);
+
+  const [takealotAccounts, setTakealotAccounts] = useState<TakealotAccount[]>([]);
+  const [takealotForm, setTakealotForm] = useState(emptyTakealotForm);
+  const [takealotEditingId, setTakealotEditingId] = useState<number | null>(null);
+  const [takealotSaving, setTakealotSaving] = useState(false);
+  const [takealotMessage, setTakealotMessage] = useState('');
+  const [takealotTesting, setTakealotTesting] = useState<number | null>(null);
+  const [takealotDeleting, setTakealotDeleting] = useState<number | null>(null);
 
   // Ads state
   const [adsCredentials, setAdsCredentials] = useState<Array<{ id: number; region: string; account_name: string; is_active: boolean; has_ads_token: boolean }>>([]);
@@ -151,6 +168,15 @@ export default function Settings() {
     }
   };
 
+  const fetchTakealotAccounts = async () => {
+    try {
+      const res = await axios.get('/api/v1/takealot/settings');
+      setTakealotAccounts(res.data.accounts || []);
+    } catch {
+      // ignore
+    }
+  };
+
   const fetchAdsCredentials = async () => {
     try {
       const res = await axios.get('/api/v1/ads/credentials');
@@ -165,7 +191,7 @@ export default function Settings() {
     } catch { /* ignore */ }
   };
 
-  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchBolAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
+  useEffect(() => { fetchCredentials(); fetchWisersellConfig(); fetchWayfairAccounts(); fetchWalmartAccounts(); fetchBolAccounts(); fetchTakealotAccounts(); fetchAdsCredentials(); fetchAdsProfiles(); }, []);
 
   const handleEdit = (c: Credential) => {
     setEditingId(c.id);
@@ -470,6 +496,81 @@ export default function Settings() {
     }
   };
 
+  // --- Takealot handlers ---------------------------------------------------
+
+  const handleTakealotEdit = (a: TakealotAccount) => {
+    setTakealotEditingId(a.id);
+    setTakealotForm({ label: a.label, api_key: '' });
+    setTakealotMessage('');
+  };
+
+  const handleTakealotCancelEdit = () => {
+    setTakealotEditingId(null);
+    setTakealotForm(emptyTakealotForm);
+    setTakealotMessage('');
+  };
+
+  const handleTakealotSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTakealotSaving(true);
+    setTakealotMessage('');
+    try {
+      if (takealotEditingId) {
+        const updates: Record<string, unknown> = {};
+        if (takealotForm.label) updates.label = takealotForm.label;
+        if (takealotForm.api_key) updates.api_key = takealotForm.api_key;
+        await axios.put(`/api/v1/takealot/settings/${takealotEditingId}`, updates);
+        setTakealotMessage('Updated successfully!');
+        setTakealotEditingId(null);
+      } else {
+        await axios.post('/api/v1/takealot/settings', {
+          label: takealotForm.label,
+          api_key: takealotForm.api_key,
+        });
+        setTakealotMessage('Account added successfully!');
+      }
+      setTakealotForm(emptyTakealotForm);
+      fetchTakealotAccounts();
+    } catch (err: any) {
+      setTakealotMessage(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setTakealotSaving(false);
+    }
+  };
+
+  const handleTakealotTest = async (id: number) => {
+    setTakealotTesting(id);
+    setTakealotMessage('');
+    try {
+      const res = await axios.post(`/api/v1/takealot/settings/${id}/test`);
+      setTakealotMessage(res.data.message);
+    } catch (err: any) {
+      setTakealotMessage(err.response?.data?.error || 'Connection failed');
+    } finally {
+      setTakealotTesting(null);
+    }
+  };
+
+  const handleTakealotToggle = async (id: number, currentActive: boolean) => {
+    try {
+      await axios.put(`/api/v1/takealot/settings/${id}`, { is_active: !currentActive });
+      fetchTakealotAccounts();
+    } catch { /* ignore */ }
+  };
+
+  const handleTakealotDelete = async (id: number, label: string) => {
+    if (!confirm(`Delete Takealot account "${label}"?`)) return;
+    setTakealotDeleting(id);
+    try {
+      await axios.delete(`/api/v1/takealot/settings/${id}`);
+      fetchTakealotAccounts();
+    } catch (err: any) {
+      setTakealotMessage(err.response?.data?.error || 'Failed to delete');
+    } finally {
+      setTakealotDeleting(null);
+    }
+  };
+
   const handleWayfairDelete = async (id: number, label: string) => {
     if (!confirm(`Delete Wayfair account "${label}"?`)) return;
     setWayfairDeleting(id);
@@ -541,8 +642,8 @@ export default function Settings() {
 
       {/* Tab bar */}
       <div className="flex gap-1 mb-6 border-b-2 border-slate-200">
-        {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'wisersell'] as const).map(t => {
-          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', wisersell: 'Wisersell' };
+        {(['amazon', 'ads', 'wayfair', 'walmart', 'bol', 'takealot', 'wisersell'] as const).map(t => {
+          const labels: Record<string, string> = { amazon: 'Amazon SP-API', ads: 'Amazon Ads', wayfair: 'Wayfair', walmart: 'Walmart', bol: 'Bol', takealot: 'Takealot', wisersell: 'Wisersell' };
           return (
             <button
               key={t}
@@ -999,6 +1100,99 @@ export default function Settings() {
             <button type="submit" disabled={bolSaving}
               className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${bolEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
               {bolSaving ? 'Saving...' : bolEditingId ? 'Update Account' : 'Add Account'}
+            </button>
+          </form>
+        </div>
+      </>}
+
+      {/* Takealot tab */}
+      {activeTab === 'takealot' && <>
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <h2 className="mb-4">Takealot Accounts</h2>
+          {takealotMessage && (
+            <p className={`mb-3 ${takealotMessage.includes('OK') || takealotMessage.includes('success') || takealotMessage.includes('Updated') || takealotMessage.includes('added') ? 'text-emerald-600' : 'text-red-600'}`}>
+              {takealotMessage}
+            </p>
+          )}
+          {takealotAccounts.length === 0 ? (
+            <p className="text-slate-500">No Takealot accounts configured yet.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b-2 border-slate-200">
+                  <th className="text-left p-2">Account</th>
+                  <th className="text-left p-2">Status</th>
+                  <th className="text-left p-2">Updated</th>
+                  <th className="text-left p-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {takealotAccounts.map(a => (
+                  <tr key={a.id} className={`border-b border-slate-200 ${takealotEditingId === a.id ? 'bg-[#eff6ff]' : ''}`}>
+                    <td className="p-2 font-semibold">{a.label}</td>
+                    <td className="p-2">
+                      <span className={a.is_active ? 'text-emerald-600' : 'text-gray-400'}>
+                        {a.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </td>
+                    <td className="p-2 text-sm text-slate-500">
+                      {a.updated_at ? new Date(a.updated_at).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="p-2 whitespace-nowrap">
+                      <button onClick={() => handleTakealotTest(a.id)} disabled={takealotTesting === a.id}
+                        className="px-3 py-1 bg-[#6366f1] text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {takealotTesting === a.id ? '...' : 'Test'}
+                      </button>
+                      <button onClick={() => handleTakealotToggle(a.id, a.is_active)}
+                        className={`px-3 py-1 text-white border-none rounded cursor-pointer text-xs mr-1 ${a.is_active ? 'bg-amber-600' : 'bg-emerald-600'}`}>
+                        {a.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button onClick={() => handleTakealotEdit(a)}
+                        className="px-3 py-1 bg-blue-600 text-white border-none rounded cursor-pointer text-xs mr-1">Edit</button>
+                      <button onClick={() => handleTakealotDelete(a.id, a.label)} disabled={takealotDeleting === a.id}
+                        className="px-3 py-1 bg-red-600 text-white border-none rounded cursor-pointer text-xs mr-1">
+                        {takealotDeleting === a.id ? '...' : 'Delete'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg p-6 shadow-sm mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2>{takealotEditingId ? `Edit — ${takealotForm.label}` : 'Add Takealot Account'}</h2>
+            {takealotEditingId && (
+              <button onClick={handleTakealotCancelEdit}
+                className="px-4 py-1 bg-gray-500 text-white border-none rounded cursor-pointer text-sm">Cancel</button>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Takealot Seller Portal API Integration → Authentication sayfasından alınacak.
+            channel='takealot' (sales_data tablosunda). Günlük 04:45 UTC sync (siparişler + stok).
+          </p>
+          <form onSubmit={handleTakealotSubmit}>
+            <div className="grid grid-cols-2 gap-x-4">
+              <div>
+                <label htmlFor="ta-label" className="block mb-1 font-medium">Account Label</label>
+                <input id="ta-label" type="text" placeholder="e.g. za-main" value={takealotForm.label}
+                  onChange={e => setTakealotForm({ ...takealotForm, label: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required />
+              </div>
+              <div>
+                <label htmlFor="ta-key" className="block mb-1 font-medium">API Key</label>
+                <input id="ta-key" type="password"
+                  placeholder={takealotEditingId ? 'Leave blank to keep current' : 'Takealot API Key'}
+                  value={takealotForm.api_key}
+                  onChange={e => setTakealotForm({ ...takealotForm, api_key: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-md text-sm mb-3" required={!takealotEditingId} />
+              </div>
+            </div>
+            <button type="submit" disabled={takealotSaving}
+              className={`px-8 py-2 text-white border-none rounded-md cursor-pointer ${takealotEditingId ? 'bg-emerald-600' : 'bg-blue-600'}`}>
+              {takealotSaving ? 'Saving...' : takealotEditingId ? 'Update Account' : 'Add Account'}
             </button>
           </form>
         </div>
