@@ -58,7 +58,7 @@ export async function fetchAllUnits(account: KauflandAccount): Promise<ParsedUni
       all.push({
         id_unit: String(u.id_unit),
         ean: null,
-        offer_sku: u.id_offer ?? null,
+        offer_sku: u.id_offer || null,
         product_title: null,
         storefront: u.storefront ?? account.storefront,
         amount: Number(u.amount ?? 0),

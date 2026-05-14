@@ -85,9 +85,13 @@ function parseDetail(detail: KauflandOrderDetail): KauflandParsedOrderLine[] {
       storefront: detail.storefront,
       order_date: orderDate,
       order_date_local: localDate,
-      ean: u.product?.eans?.[0] ?? null,
-      offer_sku: u.id_offer ?? null,
-      product_title: u.product?.title ?? null,
+      // Coerce empty strings to null — Kaufland often returns offer_sku/ean
+      // as '' for products listed by EAN-only or auto-generated offers, which
+      // then breaks downstream IS NOT NULL / COALESCE / unique-constraint
+      // checks (saw 'marketplace_sku=""' validation failures in mapping UI).
+      ean: u.product?.eans?.[0] || null,
+      offer_sku: u.id_offer || null,
+      product_title: u.product?.title || null,
       product_id_unit: u.product?.id_product != null ? String(u.product.id_product) : null,
       quantity,
       unit_price: unitPrice,

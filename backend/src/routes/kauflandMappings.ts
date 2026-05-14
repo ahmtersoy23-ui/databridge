@@ -45,7 +45,7 @@ router.get('/', async (req: Request, res: Response) => {
     // NOTE: parenthesize the OR so it doesn't bind to the iwasku filter below
     // (SQL: AND has higher precedence than OR — without parens, 'matched' filter
     // would return offer_sku-only rows even when iwasku IS NULL).
-    const whereParts: string[] = ['(ko.offer_sku IS NOT NULL OR ko.ean IS NOT NULL)'];
+    const whereParts: string[] = ['(NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)'];
     const params: unknown[] = [];
     let idx = 1;
     if (accountId) { whereParts.push(`ko.account_id = $${idx}`); params.push(accountId); idx++; }
@@ -71,7 +71,7 @@ router.get('/', async (req: Request, res: Response) => {
     const data = await pool.query(
       `SELECT
          ko.account_id,
-         COALESCE(ko.offer_sku, ko.ean) AS marketplace_sku,
+         COALESCE(NULLIF(ko.offer_sku, ''), NULLIF(ko.ean, '')) AS marketplace_sku,
          ko.offer_sku, ko.ean, ko.iwasku,
          (array_agg(ko.product_title ORDER BY ko.order_date_local DESC) FILTER (WHERE ko.product_title IS NOT NULL))[1] AS product_title,
          SUM(ko.quantity)::int AS total_qty,
@@ -80,10 +80,10 @@ router.get('/', async (req: Request, res: Response) => {
        FROM kaufland_raw_orders ko
        LEFT JOIN kaufland_sku_mapping m
          ON m.account_id = ko.account_id
-        AND m.marketplace_sku = COALESCE(ko.offer_sku, ko.ean)
+        AND m.marketplace_sku = COALESCE(NULLIF(ko.offer_sku, ''), NULLIF(ko.ean, ''))
        ${where}
        GROUP BY ko.account_id, ko.offer_sku, ko.ean, ko.iwasku, m.updated_at
-       ORDER BY (ko.iwasku IS NULL) DESC, COALESCE(ko.offer_sku, ko.ean)
+       ORDER BY (ko.iwasku IS NULL) DESC, COALESCE(NULLIF(ko.offer_sku, ''), NULLIF(ko.ean, ''))
        LIMIT $${idx} OFFSET $${idx + 1}`,
       [...params, limit, offset],
     );
@@ -136,12 +136,12 @@ router.get('/export', async (req: Request, res: Response) => {
   try {
     const accountId = req.query.accountId ? parseInt(req.query.accountId as string, 10) : null;
     const params: unknown[] = [];
-    let where = 'WHERE (ko.offer_sku IS NOT NULL OR ko.ean IS NOT NULL)';
+    let where = 'WHERE (NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)';
     if (accountId) { where += ` AND ko.account_id = $1`; params.push(accountId); }
 
     const result = await pool.query(
       `SELECT ko.account_id,
-              COALESCE(ko.offer_sku, ko.ean) AS marketplace_sku,
+              COALESCE(NULLIF(ko.offer_sku, ''), NULLIF(ko.ean, '')) AS marketplace_sku,
               ko.offer_sku, ko.ean,
               COALESCE(ko.iwasku, '') AS iwasku,
               SUM(ko.quantity)::int AS total_qty,
@@ -149,7 +149,7 @@ router.get('/export', async (req: Request, res: Response) => {
        FROM kaufland_raw_orders ko
        ${where}
        GROUP BY ko.account_id, ko.offer_sku, ko.ean, ko.iwasku
-       ORDER BY ko.account_id, COALESCE(ko.offer_sku, ko.ean)`,
+       ORDER BY ko.account_id, COALESCE(NULLIF(ko.offer_sku, ''), NULLIF(ko.ean, ''))`,
       params,
     );
     const rows = result.rows.map((r: any) => ({
