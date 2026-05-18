@@ -24,6 +24,7 @@ const triggerSchema = z.object({
   type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
+  account: z.string().optional(),
 });
 
 // POST /api/v1/sync/trigger - Manual sync trigger (auth: INTERNAL_API_KEY header)
