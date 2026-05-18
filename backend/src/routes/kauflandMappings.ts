@@ -45,7 +45,7 @@ router.get('/', async (req: Request, res: Response) => {
     // NOTE: parenthesize the OR so it doesn't bind to the iwasku filter below
     // (SQL: AND has higher precedence than OR — without parens, 'matched' filter
     // would return offer_sku-only rows even when iwasku IS NULL).
-    const whereParts: string[] = ['(NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)'];
+    const whereParts: string[] = [`(NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)`];
     const params: unknown[] = [];
     let idx = 1;
     if (accountId) { whereParts.push(`ko.account_id = $${idx}`); params.push(accountId); idx++; }
@@ -136,7 +136,7 @@ router.get('/export', async (req: Request, res: Response) => {
   try {
     const accountId = req.query.accountId ? parseInt(req.query.accountId as string, 10) : null;
     const params: unknown[] = [];
-    let where = 'WHERE (NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)';
+    let where = `WHERE (NULLIF(ko.offer_sku, '') IS NOT NULL OR NULLIF(ko.ean, '') IS NOT NULL)`;
     if (accountId) { where += ` AND ko.account_id = $1`; params.push(accountId); }
 
     const result = await pool.query(
