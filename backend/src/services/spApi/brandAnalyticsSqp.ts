@@ -8,7 +8,8 @@ import { createGunzip } from 'zlib';
 import { createWriteStream, createReadStream, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// JSONStream npm paketinin tipe sahip ES export'u yok; CJS shim.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const JSONStream = require('JSONStream');
 import { pipeline as pipelineCallback } from 'stream';
 import { promisify } from 'util';
@@ -237,7 +238,7 @@ export async function fetchBrandAnalyticsSqp(
       });
     });
   } finally {
-    // Cleanup temp file
-    try { unlinkSync(tmpFile); } catch {}
+    // Cleanup temp file — failure önemsiz (dosya zaten silinmiş olabilir).
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
   }
 }

@@ -80,11 +80,12 @@ describe('computeEffectiveStatus', () => {
   });
 });
 
+import { readFileSync as _readFileSync } from 'fs';
+import { resolve as _resolve } from 'path';
+
 describe('wisersellPendingSync — source-level regression', () => {
-  const { readFileSync } = require('fs');
-  const { resolve } = require('path');
-  const filePath = resolve(__dirname, '../services/sync/wisersellPendingSync.ts');
-  const source: string = readFileSync(filePath, 'utf-8');
+  const filePath = _resolve(__dirname, '../services/sync/wisersellPendingSync.ts');
+  const source: string = _readFileSync(filePath, 'utf-8');
 
   it('idempotent: DELETE-then-INSERT pattern (aynı gün re-run safe)', () => {
     expect(source).toContain('DELETE FROM wisersell_pending_orders WHERE snapshot_date = $1 AND status = $2');

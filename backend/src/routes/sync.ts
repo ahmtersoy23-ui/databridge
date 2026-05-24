@@ -7,6 +7,8 @@ import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
 import { syncSalesForMarketplace, backfillSales } from '../services/sync/salesSync';
 import { syncTransactionsForMarketplace, backfillTransactions } from '../services/sync/transactionSync';
+import { getAccountByLabel } from '../services/wayfair/client';
+import { syncWayfairAccount } from '../services/sync/wayfairSync';
 import { validateBody } from '../middleware/validate';
 import { adminOpsAuth } from '../middleware/adminOps';
 import { withSyncLog } from '../utils/syncLog';
@@ -75,8 +77,6 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       const accountLabel = req.body.account as string | undefined;
       if (accountLabel) {
         // Sync specific account
-        const { getAccountByLabel } = require('../services/wayfair/client');
-        const { syncWayfairAccount } = require('../services/sync/wayfairSync');
         const account = await getAccountByLabel(accountLabel);
         syncWayfairAccount(account).catch((err: any) => logger.error(`[Sync] Wayfair ${accountLabel} error:`, err));
         res.json({ success: true, message: `Wayfair sync started for '${accountLabel}'` });
