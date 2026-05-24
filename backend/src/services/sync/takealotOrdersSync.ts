@@ -5,6 +5,7 @@ import { getActiveAccounts, type TakealotAccount } from '../takealot/client';
 import { fetchOrders, type TakealotParsedOrderLine } from '../takealot/orders';
 import { fetchOffers, type TakealotParsedInventoryRow } from '../takealot/inventory';
 import { writeTakealotSalesData } from './takealotSalesDataWriter';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 export const TAKEALOT_ROLLING_DAYS = 30;
 
@@ -197,9 +198,10 @@ export async function syncTakealotForAccount(
       [startDate],
     );
     const existingCount = parseInt(existing.rows[0].cnt, 10);
-    if (existingCount > 10 && orderRows.length < existingCount * 0.2) {
+    const threshold = getSafetyDropThreshold('TAKEALOT_ORDERS');
+    if (existingCount > 10 && orderRows.length < existingCount * threshold) {
       const msg = `[Takealot] '${account.label}' ORDERS SKIPPED — ` +
-        `fetched ${orderRows.length} vs ${existingCount} existing (>80% drop)`;
+        `fetched ${orderRows.length} vs ${existingCount} existing (threshold ${threshold})`;
       logger.error(msg);
       await notify(`⚠️ ${msg}`);
     } else {

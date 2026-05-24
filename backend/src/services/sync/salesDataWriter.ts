@@ -1,6 +1,7 @@
 import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'others'];
 const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
@@ -212,9 +213,10 @@ export async function writeSalesData(): Promise<void> {
       [ch],
     );
     const existingCount = existing.rows[0].cnt;
-    if (existingCount > 10 && combined.rows.length < existingCount * 0.2) {
-      logger.error(`[SalesData] ${ch}: SKIPPED — new ${combined.rows.length} vs existing ${existingCount} (safety threshold)`);
-      await notify(`⚠️ [SalesData] ${ch} skipped: ${combined.rows.length} rows vs ${existingCount} existing`);
+    const threshold = getSafetyDropThreshold('SALES_DATA');
+    if (existingCount > 10 && combined.rows.length < existingCount * threshold) {
+      logger.error(`[SalesData] ${ch}: SKIPPED — new ${combined.rows.length} vs existing ${existingCount} (threshold ${threshold})`);
+      await notify(`⚠️ [SalesData] ${ch} skipped: ${combined.rows.length} rows vs ${existingCount} existing (threshold ${threshold})`);
       continue;
     }
     const combinedCount = await upsertSalesData(ch, combined.rows, null);

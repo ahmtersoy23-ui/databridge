@@ -1,6 +1,7 @@
 import { pool } from '../config/database';
 import logger from '../config/logger';
 import { notify } from './notify';
+import { getSafetyDropThreshold } from './safetyThreshold';
 
 export async function withSyncLog(
   jobName: string,
@@ -30,8 +31,9 @@ export async function withSyncLog(
       );
       if (prev.rows.length && prev.rows[0].rows_processed > 0) {
         const ratio = rowCount / prev.rows[0].rows_processed;
-        if (ratio < 0.2) {
-          await notify(`⚠️ [${jobName}] Row count dropped ${prev.rows[0].rows_processed} → ${rowCount} (${Math.round(ratio * 100)}%)`);
+        const threshold = getSafetyDropThreshold('SYNC_LOG_ROW_DROP');
+        if (ratio < threshold) {
+          await notify(`⚠️ [${jobName}] Row count dropped ${prev.rows[0].rows_processed} → ${rowCount} (${Math.round(ratio * 100)}%, threshold ${threshold})`);
         }
       }
     }

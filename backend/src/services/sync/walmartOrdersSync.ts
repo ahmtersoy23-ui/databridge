@@ -4,6 +4,7 @@ import { notify } from '../../utils/notify';
 import { getActiveAccounts, type WalmartAccount } from '../walmart/client';
 import { fetchOrders, type WalmartParsedOrderLine } from '../walmart/orders';
 import { writeWalmartSalesData } from './walmartSalesDataWriter';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 // Rolling window — match user request (start with 30, expand later)
 export const WALMART_ROLLING_DAYS = 30;
@@ -164,10 +165,11 @@ export async function syncWalmartOrdersForAccount(
     [startDate],
   );
   const existingCount = parseInt(existing.rows[0].cnt, 10);
-  if (existingCount > 10 && rows.length < existingCount * 0.2) {
+  const threshold = getSafetyDropThreshold('WALMART_ORDERS');
+  if (existingCount > 10 && rows.length < existingCount * threshold) {
     const msg =
       `[Walmart] '${account.label}' SKIPPED — fetched ${rows.length} lines vs ` +
-      `${existingCount} existing (>80% drop, safety threshold)`;
+      `${existingCount} existing (threshold ${threshold}, >${Math.round((1 - threshold) * 100)}% drop)`;
     logger.error(msg);
     await notify(`⚠️ ${msg}`);
     return 0;

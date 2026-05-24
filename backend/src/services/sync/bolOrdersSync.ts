@@ -4,6 +4,7 @@ import { notify } from '../../utils/notify';
 import { getActiveAccounts, type BolAccount } from '../bol/client';
 import { fetchOrders, fetchShipments, type BolParsedOrderLine } from '../bol/orders';
 import { writeBolSalesData } from './bolSalesDataWriter';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 // Rolling window — Bol allows max 3 months via latest-change-date.
 // Default daily sync = 30 days (matches Walmart pattern).
@@ -162,10 +163,11 @@ export async function syncBolOrdersForAccount(
     [account.id, compareSince],
   );
   const existingCount = parseInt(existing.rows[0].cnt, 10);
-  if (existingCount > 10 && rows.length < existingCount * 0.2) {
+  const threshold = getSafetyDropThreshold('BOL_ORDERS');
+  if (existingCount > 10 && rows.length < existingCount * threshold) {
     const msg =
       `[Bol] '${account.label}' SKIPPED — fetched ${rows.length} items vs ` +
-      `${existingCount} existing (>80% drop, safety threshold)`;
+      `${existingCount} existing (threshold ${threshold}, >${Math.round((1 - threshold) * 100)}% drop)`;
     logger.error(msg);
     await notify(`⚠️ ${msg}`);
     return 0;

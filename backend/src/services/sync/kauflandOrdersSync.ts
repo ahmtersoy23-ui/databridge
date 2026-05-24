@@ -5,6 +5,7 @@ import { getActiveAccounts, type KauflandAccount } from '../kaufland/client';
 import { fetchOrdersWithUnits, type KauflandParsedOrderLine } from '../kaufland/orders';
 import { fetchAllUnits, type ParsedUnit } from '../kaufland/inventory';
 import { writeKauflandSalesData } from './kauflandSalesDataWriter';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 export const KAUFLAND_ROLLING_DAYS = 30;
 
@@ -231,9 +232,10 @@ export async function syncKauflandForAccount(
       [account.id, days],
     );
     const existingCount = parseInt(existing.rows[0].cnt, 10);
-    if (existingCount > 10 && orderRows.length < existingCount * 0.2) {
+    const threshold = getSafetyDropThreshold('KAUFLAND_ORDERS');
+    if (existingCount > 10 && orderRows.length < existingCount * threshold) {
       const msg = `[Kaufland] '${account.label}' ORDERS SKIPPED — ` +
-        `fetched ${orderRows.length} vs ${existingCount} existing (>80% drop)`;
+        `fetched ${orderRows.length} vs ${existingCount} existing (threshold ${threshold})`;
       logger.error(msg);
       await notify(`⚠️ ${msg}`);
     } else {
