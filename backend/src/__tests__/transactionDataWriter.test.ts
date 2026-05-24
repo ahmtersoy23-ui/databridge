@@ -111,6 +111,21 @@ describe('writeTransactionData', () => {
     expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
   });
 
+  it('INSERT UPSERT WHERE clause Excel rows korur (file_name != sp-api-sync override etmez)', async () => {
+    const txns = [makeTransaction()];
+    mockPoolQuery.mockResolvedValueOnce({ rows: txns });
+    mockClientQuery.mockResolvedValue({ rowCount: 1 });
+
+    await writeTransactionData();
+
+    const insertCalls = mockClientQuery.mock.calls.filter((c: any[]) =>
+      typeof c[0] === 'string' && c[0].includes('INSERT INTO amz_transactions'),
+    );
+    expect(insertCalls.length).toBeGreaterThan(0);
+    const sql = insertCalls[0][0] as string;
+    expect(sql).toContain("WHERE amz_transactions.file_name = 'sp-api-sync'");
+  });
+
   it('rolls back on error', async () => {
     mockPoolQuery.mockResolvedValueOnce({ rows: [makeTransaction()] });
     mockClientQuery

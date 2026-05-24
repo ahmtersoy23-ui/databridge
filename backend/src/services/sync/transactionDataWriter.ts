@@ -10,7 +10,8 @@ const BATCH_SIZE = 200;
  * - Only writes Order + Refund category_types
  * - Only writes current month data
  * - Uses file_name='sp-api-sync' to distinguish from Excel uploads
- * - ON CONFLICT updates existing sp-api-sync rows; never touches Excel data
+ * - ON CONFLICT updates existing sp-api-sync rows; Excel rows (file_name != 'sp-api-sync')
+ *   korunur (WHERE clause aşağıda)
  */
 export async function writeTransactionData(): Promise<void> {
   const startTime = Date.now();
@@ -116,6 +117,7 @@ export async function writeTransactionData(): Promise<void> {
           transaction_status = EXCLUDED.transaction_status,
           maturity_date = EXCLUDED.maturity_date,
           deferral_reason = EXCLUDED.deferral_reason
+        WHERE amz_transactions.file_name = 'sp-api-sync'
       `, params);
 
       written += batch.length;
