@@ -67,6 +67,23 @@ describe('upsertSalesData', () => {
     expect(mockClientRelease).toHaveBeenCalled();
   });
 
+  it('UPSERT uses DO UPDATE (no longer DO NOTHING) — silent loss koruması', async () => {
+    await upsertSalesData('us', [makeSalesRow()], null);
+    const insertCalls = mockClientQuery.mock.calls.filter((c: any[]) =>
+      typeof c[0] === 'string' && c[0].includes('INSERT INTO sales_data'),
+    );
+    expect(insertCalls.length).toBeGreaterThan(0);
+    const sql = insertCalls[0][0] as string;
+    expect(sql).toContain('ON CONFLICT');
+    expect(sql).toContain('DO UPDATE SET');
+    expect(sql).not.toContain('DO NOTHING');
+    // Tüm 15 metrik kolonu UPDATE'te güncelleniyor mu kontrolü
+    expect(sql).toMatch(/asin\s*=\s*EXCLUDED\.asin/);
+    expect(sql).toMatch(/last3\s*=\s*EXCLUDED\.last3/);
+    expect(sql).toMatch(/last366\s*=\s*EXCLUDED\.last366/);
+    expect(sql).toMatch(/pre_year_next180\s*=\s*EXCLUDED\.pre_year_next180/);
+  });
+
   it('writes FBA satırları sadece Amazon fulfillment ile siler', async () => {
     await upsertSalesData('us', [makeSalesRow()], 'Amazon');
 

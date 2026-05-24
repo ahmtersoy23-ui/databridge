@@ -147,13 +147,33 @@ export async function upsertSalesData(
         );
       });
 
+      // ON CONFLICT DO UPDATE: DELETE first sayesinde conflict beklenmiyor, AMA
+      // source query'de ileride bir bug duplicate üretirse "DO NOTHING" sessizce
+      // ilk row'u tutardı (snapshot 2026-05-17 bug akrabası). DO UPDATE last-write-wins
+      // — intent net, sessiz veri kaybı maskelenmiyor.
       await client.query(`
         INSERT INTO sales_data (channel, iwasku, asin, fulfillment_channel,
           last3, last7, last30, last90, last180, last366,
           pre_year_last7, pre_year_last30, pre_year_last90, pre_year_last180, pre_year_last365,
           pre_year_next7, pre_year_next30, pre_year_next90, pre_year_next180)
         VALUES ${values.join(', ')}
-        ON CONFLICT (channel, iwasku, COALESCE(fulfillment_channel, '')) DO NOTHING
+        ON CONFLICT (channel, iwasku, COALESCE(fulfillment_channel, '')) DO UPDATE SET
+          asin = EXCLUDED.asin,
+          last3 = EXCLUDED.last3,
+          last7 = EXCLUDED.last7,
+          last30 = EXCLUDED.last30,
+          last90 = EXCLUDED.last90,
+          last180 = EXCLUDED.last180,
+          last366 = EXCLUDED.last366,
+          pre_year_last7 = EXCLUDED.pre_year_last7,
+          pre_year_last30 = EXCLUDED.pre_year_last30,
+          pre_year_last90 = EXCLUDED.pre_year_last90,
+          pre_year_last180 = EXCLUDED.pre_year_last180,
+          pre_year_last365 = EXCLUDED.pre_year_last365,
+          pre_year_next7 = EXCLUDED.pre_year_next7,
+          pre_year_next30 = EXCLUDED.pre_year_next30,
+          pre_year_next90 = EXCLUDED.pre_year_next90,
+          pre_year_next180 = EXCLUDED.pre_year_next180
       `, params);
 
       written += batch.length;
