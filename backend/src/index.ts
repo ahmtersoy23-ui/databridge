@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+// Sentry instrumentation MUST be imported before any other modules (auto-instrumentation hooks
+// into Node internals). DSN yoksa no-op.
+import './instrument';
+
 import { createApp } from './app';
 import { checkConnections, closePools } from './config/database';
 import { startScheduler, stopScheduler } from './services/sync/scheduler';

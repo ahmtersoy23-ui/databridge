@@ -4,6 +4,7 @@ import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import { Sentry } from './instrument';
 import routes from './routes';
 import { errorHandler } from './middleware/errorHandler';
 import { pool } from './config/database';
@@ -56,6 +57,10 @@ export function createApp(): Application {
   // API routes
   app.use('/api/v1', routes);
   app.use('/api', routes); // backwards compat
+
+  // Sentry Express error handler — Express'in kendi errorHandler'ından ÖNCE eklenir.
+  // DSN yoksa Sentry init no-op'tur, setupExpressErrorHandler de no-op davranır.
+  Sentry.setupExpressErrorHandler(app);
 
   // Global error handler
   app.use(errorHandler);

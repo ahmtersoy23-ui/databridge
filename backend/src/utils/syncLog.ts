@@ -2,6 +2,7 @@ import { pool } from '../config/database';
 import logger from '../config/logger';
 import { notify } from './notify';
 import { getSafetyDropThreshold } from './safetyThreshold';
+import { captureIfInitialized } from '../instrument';
 
 export async function withSyncLog(
   jobName: string,
@@ -45,6 +46,8 @@ export async function withSyncLog(
     ).catch(() => {}); // don't throw on logging failure
     logger.error(`[SyncLog] ${jobName} FAILED after ${(durationMs / 1000).toFixed(1)}s:`, err.message);
     await notify(`🔴 [${jobName}] Sync failed: ${err.message?.slice(0, 200)}`);
+    // Sentry'ye final fail kaydı (transient hatalar instrument.ts beforeSend ile filtrelenir)
+    captureIfInitialized(err, { tags: { component: 'syncLog', job: jobName } });
     throw err; // re-throw so caller's catch still works
   }
 }

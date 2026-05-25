@@ -32,6 +32,7 @@ import reviewsRouter from './reviews';
 import inventoryAgingRouter from './inventoryAging';
 import adsRouter from './ads';
 import adsAnalysisRouter from './adsAnalysis';
+import sentryVerifyRouter from './sentryVerify';
 import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -42,6 +43,7 @@ router.use('/amazonsales', salesRouter);   // StockPulse reads these
 router.use('/amazonfba', inventoryRouter); // StockPulse reads these
 router.use('/status', statusRouter);       // Monitoring (UptimeRobot)
 router.use('/sync', syncRouter);           // Internal tool — localhost only
+router.use('/sentry-verify', sentryVerifyRouter); // Token-gated Sentry probe
 
 // Auth gate — everything below requires SSO session
 router.use(ssoAuthMiddleware);
