@@ -31,6 +31,7 @@ import { runBrandAnalyticsSync } from './brandAnalyticsSync';
 import { calculateProductFeeRates } from './feeRatesService';
 import { withRetry } from '../../utils/retry';
 import { withSyncLog } from '../../utils/syncLog';
+import { getCronJitterMs } from '../../utils/jitter';
 import { runDailyHealthCheck, runPostSyncChecksAndAlert } from '../../utils/dataQualityChecks';
 import type { MarketplaceConfig } from '../../types';
 
@@ -574,124 +575,135 @@ async function runWisersellPendingSync(): Promise<number> {
   }
 }
 
+/**
+ * cron.schedule wrapper — handler'ı 0-30sn rastgele jitter ile geciktirir
+ * (env CRON_JITTER_MAX_SEC ile ayarlanabilir). 15+ cron aynı dakikada
+ * tetiklendiğinde DB pool contention + dış API hammer riskini azaltır.
+ */
+function scheduleWithJitter(cronExpr: string, handler: () => void): cron.ScheduledTask {
+  return cron.schedule(cronExpr, () => {
+    setTimeout(handler, getCronJitterMs());
+  });
+}
+
 export function startScheduler(): void {
-  inventoryTask = cron.schedule(SYNC_INVENTORY_CRON, () => {
+  inventoryTask = scheduleWithJitter(SYNC_INVENTORY_CRON, () => {
     withSyncLog('inventory', () => runInventorySync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Inventory sync error:', err));
   });
 
-  salesTask = cron.schedule(SYNC_SALES_CRON, () => {
+  salesTask = scheduleWithJitter(SYNC_SALES_CRON, () => {
     withSyncLog('sales', () => runSalesSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Sales sync error:', err));
   });
 
-  njWarehouseTask = cron.schedule(SYNC_NJ_WAREHOUSE_CRON, () => {
+  njWarehouseTask = scheduleWithJitter(SYNC_NJ_WAREHOUSE_CRON, () => {
     withSyncLog('nj-warehouse', () => runNJWarehouseSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
   });
 
-  transactionTask = cron.schedule(SYNC_TRANSACTIONS_CRON, () => {
+  transactionTask = scheduleWithJitter(SYNC_TRANSACTIONS_CRON, () => {
     withSyncLog('transactions', () => runTransactionSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Transaction sync error:', err));
   });
 
-  wisersellTask = cron.schedule(SYNC_WISERSELL_CRON, () => {
+  wisersellTask = scheduleWithJitter(SYNC_WISERSELL_CRON, () => {
     withSyncLog('wisersell', () => runWisersellSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Wisersell sync error:', err));
   });
 
-  wayfairTask = cron.schedule(SYNC_WAYFAIR_CRON, () => {
+  wayfairTask = scheduleWithJitter(SYNC_WAYFAIR_CRON, () => {
     withSyncLog('wayfair', () => runWayfairSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Wayfair sync error:', err));
   });
 
-  adsTask = cron.schedule(SYNC_ADS_CRON, () => {
+  adsTask = scheduleWithJitter(SYNC_ADS_CRON, () => {
     withSyncLog('ads', () => runAdsSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Ads sync error:', err));
   });
 
-  agingTask = cron.schedule(SYNC_AGING_CRON, () => {
+  agingTask = scheduleWithJitter(SYNC_AGING_CRON, () => {
     withSyncLog('aging', () => runAgingSyncJob().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Aging sync error:', err));
   });
 
-  skuMasterDiffTask = cron.schedule(SYNC_SKU_MASTER_DIFF_CRON, () => {
+  skuMasterDiffTask = scheduleWithJitter(SYNC_SKU_MASTER_DIFF_CRON, () => {
     withSyncLog('sku-master-diff', () => runSkuMasterDiffJob().then(() => undefined))
       .catch(err => logger.error('[Scheduler] SKU master diff error:', err));
   });
 
-  businessReportTask = cron.schedule(SYNC_BUSINESS_REPORT_CRON, () => {
+  businessReportTask = scheduleWithJitter(SYNC_BUSINESS_REPORT_CRON, () => {
     withSyncLog('business-report', () => runBusinessReportSyncJob())
       .catch(err => logger.error('[Scheduler] Business report sync error:', err));
   });
 
-  campaignSnapshotTask = cron.schedule(SYNC_CAMPAIGN_SNAPSHOT_CRON, () => {
+  campaignSnapshotTask = scheduleWithJitter(SYNC_CAMPAIGN_SNAPSHOT_CRON, () => {
     withSyncLog('campaign-snapshot', () => runCampaignSnapshotJob().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Campaign snapshot error:', err));
   });
 
-  brandAnalyticsTask = cron.schedule(SYNC_BRAND_ANALYTICS_CRON, () => {
+  brandAnalyticsTask = scheduleWithJitter(SYNC_BRAND_ANALYTICS_CRON, () => {
     withSyncLog('brand-analytics', () => runBrandAnalyticsSyncJob())
       .catch(err => logger.error('[Scheduler] Brand analytics sync error:', err));
   });
 
-  sbAdsTask = cron.schedule(SYNC_SB_ADS_CRON, () => {
+  sbAdsTask = scheduleWithJitter(SYNC_SB_ADS_CRON, () => {
     withSyncLog('sb-ads', () => runSbAdsSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] SB Ads sync error:', err));
   });
 
-  sdAdsTask = cron.schedule(SYNC_SD_ADS_CRON, () => {
+  sdAdsTask = scheduleWithJitter(SYNC_SD_ADS_CRON, () => {
     withSyncLog('sd-ads', () => runSdAdsSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] SD Ads sync error:', err));
   });
 
-  dataQualityTask = cron.schedule(DATA_QUALITY_CRON, () => {
+  dataQualityTask = scheduleWithJitter(DATA_QUALITY_CRON, () => {
     withSyncLog('data-quality', () => runDailyHealthCheck().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Data quality check error:', err));
   });
 
-  feeRatesTask = cron.schedule(FEE_RATES_CRON, () => {
+  feeRatesTask = scheduleWithJitter(FEE_RATES_CRON, () => {
     withSyncLog('fee-rates', () => runFeeRatesJob())
       .catch(err => logger.error('[Scheduler] Fee rates calc error:', err));
   });
 
-  fedexTrackTask = cron.schedule(SYNC_FEDEX_TRACK_CRON, () => {
+  fedexTrackTask = scheduleWithJitter(SYNC_FEDEX_TRACK_CRON, () => {
     withSyncLog('fedex-track', () => runFedexSync())
       .catch(err => logger.error('[Scheduler] FedEx Track sync error:', err));
   });
 
-  cron.schedule(SYNC_WISERSELL_ORDERS_CRON, () => {
+  scheduleWithJitter(SYNC_WISERSELL_ORDERS_CRON, () => {
     withSyncLog('wisersell-orders', () => runWisersellOrdersSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Wisersell orders sync error:', err));
   });
 
   // Pending sync — closed sync (09:00) bittikten 15 dk sonra
-  wisersellPendingTask = cron.schedule(SYNC_WISERSELL_PENDING_CRON, () => {
+  wisersellPendingTask = scheduleWithJitter(SYNC_WISERSELL_PENDING_CRON, () => {
     withSyncLog('wisersell-pending', () => runWisersellPendingSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Wisersell pending sync error:', err));
   });
 
-  wisersellShipmentTask = cron.schedule(SYNC_WISERSELL_SHIPMENT_CRON, () => {
+  wisersellShipmentTask = scheduleWithJitter(SYNC_WISERSELL_SHIPMENT_CRON, () => {
     withSyncLog('wisersell-shipment', () => runWisersellShipmentSync())
       .catch(err => logger.error('[Scheduler] Wisersell shipment sync error:', err));
   });
 
-  walmartOrdersTask = cron.schedule(SYNC_WALMART_ORDERS_CRON, () => {
+  walmartOrdersTask = scheduleWithJitter(SYNC_WALMART_ORDERS_CRON, () => {
     withSyncLog('walmart-orders', () => runWalmartOrdersSync())
       .catch(err => logger.error('[Scheduler] Walmart orders sync error:', err));
   });
 
-  bolOrdersTask = cron.schedule(SYNC_BOL_ORDERS_CRON, () => {
+  bolOrdersTask = scheduleWithJitter(SYNC_BOL_ORDERS_CRON, () => {
     withSyncLog('bol-orders', () => runBolOrdersSync())
       .catch(err => logger.error('[Scheduler] Bol orders sync error:', err));
   });
 
-  takealotTask = cron.schedule(SYNC_TAKEALOT_CRON, () => {
+  takealotTask = scheduleWithJitter(SYNC_TAKEALOT_CRON, () => {
     withSyncLog('takealot', () => runTakealotSync())
       .catch(err => logger.error('[Scheduler] Takealot sync error:', err));
   });
 
-  kauflandTask = cron.schedule(SYNC_KAUFLAND_CRON, () => {
+  kauflandTask = scheduleWithJitter(SYNC_KAUFLAND_CRON, () => {
     withSyncLog('kaufland', () => runKauflandSync())
       .catch(err => logger.error('[Scheduler] Kaufland sync error:', err));
   });
