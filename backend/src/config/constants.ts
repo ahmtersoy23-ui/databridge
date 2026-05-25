@@ -67,10 +67,30 @@ export const WISERSELL_AMAZON_PLATFORMS_DUPLICATE = new Set<string>([
 ]);
 export const WISERSELL_AMAZON_PLATFORMS_KEEP = new Set<string>(['Ama_CITI', 'Ama_SGP']);
 
-// Pending snapshot retention — 30 gün trend için yeterli, sonrası silinir.
-export const WISERSELL_PENDING_RETENTION_DAYS = 30;
-// Stale işaretleme: sipariş tarihi N günden eskiyse "stale" (operasyonel kapanmamış hayalet).
-export const WISERSELL_PENDING_STALE_AGE_DAYS = 90;
+function parseEnvInt(envName: string, def: number, min: number, max: number): number {
+  const raw = process.env[envName];
+  if (raw === undefined) return def;
+  const n = parseInt(raw, 10);
+  if (Number.isFinite(n) && n >= min && n <= max) return n;
+  return def;
+}
+
+/**
+ * Pending snapshot retention — default 30 gün trend için yeterli, sonrası silinir.
+ * Sezonsal yoğunluk (Q4 holiday backlog) için WISERSELL_PENDING_RETENTION_DAYS env ile gevşetilir.
+ * Lazy getter — module yükleme sırası dotenv.config()'i bekler.
+ */
+export function getWisersellPendingRetentionDays(): number {
+  return parseEnvInt('WISERSELL_PENDING_RETENTION_DAYS', 30, 1, 365);
+}
+
+/**
+ * Stale işaretleme: sipariş tarihi N günden eskiyse "stale" (operasyonel kapanmamış hayalet).
+ * WISERSELL_PENDING_STALE_AGE_DAYS env ile override.
+ */
+export function getWisersellPendingStaleAgeDays(): number {
+  return parseEnvInt('WISERSELL_PENDING_STALE_AGE_DAYS', 90, 1, 730);
+}
 
 export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
 

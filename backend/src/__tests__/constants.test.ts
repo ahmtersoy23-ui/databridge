@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import { SALES_CHANNEL_TO_CHANNEL } from '../config/constants';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  SALES_CHANNEL_TO_CHANNEL,
+  getWisersellPendingRetentionDays,
+  getWisersellPendingStaleAgeDays,
+} from '../config/constants';
 
 describe('SALES_CHANNEL_TO_CHANNEL', () => {
   it('maps major Amazon domains to correct channels', () => {
@@ -22,5 +26,63 @@ describe('SALES_CHANNEL_TO_CHANNEL', () => {
 
   it('returns undefined for unknown domains', () => {
     expect(SALES_CHANNEL_TO_CHANNEL['Amazon.co.jp']).toBeUndefined();
+  });
+});
+
+describe('getWisersellPendingRetentionDays', () => {
+  const original = process.env.WISERSELL_PENDING_RETENTION_DAYS;
+  beforeEach(() => { delete process.env.WISERSELL_PENDING_RETENTION_DAYS; });
+  afterEach(() => {
+    if (original === undefined) delete process.env.WISERSELL_PENDING_RETENTION_DAYS;
+    else process.env.WISERSELL_PENDING_RETENTION_DAYS = original;
+  });
+
+  it('default 30', () => {
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+  });
+
+  it('env override (valid range)', () => {
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = '60';
+    expect(getWisersellPendingRetentionDays()).toBe(60);
+  });
+
+  it('rejects invalid (0, negative, >365, NaN) → default', () => {
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = '0';
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = '-5';
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = '400';
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = 'abc';
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+  });
+
+  it('reads env lazily (runtime change uygulanır)', () => {
+    expect(getWisersellPendingRetentionDays()).toBe(30);
+    process.env.WISERSELL_PENDING_RETENTION_DAYS = '45';
+    expect(getWisersellPendingRetentionDays()).toBe(45);
+  });
+});
+
+describe('getWisersellPendingStaleAgeDays', () => {
+  const original = process.env.WISERSELL_PENDING_STALE_AGE_DAYS;
+  beforeEach(() => { delete process.env.WISERSELL_PENDING_STALE_AGE_DAYS; });
+  afterEach(() => {
+    if (original === undefined) delete process.env.WISERSELL_PENDING_STALE_AGE_DAYS;
+    else process.env.WISERSELL_PENDING_STALE_AGE_DAYS = original;
+  });
+
+  it('default 90', () => {
+    expect(getWisersellPendingStaleAgeDays()).toBe(90);
+  });
+
+  it('env override (valid range)', () => {
+    process.env.WISERSELL_PENDING_STALE_AGE_DAYS = '120';
+    expect(getWisersellPendingStaleAgeDays()).toBe(120);
+  });
+
+  it('rejects >730 → default', () => {
+    process.env.WISERSELL_PENDING_STALE_AGE_DAYS = '800';
+    expect(getWisersellPendingStaleAgeDays()).toBe(90);
   });
 });

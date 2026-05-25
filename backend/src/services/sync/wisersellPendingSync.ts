@@ -6,8 +6,8 @@ import {
   WISERSELL_STATUS_CODES,
   WISERSELL_AMAZON_PLATFORMS_DUPLICATE,
   WISERSELL_AMAZON_PLATFORMS_KEEP,
-  WISERSELL_PENDING_RETENTION_DAYS,
-  WISERSELL_PENDING_STALE_AGE_DAYS,
+  getWisersellPendingRetentionDays,
+  getWisersellPendingStaleAgeDays,
 } from '../../config/constants';
 
 /**
@@ -114,7 +114,7 @@ export function computeEffectiveStatus(
   // Sadece ready_to_ship'i stale işaretle — etiketi basılmış ama sevkiyat olmamış,
   // operasyonel kapanmamış demek. Open'da eski sipariş = farklı durum (müşteri
   // onayı bekleniyor olabilir), ayrı incelenmesi gerek.
-  const isStale = status === 'ready_to_ship' && days > WISERSELL_PENDING_STALE_AGE_DAYS;
+  const isStale = status === 'ready_to_ship' && days > getWisersellPendingStaleAgeDays();
   return { effective_status: isStale ? 'stale' : 'active', stale_age_days: days };
 }
 
@@ -359,15 +359,16 @@ export async function syncWisersellPendingOrders(
     logger.info(`[WisersellPendingSync] Post-cleanup: ${closed_overlap_removed} closed-overlap satırı silindi`);
   }
 
-  // 4. Retention: 30 günden eski snapshot'ları sil
+  // 4. Retention: eski snapshot'ları sil (default 30 gün, env ile override)
+  const retentionDays = getWisersellPendingRetentionDays();
   const retentionRes = await pool.query(
     `DELETE FROM wisersell_pending_orders
      WHERE snapshot_date < CURRENT_DATE - ($1 || ' days')::interval`,
-    [String(WISERSELL_PENDING_RETENTION_DAYS)],
+    [String(retentionDays)],
   );
   const old_snapshots_removed = retentionRes.rowCount ?? 0;
   if (old_snapshots_removed > 0) {
-    logger.info(`[WisersellPendingSync] Retention: ${old_snapshots_removed} eski snapshot satırı silindi (>${WISERSELL_PENDING_RETENTION_DAYS} gün)`);
+    logger.info(`[WisersellPendingSync] Retention: ${old_snapshots_removed} eski snapshot satırı silindi (>${retentionDays} gün)`);
   }
 
   return { open, ready_to_ship: ready, closed_overlap_removed, old_snapshots_removed };
