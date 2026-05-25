@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
+import { parseRetryAfterHeader } from '../../utils/retry';
 
 // -- Account type ----------------------------------------------------------
 
@@ -199,7 +200,12 @@ export async function walmartGet<T = unknown>(
     // 429 — surface replenish time so callers can back off
     if (err.response?.status === 429) {
       const replenishAt = err.response.headers?.['x-next-replenishment-time'];
-      throw new Error(`Walmart rate limit (429). Next replenish: ${replenishAt ?? 'unknown'}`);
+      // Walmart `x-next-replenishment-time` HTTP-date veya saniye olabilir; ikisini de parseRetryAfterHeader yakalar.
+      const sec = parseRetryAfterHeader(replenishAt);
+      const e: any = new Error(`Walmart rate limit (429). Next replenish: ${replenishAt ?? 'unknown'}`);
+      e.status = 429;
+      if (sec !== null) e.retryAfterMs = sec * 1000;
+      throw e;
     }
 
     throw err;

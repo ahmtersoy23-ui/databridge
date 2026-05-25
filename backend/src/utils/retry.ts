@@ -11,6 +11,38 @@ export function getHttpStatus(err: any): number | undefined {
   return err?.response?.status ?? err?.status ?? err?.statusCode;
 }
 
+const RETRY_AFTER_CAP_MS = 60_000;
+
+/**
+ * Error object'inde `retryAfterMs` property'si varsa onu (cap'le birlikte) döndürür.
+ * Yoksa undefined — caller exponential backoff'a düşmeli.
+ *
+ * Client'lar 429 fırlatırken bu property'i ataması beklenir:
+ *   const e: any = new Error(...); e.status = 429; e.retryAfterMs = X; throw e;
+ */
+export function getRetryAfterMs(err: any): number | undefined {
+  const raw = err?.retryAfterMs;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return undefined;
+  return Math.min(raw, RETRY_AFTER_CAP_MS);
+}
+
+/**
+ * "Retry-After" HTTP header'ını parse eder.
+ * Format: saniye (int) ya da HTTP-date.
+ * Geçersiz/eksik için null.
+ */
+export function parseRetryAfterHeader(raw: string | undefined | null): number | null {
+  if (!raw) return null;
+  const num = Number(raw);
+  if (Number.isFinite(num) && num >= 0) return Math.floor(num);
+  const epoch = Date.parse(raw);
+  if (Number.isFinite(epoch)) {
+    const sec = Math.ceil((epoch - Date.now()) / 1000);
+    return sec > 0 ? sec : 0;
+  }
+  return null;
+}
+
 /**
  * Default sınıflandırıcı.
  * - HTTP 429 ve 5xx → transient (retry)
@@ -70,8 +102,10 @@ export async function withRetry<T>(
         logger.error(`[Retry] ${label} failed after ${maxRetries} attempts${statusInfo}: ${err.message}`);
         throw err;
       }
-      const delay = baseDelayMs * attempt * attempt;
-      logger.warn(`[Retry] ${label} attempt ${attempt}/${maxRetries}${statusInfo} failed: ${err.message}. Retrying in ${delay / 1000}s...`);
+      const retryAfter = getRetryAfterMs(err);
+      const delay = retryAfter ?? baseDelayMs * attempt * attempt;
+      const source = retryAfter ? 'Retry-After' : 'exponential';
+      logger.warn(`[Retry] ${label} attempt ${attempt}/${maxRetries}${statusInfo} failed: ${err.message}. Retrying in ${delay / 1000}s (${source})...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

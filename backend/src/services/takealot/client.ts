@@ -2,6 +2,7 @@ import axios from 'axios';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
+import { parseRetryAfterHeader } from '../../utils/retry';
 
 // -- Account type (single-account but multi-account ready) -----------------
 
@@ -106,7 +107,11 @@ export async function takealotGet<T = unknown>(
 
     if (err.response?.status === 429) {
       const retryAfter = err.response.headers?.['retry-after'];
-      throw new Error(`Takealot rate limit (429). Retry-After: ${retryAfter ?? 'unknown'}`);
+      const sec = parseRetryAfterHeader(retryAfter);
+      const e: any = new Error(`Takealot rate limit (429). Retry-After: ${retryAfter ?? 'unknown'}`);
+      e.status = 429;
+      if (sec !== null) e.retryAfterMs = sec * 1000;
+      throw e;
     }
 
     throw err;

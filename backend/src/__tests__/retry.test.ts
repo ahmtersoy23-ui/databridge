@@ -4,7 +4,7 @@ vi.mock('../config/logger', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { withRetry, isTransientError } from '../utils/retry';
+import { withRetry, isTransientError, parseRetryAfterHeader, getRetryAfterMs } from '../utils/retry';
 
 describe('isTransientError', () => {
   it('classifies HTTP 429 as transient', () => {
@@ -120,5 +120,58 @@ describe('withRetry', () => {
       }),
     ).rejects.toMatchObject({ response: { status: 401 } });
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('honors err.retryAfterMs over exponential backoff', async () => {
+    const start = Date.now();
+    const fn = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('429'), { status: 429, retryAfterMs: 50 }))
+      .mockResolvedValue('ok');
+    const result = await withRetry(fn, { baseDelayMs: 10_000, label: 'rate', maxRetries: 2 });
+    const elapsed = Date.now() - start;
+    expect(result).toBe('ok');
+    // 50ms retryAfter kullanıldı, 10s exponential değil
+    expect(elapsed).toBeLessThan(1000);
+    expect(elapsed).toBeGreaterThanOrEqual(40);
+  });
+});
+
+describe('parseRetryAfterHeader', () => {
+  it('parses integer seconds', () => {
+    expect(parseRetryAfterHeader('30')).toBe(30);
+    expect(parseRetryAfterHeader('0')).toBe(0);
+    expect(parseRetryAfterHeader('120')).toBe(120);
+  });
+
+  it('parses HTTP-date (future)', () => {
+    const future = new Date(Date.now() + 45_000).toUTCString();
+    const sec = parseRetryAfterHeader(future);
+    expect(sec).toBeGreaterThanOrEqual(44);
+    expect(sec).toBeLessThanOrEqual(46);
+  });
+
+  it('returns 0 for past HTTP-date', () => {
+    const past = new Date(Date.now() - 10_000).toUTCString();
+    expect(parseRetryAfterHeader(past)).toBe(0);
+  });
+
+  it('returns null for missing/invalid', () => {
+    expect(parseRetryAfterHeader(undefined)).toBeNull();
+    expect(parseRetryAfterHeader('')).toBeNull();
+    expect(parseRetryAfterHeader('garbage')).toBeNull();
+  });
+});
+
+describe('getRetryAfterMs', () => {
+  it('caps at 60_000 ms', () => {
+    expect(getRetryAfterMs({ retryAfterMs: 5_000 })).toBe(5_000);
+    expect(getRetryAfterMs({ retryAfterMs: 120_000 })).toBe(60_000);
+  });
+
+  it('returns undefined for missing/invalid', () => {
+    expect(getRetryAfterMs({})).toBeUndefined();
+    expect(getRetryAfterMs({ retryAfterMs: 0 })).toBeUndefined();
+    expect(getRetryAfterMs({ retryAfterMs: -100 })).toBeUndefined();
+    expect(getRetryAfterMs({ retryAfterMs: 'abc' })).toBeUndefined();
   });
 });
