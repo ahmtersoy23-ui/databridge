@@ -28,6 +28,25 @@ router.get('/', async (_req: Request, res: Response) => {
 // GET /api/v1/status/sync/health — Public sync sağlığı (UptimeRobot icin).
 // Body sade: sadece overall healthy boolean + sayım. HTTP 200/503 ile UptimeRobot
 // fail tetikler. Job-spesifik error message ve job_name detaylari /detailed'da.
+//
+// maxAgeHours seçimi cron schedule + nominal süreyi tolere eder.
+// Sub-job'lar (wisersell-orders, sb-ads, fedex-track vb.) izlenmiyor — ana cron'lar
+// fail ederse zaten sync_log fail kaydı + Slack alert düşer.
+const SYNC_HEALTH_EXPECTED: Array<{ name: string; maxAgeHours: number }> = [
+  { name: 'inventory', maxAgeHours: 10 },       // 8h aralık
+  { name: 'sales', maxAgeHours: 26 },           // günlük 03:00
+  { name: 'transactions', maxAgeHours: 26 },    // günlük 05:00
+  { name: 'nj-warehouse', maxAgeHours: 10 },    // 8h aralık
+  { name: 'wisersell', maxAgeHours: 10 },       // 8h aralık
+  { name: 'wayfair', maxAgeHours: 12 },         // günde 3x
+  { name: 'ads', maxAgeHours: 26 },             // günlük
+  { name: 'aging', maxAgeHours: 26 },           // günlük 02:00
+  { name: 'bol-orders', maxAgeHours: 26 },      // günlük
+  { name: 'walmart-orders', maxAgeHours: 26 },  // günlük
+  { name: 'takealot', maxAgeHours: 26 },        // günlük
+  { name: 'kaufland', maxAgeHours: 26 },        // günlük
+];
+
 router.get('/sync/health', async (_req: Request, res: Response) => {
   try {
     const jobs = await pool.query<{
@@ -40,24 +59,22 @@ router.get('/sync/health', async (_req: Request, res: Response) => {
       ORDER BY job_name, started_at DESC
     `);
 
-    const expected = ['inventory', 'sales', 'transactions', 'nj-warehouse', 'wisersell', 'wayfair', 'ads', 'aging'];
     const lastRuns = new Map(jobs.rows.map(r => [r.job_name, r]));
     const now = Date.now();
 
     let healthyCount = 0;
-    for (const name of expected) {
+    for (const { name, maxAgeHours } of SYNC_HEALTH_EXPECTED) {
       const last = lastRuns.get(name);
       if (!last || last.status !== 'success') continue;
       const ageHours = (now - new Date(last.started_at).getTime()) / 3_600_000;
-      const maxAge = name === 'inventory' || name === 'nj-warehouse' ? 10 : 26;
-      if (ageHours < maxAge) healthyCount++;
+      if (ageHours < maxAgeHours) healthyCount++;
     }
 
-    const allHealthy = healthyCount === expected.length;
+    const allHealthy = healthyCount === SYNC_HEALTH_EXPECTED.length;
     res.status(allHealthy ? 200 : 503).json({
       healthy: allHealthy,
       healthyJobs: healthyCount,
-      totalJobs: expected.length,
+      totalJobs: SYNC_HEALTH_EXPECTED.length,
     });
   } catch {
     res.status(503).json({ healthy: false });
