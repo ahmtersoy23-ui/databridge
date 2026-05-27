@@ -51,7 +51,7 @@ export async function createAdsReport(
 export async function waitForAdsReport(
   client: AxiosInstance,
   reportId: string,
-  maxAttempts = 15,
+  maxAttempts = 30,
 ): Promise<string> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const res = await client.get(`/reporting/reports/${reportId}`);
@@ -67,7 +67,7 @@ export async function waitForAdsReport(
       throw new Error(`Report ${reportId} failed: ${report.failureReason || 'unknown'}`);
     }
 
-    // Exponential backoff: 10s, 15s, 20s, ... up to 60s
+    // Exponential backoff: 10s, 15s, 20s, ... up to 60s. 30 attempts ≈ 25 min total.
     const waitMs = Math.min(10_000 + attempt * 5_000, 60_000);
     logger.debug(`[AdsAPI] Report ${reportId} status: ${report.status}, waiting ${waitMs}ms...`);
     await new Promise(resolve => setTimeout(resolve, waitMs));
