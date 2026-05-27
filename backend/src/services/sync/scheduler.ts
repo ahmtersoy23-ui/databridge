@@ -21,7 +21,7 @@ import { syncTakealot } from './takealotOrdersSync';
 import { syncKaufland } from './kauflandOrdersSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -67,7 +67,8 @@ let isSdAdsSyncing = false;
 let isFeeRatesRunning = false;
 let feeRatesTask: cron.ScheduledTask | null = null;
 let isFedexSyncing = false;
-let fedexTrackTask: cron.ScheduledTask | null = null;
+let fedexTrackFullTask: cron.ScheduledTask | null = null;
+let fedexTrackDeltaTask: cron.ScheduledTask | null = null;
 let isWisersellShipmentSyncing = false;
 let wisersellShipmentTask: cron.ScheduledTask | null = null;
 
@@ -667,9 +668,15 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Fee rates calc error:', err));
   });
 
-  fedexTrackTask = scheduleWithJitter(SYNC_FEDEX_TRACK_CRON, () => {
-    withSyncLog('fedex-track', () => runFedexSync())
-      .catch(err => logger.error('[Scheduler] FedEx Track sync error:', err));
+  // 05/17 UTC: 6h+ açık tracking'ler dahil tam refresh (~500-750 satır baseline).
+  fedexTrackFullTask = scheduleWithJitter(SYNC_FEDEX_TRACK_FULL_CRON, () => {
+    withSyncLog('fedex-track-full', () => runFedexSync())
+      .catch(err => logger.error('[Scheduler] FedEx Track FULL sync error:', err));
+  });
+  // 11/23 UTC: sadece yeni eklenen tracking'ler (~0-130 satır baseline).
+  fedexTrackDeltaTask = scheduleWithJitter(SYNC_FEDEX_TRACK_DELTA_CRON, () => {
+    withSyncLog('fedex-track-delta', () => runFedexSync())
+      .catch(err => logger.error('[Scheduler] FedEx Track DELTA sync error:', err));
   });
 
   scheduleWithJitter(SYNC_WISERSELL_ORDERS_CRON, () => {
@@ -726,7 +733,8 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] SD Ads sync: ${SYNC_SD_ADS_CRON}`);
   logger.info(`[Scheduler] Data quality check: ${DATA_QUALITY_CRON}`);
   logger.info(`[Scheduler] Fee rates calc: ${FEE_RATES_CRON}`);
-  logger.info(`[Scheduler] FedEx Track sync: ${SYNC_FEDEX_TRACK_CRON}`);
+  logger.info(`[Scheduler] FedEx Track FULL sync: ${SYNC_FEDEX_TRACK_FULL_CRON}`);
+  logger.info(`[Scheduler] FedEx Track DELTA sync: ${SYNC_FEDEX_TRACK_DELTA_CRON}`);
   logger.info(`[Scheduler] Wisersell shipment sync: ${SYNC_WISERSELL_SHIPMENT_CRON}`);
   logger.info(`[Scheduler] Wisersell orders sync: ${SYNC_WISERSELL_ORDERS_CRON}`);
   logger.info(`[Scheduler] Wisersell pending sync: ${SYNC_WISERSELL_PENDING_CRON}`);
@@ -754,7 +762,8 @@ export function stopScheduler(): void {
   sdAdsTask?.stop();
   dataQualityTask?.stop();
   feeRatesTask?.stop();
-  fedexTrackTask?.stop();
+  fedexTrackFullTask?.stop();
+  fedexTrackDeltaTask?.stop();
   wisersellShipmentTask?.stop();
   wisersellPendingTask?.stop();
   walmartOrdersTask?.stop();

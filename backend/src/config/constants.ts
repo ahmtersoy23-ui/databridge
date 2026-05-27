@@ -26,10 +26,13 @@ export const SYNC_SD_ADS_CRON = '15 7 * * *';         // Daily at 07:15 UTC (aft
 export const DATA_QUALITY_CRON = '0 9 * * *';          // Daily at 09:00 UTC (after all syncs complete)
 export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:00 UTC
 // Wisersell sabah 04:30'da tek run (yeni tracking'ler oms_shipments'a).
-// FedEx Track 4x/gün — ilk run 05:00 (Wisersell'den sonra), kalan 3'ü in_transit refresh için.
-// In-flight ~500 tracking × 4 sorgu = 67 API call/gün, quota'nın %0.07'si.
+// FedEx Track 4x/gün, iki ayrı job ismiyle (sync_log baseline'ı doğru karşılaşsın diye):
+//   - FULL (05/17 UTC): 6 saatten eski açık tracking'ler de dahil → ~500-750 satır
+//   - DELTA (11/23 UTC): sadece fedex_synced_at IS NULL yeni eklenenler → ~0-130 satır
+// İş mantığı aynı (runFedexSync), sadece iki ayrı sync_log entry'si.
 export const SYNC_WISERSELL_SHIPMENT_CRON = '30 4 * * *';        // 04:30 UTC (07:30 TR)
-export const SYNC_FEDEX_TRACK_CRON         = '0 5,11,17,23 * * *'; // 05/11/17/23 UTC — 6h aralık
+export const SYNC_FEDEX_TRACK_FULL_CRON   = '0 5,17 * * *';      // 05/17 UTC — open tracking refresh dahil
+export const SYNC_FEDEX_TRACK_DELTA_CRON  = '0 11,23 * * *';     // 11/23 UTC — yeni shipment delta
 export const SYNC_WISERSELL_ORDERS_CRON   = '0 9 * * *';          // 09:00 UTC (12:00 TR) — ABD gecesi, son 14 gün rolling
 // Pending sync (open + ready_to_ship) — closed sync'in 15 dk arkasından. Stok istatistiği için günde 1 snapshot yeterli.
 export const SYNC_WISERSELL_PENDING_CRON  = '15 9 * * *';         // 09:15 UTC (12:15 TR) — closed sync 09:00'da bitince

@@ -159,7 +159,8 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
         .catch(err => logger.error('[Sync] Fee rates calc error:', err));
       res.json({ success: true, message: 'Product fee rates calculation started' });
     } else if (type === 'fedex_track') {
-      withSyncLog('fedex-track', () => runFedexSync())
+      // Manuel run ayrı bucket — fedex-track-full/delta baseline'larını bozmasın.
+      withSyncLog('fedex-track-manual', () => runFedexSync())
         .catch(err => logger.error('[Sync] FedEx Track sync error:', err));
       res.json({ success: true, message: 'FedEx Track sync started — check sync_log for results' });
     } else if (type === 'wisersell_shipment') {
