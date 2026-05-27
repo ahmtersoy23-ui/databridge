@@ -21,8 +21,8 @@ export const SYNC_SKU_MASTER_DIFF_CRON = '0 0 * * 0'; // Weekly Sunday 00:00 UTC
 export const SYNC_BUSINESS_REPORT_CRON = '0 7 * * *'; // Daily at 07:00 UTC (after ads sync)
 export const SYNC_CAMPAIGN_SNAPSHOT_CRON = '30 6 * * *'; // Daily at 06:30 UTC (during ads sync window)
 export const SYNC_BRAND_ANALYTICS_CRON = '0 8 * * 1'; // Weekly Monday 08:00 UTC
-export const SYNC_SB_ADS_CRON = '45 6 * * *';         // Daily at 06:45 UTC (after SP ads at 06:00) (previous week data)
-export const SYNC_SD_ADS_CRON = '15 7 * * *';         // Daily at 07:15 UTC (after SB at 06:45)
+export const SYNC_SB_ADS_CRON = '30 8 * * *';         // Daily at 08:30 UTC — moved from 06:45 to avoid Amazon morning peak 429s
+export const SYNC_SD_ADS_CRON = '15 9 * * *';         // Daily at 09:15 UTC — moved from 07:15 (after SB at 08:30)
 export const DATA_QUALITY_CRON = '0 9 * * *';          // Daily at 09:00 UTC (after all syncs complete)
 export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:00 UTC
 // Wisersell sabah 04:30'da tek run (yeni tracking'ler oms_shipments'a).

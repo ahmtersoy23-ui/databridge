@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncFedexTrackings } from '../services/sync/fedexSync';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
@@ -23,15 +23,16 @@ const router = Router();
 router.use(adminOpsAuth);
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sp_ads', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
   account: z.string().optional(),
+  lookbackDays: z.number().int().min(1).max(95).optional(),
 });
 
 // POST /api/v1/sync/trigger - Manual sync trigger (auth: INTERNAL_API_KEY header)
 router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: Response) => {
-  const { type, marketplace, months } = req.body;
+  const { type, marketplace, months, lookbackDays } = req.body;
 
   try {
     if (type === 'inventory') {
@@ -146,14 +147,18 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       withSyncLog('brand-analytics', () => runBrandAnalyticsSyncJob())
         .catch(err => logger.error('[Sync] Brand analytics sync error:', err));
       res.json({ success: true, message: 'Brand analytics sync started' });
+    } else if (type === 'sp_ads') {
+      withSyncLog('sp-ads', () => runAdsSync(lookbackDays).then(() => undefined))
+        .catch(err => logger.error('[Sync] SP Ads sync error:', err));
+      res.json({ success: true, message: `SP Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'sb_ads') {
-      withSyncLog('sb-ads', () => runSbAdsSync().then(() => undefined))
+      withSyncLog('sb-ads', () => runSbAdsSync(lookbackDays).then(() => undefined))
         .catch(err => logger.error('[Sync] SB Ads sync error:', err));
-      res.json({ success: true, message: 'SB Ads sync started' });
+      res.json({ success: true, message: `SB Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'sd_ads') {
-      withSyncLog('sd-ads', () => runSdAdsSync().then(() => undefined))
+      withSyncLog('sd-ads', () => runSdAdsSync(lookbackDays).then(() => undefined))
         .catch(err => logger.error('[Sync] SD Ads sync error:', err));
-      res.json({ success: true, message: 'SD Ads sync started' });
+      res.json({ success: true, message: `SD Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'fee_rates') {
       withSyncLog('fee-rates', () => runFeeRatesJob())
         .catch(err => logger.error('[Sync] Fee rates calc error:', err));
