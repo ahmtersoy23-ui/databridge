@@ -28,11 +28,14 @@ const triggerSchema = z.object({
   months: z.number().min(1).max(24).optional(),
   account: z.string().optional(),
   lookbackDays: z.number().int().min(1).max(95).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD').optional(),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD').optional(),
 });
 
 // POST /api/v1/sync/trigger - Manual sync trigger (auth: INTERNAL_API_KEY header)
 router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: Response) => {
-  const { type, marketplace, months, lookbackDays } = req.body;
+  const { type, marketplace, months, lookbackDays, startDate, endDate } = req.body;
+  const dateRange = startDate && endDate ? { startDate, endDate } : undefined;
 
   try {
     if (type === 'inventory') {
@@ -148,17 +151,17 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
         .catch(err => logger.error('[Sync] Brand analytics sync error:', err));
       res.json({ success: true, message: 'Brand analytics sync started' });
     } else if (type === 'sp_ads') {
-      withSyncLog('sp-ads', () => runAdsSync(lookbackDays).then(() => undefined))
+      withSyncLog('sp-ads', () => runAdsSync(lookbackDays, dateRange).then(() => undefined))
         .catch(err => logger.error('[Sync] SP Ads sync error:', err));
-      res.json({ success: true, message: `SP Ads sync started (${lookbackDays ?? 14} days)` });
+      res.json({ success: true, message: dateRange ? `SP Ads sync started (${dateRange.startDate} → ${dateRange.endDate})` : `SP Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'sb_ads') {
-      withSyncLog('sb-ads', () => runSbAdsSync(lookbackDays).then(() => undefined))
+      withSyncLog('sb-ads', () => runSbAdsSync(lookbackDays, dateRange).then(() => undefined))
         .catch(err => logger.error('[Sync] SB Ads sync error:', err));
-      res.json({ success: true, message: `SB Ads sync started (${lookbackDays ?? 14} days)` });
+      res.json({ success: true, message: dateRange ? `SB Ads sync started (${dateRange.startDate} → ${dateRange.endDate})` : `SB Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'sd_ads') {
-      withSyncLog('sd-ads', () => runSdAdsSync(lookbackDays).then(() => undefined))
+      withSyncLog('sd-ads', () => runSdAdsSync(lookbackDays, dateRange).then(() => undefined))
         .catch(err => logger.error('[Sync] SD Ads sync error:', err));
-      res.json({ success: true, message: `SD Ads sync started (${lookbackDays ?? 14} days)` });
+      res.json({ success: true, message: dateRange ? `SD Ads sync started (${dateRange.startDate} → ${dateRange.endDate})` : `SD Ads sync started (${lookbackDays ?? 14} days)` });
     } else if (type === 'fee_rates') {
       withSyncLog('fee-rates', () => runFeeRatesJob())
         .catch(err => logger.error('[Sync] Fee rates calc error:', err));

@@ -90,8 +90,9 @@ export async function syncAdsForProfile(
   credentialId: number,
   profileId: number,
   lookbackDays = DEFAULT_LOOKBACK_DAYS,
+  dateRange?: { startDate: string; endDate: string },
 ): Promise<{ total: number; errors: string[] }> {
-  const { startDate, endDate } = getDateRange(lookbackDays);
+  const { startDate, endDate } = dateRange ?? getDateRange(lookbackDays);
   const client = await getAdsClient(credentialId, profileId);
   let total = 0;
   const errors: string[] = [];
@@ -128,7 +129,7 @@ export async function syncAdsForProfile(
 /**
  * Sync all active profiles (called by scheduler).
  */
-export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): Promise<void> {
+export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   const profiles = await getActiveProfiles();
 
   if (!profiles.length) {
@@ -136,7 +137,8 @@ export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): 
     return;
   }
 
-  logger.info(`[AdsSync] Starting sync for ${profiles.length} profiles (${lookbackDays} day lookback)`);
+  const rangeLabel = dateRange ? `${dateRange.startDate} → ${dateRange.endDate}` : `${lookbackDays} day lookback`;
+  logger.info(`[AdsSync] Starting sync for ${profiles.length} profiles (${rangeLabel})`);
 
   for (const profile of profiles) {
     try {
@@ -144,6 +146,7 @@ export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): 
         profile.credential_id,
         profile.profile_id,
         lookbackDays,
+        dateRange,
       );
 
       if (errors.length) {
@@ -169,8 +172,9 @@ export async function syncSbForProfile(
   credentialId: number,
   profileId: number,
   lookbackDays = DEFAULT_LOOKBACK_DAYS,
+  dateRange?: { startDate: string; endDate: string },
 ): Promise<{ total: number; errors: string[] }> {
-  const { startDate, endDate } = getDateRange(lookbackDays);
+  const { startDate, endDate } = dateRange ?? getDateRange(lookbackDays);
   const client = await getAdsClient(credentialId, profileId);
   let total = 0;
   const errors: string[] = [];
@@ -206,7 +210,7 @@ export async function syncSbForProfile(
 /**
  * Sync all active profiles for SB reports (called by scheduler).
  */
-export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): Promise<void> {
+export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   const profiles = await getActiveProfiles();
 
   if (!profiles.length) {
@@ -214,7 +218,8 @@ export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): P
     return;
   }
 
-  logger.info(`[SbSync] Starting SB sync for ${profiles.length} profiles (${lookbackDays} day lookback)`);
+  const rangeLabel = dateRange ? `${dateRange.startDate} → ${dateRange.endDate}` : `${lookbackDays} day lookback`;
+  logger.info(`[SbSync] Starting SB sync for ${profiles.length} profiles (${rangeLabel})`);
 
   for (const profile of profiles) {
     try {
@@ -222,6 +227,7 @@ export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): P
         profile.credential_id,
         profile.profile_id,
         lookbackDays,
+        dateRange,
       );
 
       if (errors.length) {
@@ -246,8 +252,9 @@ export async function syncSdForProfile(
   credentialId: number,
   profileId: number,
   lookbackDays = DEFAULT_LOOKBACK_DAYS,
+  dateRange?: { startDate: string; endDate: string },
 ): Promise<{ total: number; errors: string[] }> {
-  const { startDate, endDate } = getDateRange(lookbackDays);
+  const { startDate, endDate } = dateRange ?? getDateRange(lookbackDays);
   const client = await getAdsClient(credentialId, profileId);
   let total = 0;
   const errors: string[] = [];
@@ -283,7 +290,7 @@ export async function syncSdForProfile(
 /**
  * Sync all active profiles for SD reports (called by scheduler).
  */
-export async function syncAllSdProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): Promise<void> {
+export async function syncAllSdProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   const profiles = await getActiveProfiles();
 
   if (!profiles.length) {
@@ -291,7 +298,8 @@ export async function syncAllSdProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): P
     return;
   }
 
-  logger.info(`[SdSync] Starting SD sync for ${profiles.length} profiles (${lookbackDays} day lookback)`);
+  const rangeLabel = dateRange ? `${dateRange.startDate} → ${dateRange.endDate}` : `${lookbackDays} day lookback`;
+  logger.info(`[SdSync] Starting SD sync for ${profiles.length} profiles (${rangeLabel})`);
 
   for (const profile of profiles) {
     try {
@@ -299,6 +307,7 @@ export async function syncAllSdProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS): P
         profile.credential_id,
         profile.profile_id,
         lookbackDays,
+        dateRange,
       );
 
       if (errors.length) {

@@ -284,7 +284,7 @@ async function runReviewSync(): Promise<void> {
   }
 }
 
-async function runAdsSync(lookbackDays?: number): Promise<void> {
+async function runAdsSync(lookbackDays?: number, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   if (isAdsSyncing) {
     logger.warn('[Scheduler] Skipping Ads sync - another Ads sync is in progress');
     return;
@@ -292,7 +292,7 @@ async function runAdsSync(lookbackDays?: number): Promise<void> {
 
   isAdsSyncing = true;
   try {
-    await syncAllAdsProfiles(lookbackDays);
+    await syncAllAdsProfiles(lookbackDays, dateRange);
     await runPostSyncChecksAndAlert();
   } catch (err: any) {
     logger.error('[Scheduler] Ads sync failed:', err.message);
@@ -391,14 +391,14 @@ async function runFeeRatesJob(): Promise<number> {
   }
 }
 
-async function runSbAdsSync(lookbackDays?: number): Promise<void> {
+async function runSbAdsSync(lookbackDays?: number, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   if (isSbAdsSyncing) {
     logger.warn('[Scheduler] Skipping SB Ads sync - already running');
     return;
   }
   isSbAdsSyncing = true;
   try {
-    await syncAllSbProfiles(lookbackDays);
+    await syncAllSbProfiles(lookbackDays, dateRange);
   } catch (err: any) {
     logger.error('[Scheduler] SB Ads sync failed:', err.message);
   } finally {
@@ -406,14 +406,14 @@ async function runSbAdsSync(lookbackDays?: number): Promise<void> {
   }
 }
 
-async function runSdAdsSync(lookbackDays?: number): Promise<void> {
+async function runSdAdsSync(lookbackDays?: number, dateRange?: { startDate: string; endDate: string }): Promise<void> {
   if (isSdAdsSyncing) {
     logger.warn('[Scheduler] Skipping SD Ads sync - already running');
     return;
   }
   isSdAdsSyncing = true;
   try {
-    await syncAllSdProfiles(lookbackDays);
+    await syncAllSdProfiles(lookbackDays, dateRange);
   } catch (err: any) {
     logger.error('[Scheduler] SD Ads sync failed:', err.message);
   } finally {
