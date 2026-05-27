@@ -32,7 +32,13 @@ export async function withSyncLog(
       );
       if (prev.rows.length && prev.rows[0].rows_processed > 0) {
         const ratio = rowCount / prev.rows[0].rows_processed;
-        const threshold = getSafetyDropThreshold('SYNC_LOG_ROW_DROP');
+        // Job-specific override (volatil joblar için): SAFETY_DROP_THRESHOLD_SYNC_LOG_ROW_DROP_<JOB_UPPER>
+        const jobEnv = jobName.toUpperCase().replace(/[^A-Z0-9]+/g, '_');
+        const specificRaw = process.env[`SAFETY_DROP_THRESHOLD_SYNC_LOG_ROW_DROP_${jobEnv}`];
+        const specific = specificRaw ? parseFloat(specificRaw) : NaN;
+        const threshold = Number.isFinite(specific) && specific >= 0 && specific <= 1
+          ? specific
+          : getSafetyDropThreshold('SYNC_LOG_ROW_DROP');
         if (ratio < threshold) {
           await notify(`⚠️ [${jobName}] Row count dropped ${prev.rows[0].rows_processed} → ${rowCount} (${Math.round(ratio * 100)}%, threshold ${threshold})`);
         }
