@@ -11,7 +11,7 @@ export const SYNC_INVENTORY_CRON = '0 */8 * * *'; // Every 8 hours
 export const SYNC_SALES_CRON = '0 3 * * *';        // Daily at 03:00 UTC
 export const SYNC_NJ_WAREHOUSE_CRON = '0 */8 * * *'; // Every 8 hours
 export const SYNC_WISERSELL_CRON = '0 4,12,20 * * *'; // Every 8h at 04:00, 12:00, 20:00 UTC (offset from inventory/NJ at 00/08/16)
-export const SYNC_WAYFAIR_CRON = '0 1,9,17 * * *';    // Every 8h at 01:00, 09:00, 17:00 UTC
+export const SYNC_WAYFAIR_CRON = '0 2,10,18 * * *';   // Every 8h at 02:00, 10:00, 18:00 UTC (= 05:00, 13:00, 21:00 TR)
 export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for overlap
 export const SYNC_TRANSACTIONS_CRON = '0 5 * * *';  // Daily at 05:00 UTC
 export const TRANSACTION_OVERLAP_DAYS = 35;          // Fetch last 35 days (settlement delays)
