@@ -85,14 +85,26 @@ const BUSINESS_REPORT_TABLE = 'business_report';
 
 // ─── Katman 1: Post-Sync Assertions ────────────────────────────────────────
 
+export type AdsProductPrefix = 'sp' | 'sb' | 'sd';
+
+function filterTablesByPrefix(prefix?: AdsProductPrefix) {
+  if (!prefix) return ADS_TABLES;
+  return ADS_TABLES.filter(t => {
+    if (prefix === 'sb') return t.table.startsWith('ads_sb_');
+    if (prefix === 'sd') return t.table.startsWith('ads_sd_');
+    // SP = everything else (ads_search_term_report, ads_targeting_report, ads_advertised_product_report, ads_purchased_product_report, ads_campaign_report)
+    return !t.table.startsWith('ads_sb_') && !t.table.startsWith('ads_sd_');
+  });
+}
+
 /** Run after each ads sync completes. Returns array of check results. */
-export async function runPostSyncChecks(reportDate?: string): Promise<CheckResult[]> {
+export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProductPrefix): Promise<CheckResult[]> {
   // Ads raporlari T-1 gecikmeli gelir — default yesterday
   const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
   const targetDate = reportDate || yesterday;
   const results: CheckResult[] = [];
 
-  for (const cfg of ADS_TABLES) {
+  for (const cfg of filterTablesByPrefix(prefix)) {
     // 1. Duplikasyon kontrolu
     try {
       const dupeSQL = `
@@ -522,13 +534,14 @@ export async function runDailyHealthCheck(): Promise<void> {
 }
 
 /** Run post-sync checks and alert on failures. Called after each ads sync. */
-export async function runPostSyncChecksAndAlert(reportDate?: string): Promise<void> {
+export async function runPostSyncChecksAndAlert(reportDate?: string, prefix?: AdsProductPrefix): Promise<void> {
   try {
-    const results = await runPostSyncChecks(reportDate);
-    await alertResults(results, `Post-sync ${reportDate || 'today'}`);
+    const results = await runPostSyncChecks(reportDate, prefix);
+    const label = prefix ? `Post-sync ${prefix.toUpperCase()} ${reportDate || 'today'}` : `Post-sync ${reportDate || 'today'}`;
+    await alertResults(results, label);
     const failed = results.filter(r => !r.passed);
     if (failed.length > 0) {
-      logger.warn(`[DataQuality] Post-sync: ${failed.length} issue(s) detected`);
+      logger.warn(`[DataQuality] Post-sync${prefix ? ` ${prefix.toUpperCase()}` : ''}: ${failed.length} issue(s) detected`);
     }
   } catch (err: any) {
     logger.error('[DataQuality] Post-sync check error:', err.message);

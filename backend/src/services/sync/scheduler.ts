@@ -293,7 +293,7 @@ async function runAdsSync(lookbackDays?: number, dateRange?: { startDate: string
   isAdsSyncing = true;
   try {
     await syncAllAdsProfiles(lookbackDays, dateRange);
-    await runPostSyncChecksAndAlert();
+    await runPostSyncChecksAndAlert(undefined, 'sp');
   } catch (err: any) {
     logger.error('[Scheduler] Ads sync failed:', err.message);
   } finally {
@@ -399,6 +399,7 @@ async function runSbAdsSync(lookbackDays?: number, dateRange?: { startDate: stri
   isSbAdsSyncing = true;
   try {
     await syncAllSbProfiles(lookbackDays, dateRange);
+    await runPostSyncChecksAndAlert(undefined, 'sb');
   } catch (err: any) {
     logger.error('[Scheduler] SB Ads sync failed:', err.message);
   } finally {
@@ -414,6 +415,7 @@ async function runSdAdsSync(lookbackDays?: number, dateRange?: { startDate: stri
   isSdAdsSyncing = true;
   try {
     await syncAllSdProfiles(lookbackDays, dateRange);
+    await runPostSyncChecksAndAlert(undefined, 'sd');
   } catch (err: any) {
     logger.error('[Scheduler] SD Ads sync failed:', err.message);
   } finally {
