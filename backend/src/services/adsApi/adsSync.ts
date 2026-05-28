@@ -120,7 +120,7 @@ export async function syncAdsForProfile(
     }
 
     // Small delay between report types to respect rate limits
-    await new Promise(resolve => setTimeout(resolve, 2_000));
+    await new Promise(resolve => setTimeout(resolve, 30_000));
   }
 
   return { total, errors };
@@ -201,7 +201,7 @@ export async function syncSbForProfile(
       logger.error(`[SbSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 2_000));
+    await new Promise(resolve => setTimeout(resolve, 30_000));
   }
 
   return { total, errors };
@@ -281,7 +281,7 @@ export async function syncSdForProfile(
       logger.error(`[SdSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
     }
 
-    await new Promise(resolve => setTimeout(resolve, 2_000));
+    await new Promise(resolve => setTimeout(resolve, 30_000));
   }
 
   return { total, errors };
