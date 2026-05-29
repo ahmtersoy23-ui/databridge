@@ -99,9 +99,10 @@ function filterTablesByPrefix(prefix?: AdsProductPrefix) {
 
 /** Run after each ads sync completes. Returns array of check results. */
 export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProductPrefix): Promise<CheckResult[]> {
-  // Ads raporlari T-1 gecikmeli gelir — default yesterday
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const targetDate = reportDate || yesterday;
+  // Ads raporlari T-1 gecikmeli gelir, SB/SD cron'lari gece 22:00/22:45 UTC'de
+  // T-1 yaziyor → check T-2'ye bakmali, yoksa "bugun cron henuz calismadi" alarmlari uretir.
+  const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10);
+  const targetDate = reportDate || twoDaysAgo;
   const results: CheckResult[] = [];
 
   for (const cfg of filterTablesByPrefix(prefix)) {
@@ -259,14 +260,14 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
         date_range AS (
           SELECT generate_series(
             (SELECT start_date FROM table_start),
-            CURRENT_DATE - 1,
+            CURRENT_DATE - 2,
             '1 day'::interval
           )::date AS d
         ),
         actual AS (
           SELECT DISTINCT report_date FROM ${table}
           WHERE report_date >= (SELECT start_date FROM table_start)
-            AND report_date < CURRENT_DATE
+            AND report_date < CURRENT_DATE - 1
         )
         SELECT d AS missing_date
         FROM date_range

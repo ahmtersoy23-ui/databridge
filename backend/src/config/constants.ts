@@ -23,7 +23,7 @@ export const SYNC_CAMPAIGN_SNAPSHOT_CRON = '30 6 * * *'; // Daily at 06:30 UTC (
 export const SYNC_BRAND_ANALYTICS_CRON = '0 8 * * 1'; // Weekly Monday 08:00 UTC
 export const SYNC_SB_ADS_CRON = '0 22 * * *';         // Daily at 22:00 UTC (= 01:00 TR) — Amazon Ads API quieter at night, report generation ~10x faster
 export const SYNC_SD_ADS_CRON = '45 22 * * *';        // Daily at 22:45 UTC (= 01:45 TR) — after SB completes
-export const DATA_QUALITY_CRON = '0 7 * * *';          // Daily at 07:00 UTC (after SP ads sync at 06:00; SB/SD already ran night before at 22:00/22:45)
+export const DATA_QUALITY_CRON = '0 8 * * *';          // Daily at 08:00 UTC (after SP ads 06:00 + business_report 07:00; SB/SD ran night before)
 export const FEE_RATES_CRON = '0 10 3 * *';            // Monthly 3rd day at 10:00 UTC
 // Wisersell sabah 04:30'da tek run (yeni tracking'ler oms_shipments'a).
 // FedEx Track 4x/gün, iki ayrı job ismiyle (sync_log baseline'ı doğru karşılaşsın diye):
