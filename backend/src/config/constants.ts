@@ -9,8 +9,7 @@ export const RATE_LIMIT_MAX_REQUESTS = 200;
 
 export const SYNC_INVENTORY_CRON = '0 */8 * * *'; // Every 8 hours
 export const SYNC_SALES_CRON = '0 3 * * *';        // Daily at 03:00 UTC
-export const SYNC_NJ_WAREHOUSE_CRON = '0 */8 * * *'; // Every 8 hours
-export const SYNC_WISERSELL_CRON = '0 4,12,20 * * *'; // Every 8h at 04:00, 12:00, 20:00 UTC (offset from inventory/NJ at 00/08/16)
+export const SYNC_WISERSELL_CRON = '0 4,12,20 * * *'; // Every 8h at 04:00, 12:00, 20:00 UTC (offset from inventory at 00/08/16)
 export const SYNC_WAYFAIR_CRON = '0 2,10,18 * * *';   // Every 8h at 02:00, 10:00, 18:00 UTC (= 05:00, 13:00, 21:00 TR)
 export const SALES_OVERLAP_DAYS = 5;                // Fetch last 5 days for overlap
 export const SYNC_TRANSACTIONS_CRON = '0 5 * * *';  // Daily at 05:00 UTC
@@ -94,8 +93,6 @@ export function getWisersellPendingRetentionDays(): number {
 export function getWisersellPendingStaleAgeDays(): number {
   return parseEnvInt('WISERSELL_PENDING_STALE_AGE_DAYS', 90, 1, 730);
 }
-
-export const NJ_WAREHOUSE_CSV_URL = 'https://iwarden.iwaconcept.com/iwabot/warehouse/report.php?csv=1';
 
 export const SP_API_REGIONS = {
   NA: { endpoint: 'https://sellingpartnerapi-na.amazon.com', awsRegion: 'us-east-1' },

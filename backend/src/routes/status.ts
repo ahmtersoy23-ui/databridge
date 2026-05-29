@@ -36,7 +36,6 @@ const SYNC_HEALTH_EXPECTED: Array<{ name: string; maxAgeHours: number }> = [
   { name: 'inventory', maxAgeHours: 10 },       // 8h aralık
   { name: 'sales', maxAgeHours: 26 },           // günlük 03:00
   { name: 'transactions', maxAgeHours: 26 },    // günlük 05:00
-  { name: 'nj-warehouse', maxAgeHours: 10 },    // 8h aralık
   { name: 'wisersell', maxAgeHours: 10 },       // 8h aralık
   { name: 'wayfair', maxAgeHours: 12 },         // günde 3x
   { name: 'ads', maxAgeHours: 26 },             // günlük

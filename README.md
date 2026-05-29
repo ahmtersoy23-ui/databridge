@@ -20,7 +20,6 @@ Express TS + PostgreSQL + node-cron + Winston
 | wayfair | `01/09/17 UTC` | Wayfair GraphQL (Shukran + MDN) | wayfair_orders + wayfair_inventory |
 | ads | `06:00 UTC` | Amazon Ads V3 (4 rapor) | ads_*_report |
 | aging | `02:00 UTC` | SP-API PLANNING_DATA | fba_inventory_aging |
-| nj-warehouse | `*/8 saat` | NJ API | nj_warehouse |
 | wisersell | `04/12/20 UTC` | Wisersell API | wisersell_catalog |
 
 Tum job'lar `sync_log` tablosuna yazilir. Fail durumunda Slack'e bildirim gider.

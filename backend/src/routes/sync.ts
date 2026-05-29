@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncFedexTrackings } from '../services/sync/fedexSync';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
@@ -23,7 +23,7 @@ const router = Router();
 router.use(adminOpsAuth);
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'nj_warehouse', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sp_ads', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sp_ads', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
   account: z.string().optional(),
@@ -71,9 +71,6 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     } else if (type === 'refresh_inventory_data') {
       await writeInventoryData();
       res.json({ success: true, message: 'Inventory data refreshed to pricelab_db.fba_inventory' });
-    } else if (type === 'nj_warehouse') {
-      runNJWarehouseSync().catch(err => logger.error('[Sync] Manual NJ warehouse sync error:', err));
-      res.json({ success: true, message: 'NJ warehouse sync started' });
     } else if (type === 'wisersell') {
       runWisersellSync().catch(err => logger.error('[Sync] Manual Wisersell sync error:', err));
       res.json({ success: true, message: 'Wisersell catalog sync started' });

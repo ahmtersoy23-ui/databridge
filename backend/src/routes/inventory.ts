@@ -6,22 +6,8 @@ const router = Router();
 
 const VALID_WAREHOUSES = ['US', 'UK', 'EU', 'CA', 'AU', 'AE', 'SA'];
 
-// GET /api/v1/amazonfba/NJ — NJ physical warehouse inventory
-router.get('/NJ', async (_req: Request, res: Response) => {
-  try {
-    const result = await pool.query(`
-      SELECT fnsku, iwasku, asin, name, category,
-             count_in_ship, count_in_raf, total_count
-      FROM nj_warehouse_inventory
-      ORDER BY COALESCE(iwasku, fnsku)
-    `);
-    logger.info(`[Inventory] Serving NJ: ${result.rows.length} items`);
-    res.json(result.rows);
-  } catch (err: any) {
-    logger.error('[Inventory] Error for NJ warehouse:', err.message);
-    res.status(500).json({ error: 'Failed to fetch NJ warehouse data' });
-  }
-});
+// NJ warehouse endpoint kaldırıldı (2026-05-29) — StockPulse artık ManuMaestro Lite WMS'ten
+// (cache_us_warehouse: NJ + SHOWROOM ayrı kolon) doğrudan okuyor.
 
 // GET /api/v1/amazonfba/:warehouse
 // StockPulse-compatible: returns array of inventory objects

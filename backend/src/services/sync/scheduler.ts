@@ -8,7 +8,6 @@ import { writeInventoryData } from './inventoryDataWriter';
 // writeTransactionData / cleanupOldTransactions intentionally not imported —
 // amz_transactions is no longer mirrored from SP-API. Tests that need the
 // helpers import them directly from transactionDataWriter.
-import { syncNJWarehouse } from './njWarehouseSync';
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
 import { syncFedex } from './fedexSync';
@@ -21,7 +20,7 @@ import { syncTakealot } from './takealotOrdersSync';
 import { syncKaufland } from './kauflandOrdersSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_NJ_WAREHOUSE_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -38,7 +37,6 @@ import type { MarketplaceConfig } from '../../types';
 let inventoryTask: cron.ScheduledTask | null = null;
 let salesTask: cron.ScheduledTask | null = null;
 let transactionTask: cron.ScheduledTask | null = null;
-let njWarehouseTask: cron.ScheduledTask | null = null;
 let wisersellTask: cron.ScheduledTask | null = null;
 let wayfairTask: cron.ScheduledTask | null = null;
 let adsTask: cron.ScheduledTask | null = null;
@@ -52,7 +50,6 @@ let sdAdsTask: cron.ScheduledTask | null = null;
 let dataQualityTask: cron.ScheduledTask | null = null;
 let isSyncing = false;
 let isTransactionSyncing = false;
-let isNJSyncing = false;
 let isWisersellSyncing = false;
 let isWayfairSyncing = false;
 let isReviewSyncing = false; // kept for manual trigger via /sync/trigger
@@ -176,22 +173,6 @@ async function runSalesSync(): Promise<void> {
     }
   } finally {
     isSyncing = false;
-  }
-}
-
-async function runNJWarehouseSync(): Promise<void> {
-  if (isNJSyncing) {
-    logger.warn('[Scheduler] Skipping NJ warehouse sync - another sync is in progress');
-    return;
-  }
-
-  isNJSyncing = true;
-  try {
-    await withRetry(() => syncNJWarehouse(), { label: 'nj-warehouse' });
-  } catch (err: any) {
-    logger.error('[Scheduler] NJ warehouse sync failed:', err.message);
-  } finally {
-    isNJSyncing = false;
   }
 }
 
@@ -600,11 +581,6 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Sales sync error:', err));
   });
 
-  njWarehouseTask = scheduleWithJitter(SYNC_NJ_WAREHOUSE_CRON, () => {
-    withSyncLog('nj-warehouse', () => runNJWarehouseSync().then(() => undefined))
-      .catch(err => logger.error('[Scheduler] NJ warehouse sync error:', err));
-  });
-
   transactionTask = scheduleWithJitter(SYNC_TRANSACTIONS_CRON, () => {
     withSyncLog('transactions', () => runTransactionSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Transaction sync error:', err));
@@ -722,7 +698,6 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Inventory sync: ${SYNC_INVENTORY_CRON}`);
   logger.info(`[Scheduler] Sales sync: ${SYNC_SALES_CRON}`);
   logger.info(`[Scheduler] Transaction sync: ${SYNC_TRANSACTIONS_CRON}`);
-  logger.info(`[Scheduler] NJ warehouse sync: ${SYNC_NJ_WAREHOUSE_CRON}`);
   logger.info(`[Scheduler] Wisersell catalog sync: ${SYNC_WISERSELL_CRON}`);
   logger.info(`[Scheduler] Wayfair CastleGate sync: ${SYNC_WAYFAIR_CRON}`);
   logger.info(`[Scheduler] Ads sync: ${SYNC_ADS_CRON}`);
@@ -751,7 +726,6 @@ export function stopScheduler(): void {
   inventoryTask?.stop();
   salesTask?.stop();
   transactionTask?.stop();
-  njWarehouseTask?.stop();
   wisersellTask?.stop();
   wayfairTask?.stop();
   adsTask?.stop();
@@ -775,4 +749,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runNJWarehouseSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };

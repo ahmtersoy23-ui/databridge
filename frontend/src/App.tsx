@@ -10,7 +10,6 @@ import Orders from './pages/Orders';
 import Inventory from './pages/Inventory';
 import SalesAnalysis from './pages/SalesAnalysis';
 import InventoryAnalysis from './pages/InventoryAnalysis';
-import NJWarehouse from './pages/NJWarehouse';
 import Catalog from './pages/Catalog';
 import WayfairMappings from './pages/WayfairMappings';
 import WayfairOrders from './pages/WayfairOrders';
@@ -142,10 +141,6 @@ function Nav() {
           Kaufland
         </NavLink>
 
-        <NavLink to="/nj-warehouse" className={({ isActive }) => topCls(isActive)}>
-          NJ Warehouse
-        </NavLink>
-
         <NavLink to="/catalog" className={({ isActive }) => topCls(isActive)}>
           Catalog
         </NavLink>
@@ -247,7 +242,6 @@ export default function App() {
                   <Route path="/sales-analysis" element={<SalesAnalysis />} />
                   <Route path="/inventory-aging" element={<InventoryAging />} />
                   <Route path="/inventory-analysis" element={<InventoryAnalysis />} />
-                  <Route path="/nj-warehouse" element={<NJWarehouse />} />
                   <Route path="/catalog" element={<Catalog />} />
                   <Route path="/wayfair/orders" element={<WayfairOrders />} />
                   <Route path="/wayfair/inventory" element={<WayfairInventory />} />

@@ -286,7 +286,6 @@ export default function Dashboard() {
               <div>
                 {groupLabel('Other')}
                 <div className="flex gap-2 flex-wrap">
-                  {btn('nj_warehouse', 'NJ Warehouse', '#7c3aed')}
                   {btn('wisersell', 'Catalog', '#0891b2')}
                 </div>
               </div>
