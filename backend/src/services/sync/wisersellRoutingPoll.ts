@@ -30,6 +30,8 @@ interface ResolvedItem {
   product_code: string | null;
   marketplace_sku: string | null;
   product_name: string | null;
+  title: string | null;        // marketplace listing başlığı (özel/ödeme siparişlerde tek kimlik)
+  physical: boolean;           // gerçek ürün mü? (productId/code/sku var) — özel/ödeme linki = false
   resolved_by: string | null;
 }
 
@@ -84,12 +86,16 @@ export async function runWisersellRoutingPoll(): Promise<number> {
   const itemsByOrder = new Map<number, ResolvedItem[]>();
   itemIndex.forEach(({ orderIdx, item }, i) => {
     const arr = itemsByOrder.get(orderIdx) ?? [];
+    const productCode = item.listing?.product?.code ?? null;
+    const hasProductRef = !!(item.listing?.product?.id ?? productCode ?? item.marketplace_sku ?? item.listing?.product?.name);
     arr.push({
       iwasku: resolutions[i]?.iwasku ?? null,
       qty: Number(item.quantity ?? 0),
-      product_code: item.listing?.product?.code ?? null,
+      product_code: productCode,
       marketplace_sku: item.marketplace_sku ?? null,
       product_name: item.listing?.product?.name ?? null,
+      title: item.title ?? null,
+      physical: hasProductRef, // özel/ödeme linki (ürün referansı yok) → false → board'da hariç
       resolved_by: resolutions[i]?.resolved_by ?? null,
     });
     itemsByOrder.set(orderIdx, arr);
