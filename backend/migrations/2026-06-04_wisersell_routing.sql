@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS wisersell_routing_candidates (
   gone_at             TIMESTAMPTZ               -- açık statüden çıkınca (artık poll'da görünmüyor) işaretlenir
 );
 
+-- Tam teslim adresi (GET /api/orders/{id} detayından; liste JSON'da yok). Lazy doldurulur.
+ALTER TABLE wisersell_routing_candidates ADD COLUMN IF NOT EXISTS ship_address TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_wrc_region_active ON wisersell_routing_candidates (region) WHERE gone_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_wrc_order_code ON wisersell_routing_candidates (order_code);
 CREATE INDEX IF NOT EXISTS idx_wrc_store ON wisersell_routing_candidates (store_id);

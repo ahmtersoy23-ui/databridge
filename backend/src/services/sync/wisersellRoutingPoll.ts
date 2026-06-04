@@ -1,6 +1,6 @@
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
-import { getOpenOrders, type WisersellOrderRow, type WisersellOrderItem } from '../wisersell/webClient';
+import { getOpenOrders, getOrderDetail, type WisersellOrderRow, type WisersellOrderItem } from '../wisersell/webClient';
 import { resolveBatch } from '../wisersell/iwaskuResolver';
 import { WISERSELL_STATUS_CODES } from '../../config/constants';
 
@@ -91,6 +91,32 @@ export async function runWisersellRoutingPoll(): Promise<number> {
     itemsByOrder.set(orderIdx, arr);
   });
 
+  // Teslim adresi: liste JSON'da yok → GET /api/orders/{id} detayından lazy çek.
+  // Sadece henüz adresi olmayan adaylar için, poll başına cap + rate-limit ile.
+  const MAX_DETAIL_FETCH = 100;
+  const existingAddr = await pool.query<{ wisersell_order_id: number }>(
+    `SELECT wisersell_order_id FROM wisersell_routing_candidates WHERE ship_address IS NOT NULL`,
+  );
+  const haveAddr = new Set(existingAddr.rows.map(r => Number(r.wisersell_order_id)));
+  const addrById = new Map<number, string>();
+  let fetched = 0;
+  for (const o of usOrders) {
+    if (fetched >= MAX_DETAIL_FETCH) break;
+    if (haveAddr.has(Number(o.id))) continue;
+    try {
+      const d = await getOrderDetail(Number(o.id));
+      if (d) {
+        const line = [d.firstline || d.address, d.secondline].filter(Boolean).join(' ');
+        const cityLine = [d.city, d.state, d.zip].filter(Boolean).join(' ');
+        const addr = [line, cityLine, d.phone].filter(Boolean).join('\n');
+        if (addr) addrById.set(Number(o.id), addr);
+      }
+      fetched++;
+      await new Promise(r => setTimeout(r, 150)); // rate-limit (~1/sn altı)
+    } catch { /* adres alınamadı — sonraki poll'da tekrar denenir */ }
+  }
+  if (fetched) logger.info(`[WisersellRouting] poll: ${fetched} sipariş detayı (adres) çekildi`);
+
   const client = await pool.connect();
   const seenIds: number[] = [];
   try {
@@ -103,9 +129,9 @@ export async function runWisersellRoutingPoll(): Promise<number> {
       await client.query(
         `INSERT INTO wisersell_routing_candidates
            (wisersell_order_id, order_code, store_id, country_id, currency_id, orderstatus_id,
-            recipient_name, label_no, ws_shipment_date, created_at_ws, orderitems, region, raw_row,
+            recipient_name, label_no, ws_shipment_date, created_at_ws, orderitems, region, raw_row, ship_address,
             first_seen_at, last_seen_at, gone_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb, NOW(), NOW(), NULL)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13::jsonb,$14, NOW(), NOW(), NULL)
          ON CONFLICT (wisersell_order_id) DO UPDATE SET
            order_code     = EXCLUDED.order_code,
            store_id       = EXCLUDED.store_id,
@@ -119,6 +145,7 @@ export async function runWisersellRoutingPoll(): Promise<number> {
            orderitems     = EXCLUDED.orderitems,
            region         = EXCLUDED.region,
            raw_row        = EXCLUDED.raw_row,
+           ship_address   = COALESCE(EXCLUDED.ship_address, wisersell_routing_candidates.ship_address),
            last_seen_at   = NOW(),
            gone_at        = NULL`,
         [
@@ -135,6 +162,7 @@ export async function runWisersellRoutingPoll(): Promise<number> {
           JSON.stringify(items),
           region,
           JSON.stringify(o),
+          addrById.get(Number(o.id)) ?? null,
         ],
       );
     }

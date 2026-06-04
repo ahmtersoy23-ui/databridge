@@ -302,6 +302,42 @@ export async function getOpenOrders(opts: { status?: number[]; pageSize?: number
   return all;
 }
 
+export interface WisersellOrderDetail {
+  name: string | null;
+  address: string | null;
+  firstline: string | null;
+  secondline: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+/**
+ * Tek siparişin detayını çeker (GET /api/orders/{id}) — liste JSON'da olmayan TAM teslim adresi.
+ * (Endpoint 200 yerine 201 dönüyor — Wisersell tuhaflığı, ikisini de kabul et.)
+ */
+export async function getOrderDetail(orderId: number): Promise<WisersellOrderDetail | null> {
+  const { baseUrl } = await getWebCredentials();
+  const doRequest = (tk: string) => axios.get(`${baseUrl}/api/orders/${orderId}`, {
+    headers: { Authorization: tk, Accept: 'application/json, text/plain, */*', 'User-Agent': WS_UA },
+    timeout: 20_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) { token = await getWebToken(true); res = await doRequest(token); }
+  if (res.status !== 200 && res.status !== 201) return null;
+  const d = res.data || {};
+  return {
+    name: d.name ?? null, address: d.address ?? null,
+    firstline: d.firstline ?? null, secondline: d.secondline ?? null,
+    city: d.city ?? null, state: d.state ?? null, zip: d.zip ?? null,
+    phone: d.phone ?? null, email: d.email ?? null,
+  };
+}
+
 /**
  * Sipariş(ler)i hedef statüye geçirir (POST /api/orders/status/update).
  * Kargoya Hazır = 11. ids[] toplu destekli. Etkilenen id dizisini döndürür.
