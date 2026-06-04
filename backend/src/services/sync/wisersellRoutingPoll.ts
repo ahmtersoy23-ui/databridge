@@ -40,14 +40,18 @@ async function loadStoreMap(): Promise<Map<number, StoreMapRow>> {
   return new Map(rows.map(r => [r.store_id, r]));
 }
 
+// Wisersell varış ülke id'leri (GET /orders.countryId). Amazon US (sadece ABD'ye satar) → 238.
+const US_DEST_COUNTRY_ID = 238;
+
 /**
- * Siparişin fulfillment region'ı (allowlist). null = kapsam dışı (otomasyona girmez).
- * Şimdilik yalnız store allowlist (store_map.region). Ülke-genişletilebilir: yeni region
- * eklemek için store_map'e satır yeter. (Amazon gibi çok-ülkeli store'lar için
- * country_id/order_code prefix kuralı build-time doğrulanınca buraya eklenecek.)
+ * Siparişin fulfillment region'ı. null = kapsam dışı (US board'a girmez).
+ * Mağaza allowlist'te (store_map.region) OLSA bile, ÇOK-ÜLKELİ mağazalar (Etsy/Shopify)
+ * başka ülkelere de satıyor → US region için VARIŞ ÜLKESİ de ABD (238) olmalı.
+ * Aksi halde Almanya/UK/TR siparişleri yanlışlıkla US deposuna düşer (bunlar EU/Ankara'dan gider).
  */
 function resolveRegion(order: WisersellOrderRow, sm: StoreMapRow | undefined): string | null {
-  return sm?.region ?? null;
+  if (sm?.region !== 'US') return sm?.region ?? null; // ileride EU vb. eklenince kendi ülke kuralı
+  return Number(order.countryId) === US_DEST_COUNTRY_ID ? 'US' : null;
 }
 
 export async function runWisersellRoutingPoll(): Promise<number> {
