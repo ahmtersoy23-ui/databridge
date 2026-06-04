@@ -216,3 +216,146 @@ export async function downloadOrdersExcel(opts: OrderExcelOptions = {}): Promise
 
   return Buffer.from(res.data);
 }
+
+// ── Routing otomasyonu: JSON sipariş poll + yazma (status/update, external-close) ──
+// Excel sync'ten ayrı; sık poll + iki yönlü yazma için. Aynı web auth (ham JWT).
+
+const WS_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/147.0.0.0';
+
+export interface WisersellOrderItem {
+  id?: number;
+  title?: string;
+  quantity?: number;
+  variant?: string | null;
+  marketplace_sku?: string | null;
+  listing?: {
+    product?: { id?: number; code?: string | null; name?: string | null; tariffCode?: string | null } | null;
+  } | null;
+}
+
+export interface WisersellOrderRow {
+  id: number;
+  order_code: string;
+  storeId?: number | null;
+  countryId?: number | null;
+  currency_id?: number | null;
+  orderstatus_id?: number | null;
+  labelNo?: string | null;
+  name?: string | null;
+  shipment_date?: string | null;
+  created_at?: string | null;
+  customer?: { id?: number; name?: string | null } | null;
+  orderitems?: WisersellOrderItem[];
+  [k: string]: unknown;
+}
+
+interface OrdersResponse {
+  count: number;
+  rows: WisersellOrderRow[];
+}
+
+/**
+ * Açık siparişleri JSON olarak çeker (GET /api/orders). base64 `query` header'da filtre:
+ *   {storeFilters:[], globalFilter:"", pageParam:N, pageSize:50, sorting:[], status:[2,6]}
+ * (2026-06-04 DevTools ile doğrulandı). pageParam 0-indexli sonsuz-scroll sayfalama;
+ * tüm sayfalar count'a kadar toplanır. storeFilters:[] = tüm store'lar (çağıran filtreler).
+ */
+export async function getOpenOrders(opts: { status?: number[]; pageSize?: number; maxPages?: number } = {}): Promise<WisersellOrderRow[]> {
+  const { baseUrl } = await getWebCredentials();
+  const status = opts.status ?? [2, 6];
+  const pageSize = opts.pageSize ?? 50;
+  const maxPages = opts.maxPages ?? 100;
+
+  const fetchPage = async (pageParam: number): Promise<OrdersResponse> => {
+    const filter = { storeFilters: [], globalFilter: '', pageParam, pageSize, sorting: [], status };
+    const query = Buffer.from(JSON.stringify(filter)).toString('base64');
+    const doRequest = (tk: string) => axios.get(`${baseUrl}/api/orders`, {
+      headers: { Authorization: tk, query, Accept: 'application/json, text/plain, */*', 'User-Agent': WS_UA },
+      timeout: 30_000,
+      validateStatus: () => true,
+    });
+    let token = await getWebToken();
+    let res = await doRequest(token);
+    if (res.status === 401) {
+      logger.warn('[WisersellWeb] orders poll 401 → token refresh + retry');
+      token = await getWebToken(true);
+      res = await doRequest(token);
+    }
+    if (res.status !== 200) {
+      const body = typeof res.data === 'string' ? res.data.slice(0, 300) : JSON.stringify(res.data).slice(0, 300);
+      throw new Error(`Wisersell GET /orders HTTP ${res.status}: ${body}`);
+    }
+    const data = res.data;
+    if (Array.isArray(data)) return { count: data.length, rows: data };
+    return { count: Number(data?.count ?? 0), rows: Array.isArray(data?.rows) ? data.rows : [] };
+  };
+
+  const all: WisersellOrderRow[] = [];
+  const first = await fetchPage(0);
+  all.push(...first.rows);
+  const totalPages = Math.min(maxPages, Math.ceil((first.count || all.length) / pageSize));
+  for (let p = 1; p < totalPages; p++) {
+    const r = await fetchPage(p);
+    if (!r.rows.length) break;
+    all.push(...r.rows);
+  }
+  return all;
+}
+
+/**
+ * Sipariş(ler)i hedef statüye geçirir (POST /api/orders/status/update).
+ * Kargoya Hazır = 11. ids[] toplu destekli. Etkilenen id dizisini döndürür.
+ */
+export async function markOrdersStatus(ids: number[], orderstatusId: number): Promise<number[]> {
+  if (!ids.length) return [];
+  const { baseUrl } = await getWebCredentials();
+  const body = { query: { ids, orderstatusId, operationalstatusId: null } };
+  const doRequest = (tk: string) => axios.post(`${baseUrl}/api/orders/status/update`, body, {
+    headers: { Authorization: tk, 'Content-Type': 'application/json', Accept: 'application/json, text/plain, */*', Origin: baseUrl, 'User-Agent': WS_UA },
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const msg = typeof res.data === 'object' ? JSON.stringify(res.data) : String(res.data);
+    throw new Error(`Wisersell status/update HTTP ${res.status}: ${msg?.slice(0, 300)}`);
+  }
+  return Array.isArray(res.data) ? res.data : ids;
+}
+
+/**
+ * Siparişi tracking ile harici kapatır (POST /api/orders/external-close/{id}).
+ * Pratikte yalnız carrierId + trackingCode değişken; ölçüler 0 geçilir.
+ */
+export async function closeExternalOrder(
+  orderId: number,
+  carrierId: number,
+  trackingCode: string,
+): Promise<void> {
+  const { baseUrl } = await getWebCredentials();
+  const body = {
+    orderId, carrierId, trackingCode,
+    width: 0, height: 0, length: 0, weight: 0,
+    tarifCode: '', deci: 0, price: 0, description: '', quantity: 0,
+  };
+  const doRequest = (tk: string) => axios.post(`${baseUrl}/api/orders/external-close/${orderId}`, body, {
+    headers: { Authorization: tk, 'Content-Type': 'application/json', Accept: 'application/json, text/plain, */*', Origin: baseUrl, 'User-Agent': WS_UA },
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const msg = typeof res.data === 'object' ? JSON.stringify(res.data) : String(res.data);
+    throw new Error(`Wisersell external-close ${orderId} HTTP ${res.status}: ${msg?.slice(0, 300)}`);
+  }
+}

@@ -14,13 +14,14 @@ import { syncFedex } from './fedexSync';
 import { syncWisersellShipments } from './wisersellShipmentSync';
 import { syncWisersellOrders } from './wisersellOrderSync';
 import { syncWisersellPendingOrders } from './wisersellPendingSync';
+import { runWisersellRoutingPoll } from './wisersellRoutingPoll';
 import { syncWalmartOrders } from './walmartOrdersSync';
 import { syncBolOrders } from './bolOrdersSync';
 import { syncTakealot } from './takealotOrdersSync';
 import { syncKaufland } from './kauflandOrdersSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WISERSELL_ROUTING_POLL_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -533,6 +534,24 @@ async function runKauflandSync(): Promise<number> {
   }
 }
 
+let isWisersellRoutingPolling = false;
+let wisersellRoutingPollTask: cron.ScheduledTask | null = null;
+async function runWisersellRoutingPollJob(): Promise<number> {
+  if (isWisersellRoutingPolling) {
+    logger.warn('[Scheduler] Skipping Wisersell routing poll - already running');
+    return 0;
+  }
+  isWisersellRoutingPolling = true;
+  try {
+    return await runWisersellRoutingPoll();
+  } catch (err: any) {
+    logger.error('[Scheduler] Wisersell routing poll failed:', err.message);
+    return 0;
+  } finally {
+    isWisersellRoutingPolling = false;
+  }
+}
+
 let isWisersellPendingSyncing = false;
 let wisersellPendingTask: cron.ScheduledTask | null = null;
 async function runWisersellPendingSync(): Promise<number> {
@@ -668,6 +687,12 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] Wisersell pending sync error:', err));
   });
 
+  // Routing poll — açık siparişleri sık çek (US adayları → wisersell_routing_candidates)
+  wisersellRoutingPollTask = scheduleWithJitter(SYNC_WISERSELL_ROUTING_POLL_CRON, () => {
+    withSyncLog('wisersell-routing-poll', () => runWisersellRoutingPollJob())
+      .catch(err => logger.error('[Scheduler] Wisersell routing poll error:', err));
+  });
+
   wisersellShipmentTask = scheduleWithJitter(SYNC_WISERSELL_SHIPMENT_CRON, () => {
     withSyncLog('wisersell-shipment', () => runWisersellShipmentSync())
       .catch(err => logger.error('[Scheduler] Wisersell shipment sync error:', err));
@@ -715,6 +740,7 @@ export function startScheduler(): void {
   logger.info(`[Scheduler] Wisersell shipment sync: ${SYNC_WISERSELL_SHIPMENT_CRON}`);
   logger.info(`[Scheduler] Wisersell orders sync: ${SYNC_WISERSELL_ORDERS_CRON}`);
   logger.info(`[Scheduler] Wisersell pending sync: ${SYNC_WISERSELL_PENDING_CRON}`);
+  logger.info(`[Scheduler] Wisersell routing poll: ${SYNC_WISERSELL_ROUTING_POLL_CRON}`);
   logger.info(`[Scheduler] Walmart orders sync: ${SYNC_WALMART_ORDERS_CRON}`);
   logger.info(`[Scheduler] Bol orders sync: ${SYNC_BOL_ORDERS_CRON}`);
   logger.info(`[Scheduler] Takealot sync: ${SYNC_TAKEALOT_CRON}`);
@@ -742,6 +768,7 @@ export function stopScheduler(): void {
   fedexTrackDeltaTask?.stop();
   wisersellShipmentTask?.stop();
   wisersellPendingTask?.stop();
+  wisersellRoutingPollTask?.stop();
   walmartOrdersTask?.stop();
   bolOrdersTask?.stop();
   takealotTask?.stop();
@@ -749,4 +776,4 @@ export function stopScheduler(): void {
   logger.info('[Scheduler] Stopped all scheduled tasks');
 }
 
-export { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
+export { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWisersellRoutingPollJob, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, isSyncing, writeSalesData, writeInventoryData };
