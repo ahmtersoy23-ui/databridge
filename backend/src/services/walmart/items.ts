@@ -22,6 +22,7 @@ interface ItemsResponse {
   ItemResponse?: WalmartItem[];
   totalItems?: number;
   nextCursor?: string;
+  meta?: { totalCount?: number; nextCursor?: string };
 }
 
 export interface WalmartParsedItem {
@@ -61,6 +62,8 @@ export async function fetchAllItems(
   const out: WalmartParsedItem[] = [];
   let cursor: string | undefined;
   let page = 0;
+  let fetched = 0;      // ham item sayisi (parse oncesi) — totalItems ile kiyas icin
+  let totalItems = -1;  // ilk response'tan; -1 = bilinmiyor
 
   while (true) {
     page++;
@@ -71,25 +74,39 @@ export async function fetchAllItems(
       resp = await walmartGet<ItemsResponse>(account, '/v3/items', { params: { limit } });
     }
 
+    if (totalItems < 0) {
+      const t = resp.totalItems ?? resp.meta?.totalCount;
+      if (typeof t === 'number') totalItems = t;
+    }
+
     const items = resp.ItemResponse ?? [];
     if (items.length === 0) break;
+    fetched += items.length;
 
     for (const it of items) {
       const parsed = parseItem(it);
       if (parsed) out.push(parsed);
     }
-    logger.info(`[Walmart] '${account.label}' items page ${page}: ${items.length} (total ${out.length})`);
+    logger.info(`[Walmart] '${account.label}' items page ${page}: ${items.length} (fetched ${fetched}/${totalItems >= 0 ? totalItems : '?'})`);
 
-    if (out.length >= maxItems) {
+    if (fetched >= maxItems) {
       logger.warn(`[Walmart] '${account.label}' hit maxItems=${maxItems}, stopping`);
       break;
     }
 
-    cursor = resp.nextCursor;
-    if (!cursor) break;
-    if (cursor.startsWith('?')) cursor = cursor.slice(1);
+    // nextCursor ust seviyede ya da meta altinda olabilir — ikisini de dene
+    let next = resp.nextCursor ?? resp.meta?.nextCursor;
+    if (!next || next === '*') {
+      // Cursor yok: totalItems'a ulastiysak tamam; ulasmadiysa eksik kalmis demektir
+      if (totalItems >= 0 && fetched < totalItems) {
+        logger.warn(`[Walmart] '${account.label}' INCOMPLETE: ${fetched}/${totalItems} cekildi, nextCursor yok`);
+      }
+      break;
+    }
+    if (next.startsWith('?')) next = next.slice(1);
+    cursor = next;
   }
 
-  logger.info(`[Walmart] '${account.label}' fetched ${out.length} items across ${page} pages`);
+  logger.info(`[Walmart] '${account.label}' fetched ${out.length} items across ${page} pages (totalItems=${totalItems})`);
   return out;
 }

@@ -159,8 +159,19 @@ export async function syncAmazonListingPrices(): Promise<number> {
   const fbm = listings.filter(l => l.fulfillment === 'FBM').map(toRow);
 
   let total = 0;
-  total += await upsertChannelPrices('amazon_fba', 'US', fba, 'spapi');
-  total += await upsertChannelPrices('amazon_fbm', 'US', fbm, 'spapi');
+  const fbaWritten = await upsertChannelPrices('amazon_fba', 'US', fba, 'spapi');
+  const fbmWritten = await upsertChannelPrices('amazon_fbm', 'US', fbm, 'spapi');
+  total += fbaWritten + fbmWritten;
+
+  // SP-API artik yetkili kaynak: eski tek-seferlik 'seed' (Nisan CSV) satirlarini temizle.
+  // Sadece spapi yazimi gerceklestiyse (safety threshold'a takilmadiysa) calistir.
+  if (fbaWritten > 0 || fbmWritten > 0) {
+    const del = await sharedPool.query(
+      `DELETE FROM channel_prices
+       WHERE channel_code IN ('amazon_fba','amazon_fbm') AND country_code = 'US' AND source = 'seed'`,
+    );
+    if ((del.rowCount ?? 0) > 0) logger.info(`[ChannelPrices] ${del.rowCount} eski seed satiri temizlendi`);
+  }
   return total;
 }
 

@@ -49,6 +49,11 @@ export async function fetchMerchantListings(marketplace: MarketplaceConfig): Pro
   for (const row of reportData) {
     const sku = (row['seller-sku'] || row['sku'] || '').toString().trim();
     if (!sku) continue;
+    // Giveaway SKU'lari atla (codebase kurali: sku NOT LIKE 'amzn.gr.%')
+    if (/^amzn\.gr\./i.test(sku)) continue;
+    // Inactive listing'lerin guncel satis fiyati yok -> kiyasa girmesin
+    const statusStr = (row['status'] || '').toString();
+    if (statusStr.toLowerCase() === 'inactive') continue;
 
     const priceRaw = row['price'];
     const price = priceRaw !== undefined && priceRaw !== '' ? parseFloat(priceRaw) : NaN;
