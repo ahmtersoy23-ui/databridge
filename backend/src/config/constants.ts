@@ -54,6 +54,10 @@ export const SYNC_TAKEALOT_CRON = '45 4 * * *';                   // 04:45 UTC (
 // Kaufland Marketplace Seller API (HMAC-SHA256 auth, /v2/orders + /v2/units).
 // Detail-per-order pattern (~600ms throttle), modest volume.
 export const SYNC_KAUFLAND_CRON = '0 5 * * *';                    // 05:00 UTC (Takealot'tan 15dk sonra)
+
+// PriceLab "Fiyat Kiyas" canli listing fiyatlari (pricelab_db.channel_prices):
+// Amazon US merchant listings (FBA/FBM) + Walmart /v3/items. Sabah sync kumesinden uzak.
+export const SYNC_CHANNEL_PRICES_CRON = '0 11 * * *';             // 11:00 UTC (14:00 TR)
 // Review tracking runs locally (residential IP) via launchd — no server cron needed
 
 // Wisersell status code haritası (Excel /api/excel/order query filtresinden gözlemlendi)

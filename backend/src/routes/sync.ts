@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/database';
-import { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
+import { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, runChannelPricesSyncJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
 import { syncFedexTrackings } from '../services/sync/fedexSync';
 import { applySkuMasterUpdate } from '../services/sync/skuMasterDiff';
 import { syncInventoryForMarketplace } from '../services/sync/inventorySync';
@@ -23,7 +23,7 @@ const router = Router();
 router.use(adminOpsAuth);
 
 const triggerSchema = z.object({
-  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sp_ads', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track']),
+  type: z.enum(['inventory', 'sales', 'backfill', 'transactions', 'transaction_backfill', 'refresh_sales_data', 'refresh_inventory_data', 'wisersell', 'wisersell_shipment', 'wisersell_pending', 'wayfair', 'walmart', 'bol', 'takealot', 'kaufland', 'reviews', 'aging', 'sku_master_diff', 'sku_master_update', 'business_report', 'campaign_snapshot', 'brand_analytics', 'sp_ads', 'sb_ads', 'sd_ads', 'fee_rates', 'fedex_track', 'channel_prices']),
   marketplace: z.string().optional(),
   months: z.number().min(1).max(24).optional(),
   account: z.string().optional(),
@@ -100,6 +100,10 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
     } else if (type === 'reviews') {
       runReviewSync().catch(err => logger.error('[Sync] Manual review sync error:', err));
       res.json({ success: true, message: 'Review tracking sync started' });
+    } else if (type === 'channel_prices') {
+      withSyncLog('channel-prices', () => runChannelPricesSyncJob())
+        .catch(err => logger.error('[Sync] Manual channel-prices sync error:', err));
+      res.json({ success: true, message: 'Channel prices sync started (Amazon listings + Walmart items → channel_prices)' });
     } else if (type === 'transactions') {
       if (marketplace) {
         const mp = await getMarketplaceByCode(marketplace);
