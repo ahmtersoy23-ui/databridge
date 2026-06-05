@@ -59,6 +59,7 @@ async function upsertChannelPrices(
   countryCode: string,
   rows: PriceRow[],
   source: string,
+  pruneStale = true,   // false ise full-snapshot delete-stale calismaz (eksik pull guvenligi)
 ): Promise<number> {
   if (rows.length === 0) {
     logger.info(`[ChannelPrices] ${channelCode}/${countryCode}: 0 satir, atlaniyor`);
@@ -130,15 +131,18 @@ async function upsertChannelPrices(
     // Postgres NOW() transaction boyunca sabittir; yeni upsert'lenen satirlarin
     // captured_at'i = NOW(), eski (seed / artik listede olmayan / inactive olmus /
     // bayat csv_import) satirlar < NOW() -> silinir. Manuel eslestirmeler korunur.
-    const del = await client.query(
-      `DELETE FROM channel_prices
-       WHERE channel_code = $1 AND country_code = $2
-         AND captured_at < NOW()
-         AND COALESCE(resolved_by, '') <> 'L3_mapping'`,
-      [channelCode, countryCode],
-    );
-    if ((del.rowCount ?? 0) > 0) {
-      logger.info(`[ChannelPrices] ${channelCode}/${countryCode}: ${del.rowCount} bayat satir temizlendi`);
+    // pruneStale=false ise (eksik/partial pull) bu adim atlanir -> veri kaybi olmaz.
+    if (pruneStale) {
+      const del = await client.query(
+        `DELETE FROM channel_prices
+         WHERE channel_code = $1 AND country_code = $2
+           AND captured_at < NOW()
+           AND COALESCE(resolved_by, '') <> 'L3_mapping'`,
+        [channelCode, countryCode],
+      );
+      if ((del.rowCount ?? 0) > 0) {
+        logger.info(`[ChannelPrices] ${channelCode}/${countryCode}: ${del.rowCount} bayat satir temizlendi`);
+      }
     }
 
     await client.query('COMMIT');
@@ -189,9 +193,11 @@ export async function syncWalmartListingPrices(): Promise<number> {
   }
   // Tum hesaplarin item'larini birlestir (genelde tek US hesabi)
   const all: PriceRow[] = [];
+  let allComplete = true; // bir hesap bile eksik/hata ise delete-stale yapma
   for (const account of accounts) {
     try {
-      const items = await fetchAllItems(account);
+      const { items, complete } = await fetchAllItems(account);
+      if (!complete) allComplete = false;
       for (const it of items) {
         all.push({
           marketplace_sku: it.sku,
@@ -202,12 +208,16 @@ export async function syncWalmartListingPrices(): Promise<number> {
       }
     } catch (err: any) {
       logger.error(`[ChannelPrices] Walmart '${account.label}' items fetch failed: ${err.message}`);
+      allComplete = false;
     }
+  }
+  if (!allComplete) {
+    logger.warn('[ChannelPrices] Walmart pull eksik — delete-stale atlaniyor (veri kaybini onlemek icin)');
   }
   // Ayni SKU birden fazla hesaptan gelirse sonuncusu kazanir (dedup)
   const dedup = new Map<string, PriceRow>();
   for (const r of all) dedup.set(r.marketplace_sku, r);
-  return upsertChannelPrices('walmart', 'US', [...dedup.values()], 'walmart_api');
+  return upsertChannelPrices('walmart', 'US', [...dedup.values()], 'walmart_api', allComplete);
 }
 
 /** Birlesik job — Amazon + Walmart canli listing fiyatlari. */

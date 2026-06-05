@@ -52,10 +52,15 @@ function parseItem(item: WalmartItem): WalmartParsedItem | null {
 /**
  * Tum yayinlanmis item'lari nextCursor ile cek.
  */
+export interface FetchItemsResult {
+  items: WalmartParsedItem[];
+  complete: boolean;   // tum sayfalar cekildi mi (delete-stale guvenli mi)
+}
+
 export async function fetchAllItems(
   account: WalmartAccount,
   opts: { limit?: number; maxItems?: number } = {},
-): Promise<WalmartParsedItem[]> {
+): Promise<FetchItemsResult> {
   const limit = opts.limit ?? 200; // Walmart /v3/items max 200
   const maxItems = opts.maxItems ?? 50_000;
 
@@ -64,6 +69,7 @@ export async function fetchAllItems(
   let page = 0;
   let fetched = 0;      // ham item sayisi (parse oncesi) — totalItems ile kiyas icin
   let totalItems = -1;  // ilk response'tan; -1 = bilinmiyor
+  let incomplete = false;
 
   while (true) {
     page++;
@@ -91,6 +97,7 @@ export async function fetchAllItems(
 
     if (fetched >= maxItems) {
       logger.warn(`[Walmart] '${account.label}' hit maxItems=${maxItems}, stopping`);
+      incomplete = true;
       break;
     }
 
@@ -100,6 +107,7 @@ export async function fetchAllItems(
       // Cursor yok: totalItems'a ulastiysak tamam; ulasmadiysa eksik kalmis demektir
       if (totalItems >= 0 && fetched < totalItems) {
         logger.warn(`[Walmart] '${account.label}' INCOMPLETE: ${fetched}/${totalItems} cekildi, nextCursor yok`);
+        incomplete = true;
       }
       break;
     }
@@ -107,6 +115,7 @@ export async function fetchAllItems(
     cursor = next;
   }
 
-  logger.info(`[Walmart] '${account.label}' fetched ${out.length} items across ${page} pages (totalItems=${totalItems})`);
-  return out;
+  const complete = !incomplete && (totalItems < 0 || fetched >= totalItems);
+  logger.info(`[Walmart] '${account.label}' fetched ${out.length} items across ${page} pages (totalItems=${totalItems}, complete=${complete})`);
+  return { items: out, complete };
 }
