@@ -125,6 +125,22 @@ async function upsertChannelPrices(
       const r = await client.query(sql, values);
       written += r.rowCount ?? 0;
     }
+
+    // Full-snapshot semantigi: bu kanal+ulke icin bu run'da DOKUNULMAYAN satirlari sil.
+    // Postgres NOW() transaction boyunca sabittir; yeni upsert'lenen satirlarin
+    // captured_at'i = NOW(), eski (seed / artik listede olmayan / inactive olmus /
+    // bayat csv_import) satirlar < NOW() -> silinir. Manuel eslestirmeler korunur.
+    const del = await client.query(
+      `DELETE FROM channel_prices
+       WHERE channel_code = $1 AND country_code = $2
+         AND captured_at < NOW()
+         AND COALESCE(resolved_by, '') <> 'L3_mapping'`,
+      [channelCode, countryCode],
+    );
+    if ((del.rowCount ?? 0) > 0) {
+      logger.info(`[ChannelPrices] ${channelCode}/${countryCode}: ${del.rowCount} bayat satir temizlendi`);
+    }
+
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
@@ -159,19 +175,8 @@ export async function syncAmazonListingPrices(): Promise<number> {
   const fbm = listings.filter(l => l.fulfillment === 'FBM').map(toRow);
 
   let total = 0;
-  const fbaWritten = await upsertChannelPrices('amazon_fba', 'US', fba, 'spapi');
-  const fbmWritten = await upsertChannelPrices('amazon_fbm', 'US', fbm, 'spapi');
-  total += fbaWritten + fbmWritten;
-
-  // SP-API artik yetkili kaynak: eski tek-seferlik 'seed' (Nisan CSV) satirlarini temizle.
-  // Sadece spapi yazimi gerceklestiyse (safety threshold'a takilmadiysa) calistir.
-  if (fbaWritten > 0 || fbmWritten > 0) {
-    const del = await sharedPool.query(
-      `DELETE FROM channel_prices
-       WHERE channel_code IN ('amazon_fba','amazon_fbm') AND country_code = 'US' AND source = 'seed'`,
-    );
-    if ((del.rowCount ?? 0) > 0) logger.info(`[ChannelPrices] ${del.rowCount} eski seed satiri temizlendi`);
-  }
+  total += await upsertChannelPrices('amazon_fba', 'US', fba, 'spapi');
+  total += await upsertChannelPrices('amazon_fbm', 'US', fbm, 'spapi');
   return total;
 }
 
