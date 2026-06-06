@@ -395,3 +395,30 @@ export async function closeExternalOrder(
     throw new Error(`Wisersell external-close ${orderId} HTTP ${res.status}: ${msg?.slice(0, 300)}`);
   }
 }
+
+/**
+ * Platform kapama (evrensel son adım): siparişi Wisersell'de "Açık"tan düşürür.
+ *   GET /api/orders/{orderId}/close  (token auth, gövdesiz)
+ *
+ * ÖNKOŞUL: önce external-close ile siparişe kargo/tracking yazılmış olmalı; aksi halde
+ * 404 "Siparişe ait kargo bulunmamaktadır". 429 (rate-limit) çağrıya bırakılır (üst katman
+ * throttle + backoff uygular).
+ */
+export async function platformCloseOrder(orderId: number): Promise<void> {
+  const { baseUrl } = await getWebCredentials();
+  const doRequest = (tk: string) => axios.get(`${baseUrl}/api/orders/${orderId}/close`, {
+    headers: { Authorization: tk, Accept: 'application/json, text/plain, */*', Origin: baseUrl, 'User-Agent': WS_UA },
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const msg = typeof res.data === 'object' ? JSON.stringify(res.data) : String(res.data);
+    throw new Error(`Wisersell platform-close ${orderId} HTTP ${res.status}: ${msg?.slice(0, 300)}`);
+  }
+}
