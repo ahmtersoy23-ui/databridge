@@ -97,6 +97,17 @@ function deriveBookOptions(q: { shipping_service_options?: unknown[] }): Record<
   return out;
 }
 
+/** Operatörün modalda seçebilmesi için bir quote'un ek servislerini sadeleştirip döner. */
+function exposeServiceOptions(q: { shipping_service_options?: unknown[] }): Array<{ key: string; label?: string; type?: string; values?: Array<{ value: string; label?: string; price?: number | string }> }> {
+  return (q.shipping_service_options ?? []).map((raw) => {
+    const o = raw as { key: string; label?: string; type?: string; values?: Array<{ value: string; label?: string; price?: number | string }> };
+    return {
+      key: o.key, label: o.label, type: o.type,
+      values: Array.isArray(o.values) ? o.values.map((v) => ({ value: v.value, label: v.label, price: v.price })) : undefined,
+    };
+  }).filter((o) => typeof o.key === 'string');
+}
+
 // ---- POST /rates ----
 const parcelSchema = z.object({
   weight: z.number().positive(),
@@ -145,6 +156,7 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
         total_charge: q.total_charge,
         delivery_estimate: q.delivery_estimate,
         options: deriveBookOptions(q),
+        serviceOptions: exposeServiceOptions(q),
       }))
       .sort((a, b) => parseFloat(a.total_charge) - parseFloat(b.total_charge));
     await auditLog('veeqo-routing-rates', 'success', quotes.length);
