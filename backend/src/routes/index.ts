@@ -34,6 +34,7 @@ import adsRouter from './ads';
 import adsAnalysisRouter from './adsAnalysis';
 import sentryVerifyRouter from './sentryVerify';
 import wisersellRoutingRouter from './wisersellRouting';
+import veeqoRoutingRouter from './veeqoRouting';
 import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -46,6 +47,7 @@ router.use('/status', statusRouter);       // Monitoring (UptimeRobot)
 router.use('/sync', syncRouter);           // Internal tool — localhost only
 router.use('/sentry-verify', sentryVerifyRouter); // Token-gated Sentry probe
 router.use('/wisersell-routing', wisersellRoutingRouter); // ManuMaestro server-to-server (adminOpsAuth: API key veya SSO admin)
+router.use('/veeqo-routing', veeqoRoutingRouter);         // ManuMaestro server-to-server — Veeqo etiket (rates/book/cancel)
 
 // Auth gate — everything below requires SSO session
 router.use(ssoAuthMiddleware);
