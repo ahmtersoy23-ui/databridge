@@ -166,6 +166,7 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
       requestToken: result.request_token,
       expiresAt: result.expires_at,
       quotes,
+      destState: ((order.deliver_to as { state?: string } | undefined)?.state) ?? null, // kıyas için (FedEx Izmir eyalet bazlı)
     });
   } catch (err: any) {
     await auditLog('veeqo-routing-rates', 'failed', 0, err.message);
