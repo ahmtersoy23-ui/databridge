@@ -422,3 +422,27 @@ export async function platformCloseOrder(orderId: number): Promise<void> {
     throw new Error(`Wisersell platform-close ${orderId} HTTP ${res.status}: ${msg?.slice(0, 300)}`);
   }
 }
+
+/**
+ * Siparişi Wisersell'de iptal eder (POST /api/orders/{orderId}/cancel, gövdesiz).
+ * Amazon'da iptal edilmiş ama Wisersell'e yansımamış siparişler için
+ * (DevTools 2026-06-06 doğrulandı: 200 OK, content-length 0). Token auth.
+ */
+export async function cancelOrder(orderId: number): Promise<void> {
+  const { baseUrl } = await getWebCredentials();
+  const doRequest = (tk: string) => axios.post(`${baseUrl}/api/orders/${orderId}/cancel`, null, {
+    headers: { Authorization: tk, Accept: 'application/json, text/plain, */*', Origin: baseUrl, 'User-Agent': WS_UA },
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const msg = typeof res.data === 'object' ? JSON.stringify(res.data) : String(res.data);
+    throw new Error(`Wisersell cancel ${orderId} HTTP ${res.status}: ${msg?.slice(0, 300)}`);
+  }
+}

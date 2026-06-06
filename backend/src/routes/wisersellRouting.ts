@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { adminOpsAuth } from '../middleware/adminOps';
-import { markOrdersStatus, closeExternalOrder, platformCloseOrder } from '../services/wisersell/webClient';
+import { markOrdersStatus, closeExternalOrder, platformCloseOrder, cancelOrder } from '../services/wisersell/webClient';
 import { refreshWayfairAggregation } from '../services/sync/wayfairSync';
 import { WISERSELL_STATUS_CODES } from '../config/constants';
 import logger from '../config/logger';
@@ -87,6 +87,26 @@ router.post('/platform-close', validateBody(platformCloseSchema), async (req: Re
   } catch (err: any) {
     await auditLog('wisersell-routing-platform-close', 'failed', 0, err.message);
     logger.error('[WisersellRouting] platform-close error:', err.message);
+    res.status(502).json({ success: false, error: err.message });
+  }
+});
+
+const cancelSchema = z.object({
+  orderId: z.number().int().positive(),
+});
+
+// POST /api/wisersell-routing/cancel  { orderId }
+// Siparişi Wisersell'de iptal eder (Amazon'da iptal edilmiş, Wisersell'e yansımamış).
+router.post('/cancel', validateBody(cancelSchema), async (req: Request, res: Response) => {
+  const { orderId } = req.body as { orderId: number };
+  try {
+    await cancelOrder(orderId);
+    await auditLog('wisersell-routing-cancel', 'success', 1);
+    logger.info(`[WisersellRouting] cancel OK: order ${orderId}`);
+    res.json({ success: true, orderId });
+  } catch (err: any) {
+    await auditLog('wisersell-routing-cancel', 'failed', 0, err.message);
+    logger.error('[WisersellRouting] cancel error:', err.message);
     res.status(502).json({ success: false, error: err.message });
   }
 });
