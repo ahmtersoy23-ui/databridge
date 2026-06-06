@@ -78,6 +78,25 @@ function channelItemsFromOrder(order: Record<string, any>): unknown[] {
     }));
 }
 
+/**
+ * Bir quote için booking'de gönderilmesi gereken value-added-service değerlerini çözer.
+ * Bazı servisler (UPS Ground vb.) "Delivery Confirmation" seçimini ZORUNLU tutar →
+ * göndermezsek INVALID_VALUE_ADDED_SERVICES. Her `value_added_service__*` select için
+ * ÜCRETSİZ değeri (yoksa ilkini) seçeriz (örn. CONFIRMATION → DELIVERY_CONFIRMATION).
+ * liability_amount gibi number/opsiyonel alanlara dokunmayız (sigorta eklenmez).
+ */
+function deriveBookOptions(q: { shipping_service_options?: unknown[] }): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const raw of q.shipping_service_options ?? []) {
+    const o = raw as { key?: string; type?: string; values?: Array<{ value?: string; price?: number | string }> };
+    if (typeof o.key !== 'string' || !o.key.startsWith('value_added_service__')) continue;
+    if (o.type !== 'select' || !Array.isArray(o.values) || !o.values.length) continue;
+    const free = o.values.find((v) => Number(v.price) === 0) ?? o.values[0];
+    if (free?.value) out[o.key] = free.value;
+  }
+  return out;
+}
+
 // ---- POST /rates ----
 const parcelSchema = z.object({
   weight: z.number().positive(),
@@ -116,7 +135,8 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
       contents: contents || 'Metal Wall Art',
       ...(isAmazonOrder && channelItems.length ? { is_amazon_order: true, channel_items: channelItems } : {}),
     });
-    // UI'a sade quote listesi (ucuzdan pahalıya)
+    // UI'a sade quote listesi (ucuzdan pahalıya) + her quote için booking'de
+    // gönderilmesi gereken value-added-service'leri (zorunlu confirmation vb.) önceden çöz.
     const quotes = (result.quotes || [])
       .map((q) => ({
         rate_id: q.rate_id,
@@ -124,6 +144,7 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
         service_carrier: q.service_carrier,
         total_charge: q.total_charge,
         delivery_estimate: q.delivery_estimate,
+        options: deriveBookOptions(q),
       }))
       .sort((a, b) => parseFloat(a.total_charge) - parseFloat(b.total_charge));
     await auditLog('veeqo-routing-rates', 'success', quotes.length);
@@ -147,14 +168,16 @@ const bookSchema = z.object({
   rateId: z.string().min(3),
   requestToken: z.string().optional(),
   labelFormat: z.enum(['PDF', 'PNG', 'ZPL', 'JPEG']).default('PDF'),
+  /** rates'ten gelen value-added-service değerleri (zorunlu confirmation vb.) */
+  options: z.record(z.string(), z.string()).optional(),
 });
 
 router.post('/book', validateBody(bookSchema), async (req: Request, res: Response) => {
-  const { remoteShipmentId, rateId, requestToken, labelFormat } = req.body as {
-    remoteShipmentId: string; rateId: string; requestToken?: string; labelFormat: 'PDF' | 'PNG' | 'ZPL' | 'JPEG';
+  const { remoteShipmentId, rateId, requestToken, labelFormat, options } = req.body as {
+    remoteShipmentId: string; rateId: string; requestToken?: string; labelFormat: 'PDF' | 'PNG' | 'ZPL' | 'JPEG'; options?: Record<string, string>;
   };
   try {
-    const result = await bookShipment({ remoteShipmentId, rateId, requestToken, labelFormat });
+    const result = await bookShipment({ remoteShipmentId, rateId, requestToken, labelFormat, options });
     const ok = result.successful?.[remoteShipmentId];
     if (!ok) {
       const fail = result.failed?.[remoteShipmentId];
