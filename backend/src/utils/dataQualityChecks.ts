@@ -1,4 +1,4 @@
-import { pool } from '../config/database';
+import { pool, sharedPool } from '../config/database';
 import logger from '../config/logger';
 import { notify } from './notify';
 
@@ -329,6 +329,58 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
   return results;
 }
 
+// ─── Katman 2.5: Cekirdek downstream tablolari tazelik ──────────────────────
+
+/**
+ * sales_data + fba_inventory (pricelab_db) — StockPulse/AmzSellMetrics/PriceLab
+ * bunlara bagimli. Yazma-aninda %20 threshold + sync_log fail alarmi var, ama
+ * job hic kosmazsa (cron olu, deploy patladi) bunlar sessiz bayatlar. Bu kontrol
+ * gunluk ozette tazeligi + bos-tablo durumunu yakalar.
+ *
+ * Esikler job kadansiyla hizali: sales gunluk (03:00 UTC) → >30s bayat = CRITICAL;
+ * inventory her 8s → >14s bayat = WARNING. updated_at UTC saklanir.
+ */
+const CORE_TABLES: { table: string; maxAgeHours: number; staleSeverity: Severity }[] = [
+  { table: 'sales_data', maxAgeHours: 30, staleSeverity: 'CRITICAL' },
+  { table: 'fba_inventory', maxAgeHours: 14, staleSeverity: 'WARNING' },
+];
+
+export async function runCoreTableFreshness(): Promise<CheckResult[]> {
+  const results: CheckResult[] = [];
+
+  for (const { table, maxAgeHours, staleSeverity } of CORE_TABLES) {
+    try {
+      const { rows } = await sharedPool.query<{ cnt: string; age_hours: string | null }>(
+        `SELECT COUNT(*)::text AS cnt,
+                EXTRACT(EPOCH FROM (now() AT TIME ZONE 'UTC' - MAX(updated_at)))::text AS age_hours
+         FROM ${table}`,
+      );
+      const cnt = parseInt(rows[0].cnt, 10);
+      if (cnt === 0) {
+        results.push({ check: `fresh:${table}`, severity: 'CRITICAL', message: 'Table empty (0 rows)', passed: false });
+        continue;
+      }
+      const ageHours = rows[0].age_hours != null ? Number(rows[0].age_hours) / 3600 : null;
+      if (ageHours == null) {
+        results.push({ check: `fresh:${table}`, severity: 'WARNING', message: `${cnt} rows but no updated_at`, passed: false });
+      } else if (ageHours > maxAgeHours) {
+        results.push({
+          check: `fresh:${table}`,
+          severity: staleSeverity,
+          message: `Stale — last update ${ageHours.toFixed(1)}h ago (limit ${maxAgeHours}h)`,
+          passed: false,
+        });
+      } else {
+        results.push({ check: `fresh:${table}`, severity: 'INFO', message: `${cnt} rows, updated ${ageHours.toFixed(1)}h ago`, passed: true });
+      }
+    } catch (err: any) {
+      results.push({ check: `fresh:${table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+    }
+  }
+
+  return results;
+}
+
 // ─── Katman 3: Import/Backfill Validation ───────────────────────────────────
 
 /** Take a snapshot before import for later comparison. */
@@ -508,12 +560,13 @@ export async function runDailyHealthCheck(): Promise<void> {
   logger.info('[DataQuality] Daily health check started');
   const start = Date.now();
 
-  const [postSync, gaps] = await Promise.all([
+  const [postSync, gaps, coreFreshness] = await Promise.all([
     runPostSyncChecks(),
     runGapDetection(),
+    runCoreTableFreshness(),
   ]);
 
-  const all = [...postSync, ...gaps];
+  const all = [...postSync, ...gaps, ...coreFreshness];
   const critical = all.filter(r => r.severity === 'CRITICAL' && !r.passed);
   const warnings = all.filter(r => r.severity === 'WARNING' && !r.passed);
   const durationSec = ((Date.now() - start) / 1000).toFixed(1);

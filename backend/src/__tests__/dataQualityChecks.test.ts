@@ -9,11 +9,13 @@ vi.mock('../utils/notify', () => ({
 }));
 
 const mockQuery = vi.fn();
+const mockSharedQuery = vi.fn();
 vi.mock('../config/database', () => ({
   pool: { query: (...args: any[]) => mockQuery(...args) },
+  sharedPool: { query: (...args: any[]) => mockSharedQuery(...args) },
 }));
 
-import { runPostSyncChecks, runGapDetection, validateColumnHeaders, runDailyHealthCheck } from '../utils/dataQualityChecks';
+import { runPostSyncChecks, runGapDetection, validateColumnHeaders, runDailyHealthCheck, runCoreTableFreshness } from '../utils/dataQualityChecks';
 import { notify } from '../utils/notify';
 
 describe('dataQualityChecks', () => {
@@ -162,10 +164,47 @@ describe('dataQualityChecks', () => {
         return { rows: [] };
       });
 
+      // Core tables fresh
+      mockSharedQuery.mockResolvedValue({ rows: [{ cnt: '1000', age_hours: '3600' }] });
+
       await runDailyHealthCheck();
       expect(notify).toHaveBeenCalled();
       const msg = (notify as any).mock.calls[0][0] as string;
       expect(msg).toContain('Daily summary');
+    });
+  });
+
+  describe('runCoreTableFreshness', () => {
+    it('taze + dolu tablo → INFO passed', async () => {
+      // age 3600s = 1h → her iki esigin de altinda
+      mockSharedQuery.mockResolvedValue({ rows: [{ cnt: '5000', age_hours: '3600' }] });
+      const results = await runCoreTableFreshness();
+      expect(results).toHaveLength(2);
+      expect(results.every(r => r.passed)).toBe(true);
+    });
+
+    it('bos tablo → CRITICAL', async () => {
+      mockSharedQuery.mockResolvedValue({ rows: [{ cnt: '0', age_hours: null }] });
+      const results = await runCoreTableFreshness();
+      expect(results.every(r => r.severity === 'CRITICAL' && !r.passed)).toBe(true);
+    });
+
+    it('bayat sales_data → CRITICAL, bayat fba_inventory → WARNING', async () => {
+      // 40h = 144000s → sales (30h limit) ve inventory (14h limit) ikisi de bayat
+      mockSharedQuery.mockResolvedValue({ rows: [{ cnt: '5000', age_hours: '144000' }] });
+      const results = await runCoreTableFreshness();
+      const sales = results.find(r => r.check === 'fresh:sales_data')!;
+      const inv = results.find(r => r.check === 'fresh:fba_inventory')!;
+      expect(sales.severity).toBe('CRITICAL');
+      expect(inv.severity).toBe('WARNING');
+      expect(sales.passed).toBe(false);
+      expect(inv.passed).toBe(false);
+    });
+
+    it('query hatasi → WARNING, crash etmez', async () => {
+      mockSharedQuery.mockRejectedValue(new Error('connection refused'));
+      const results = await runCoreTableFreshness();
+      expect(results.every(r => r.severity === 'WARNING' && !r.passed)).toBe(true);
     });
   });
 });
