@@ -1,4 +1,5 @@
 import logger from '../config/logger';
+import { errMessage } from './errors';
 
 const getPrimaryWebhook = () => process.env.SLACK_WEBHOOK_URL;
 const getBackupWebhook = () => process.env.SLACK_WEBHOOK_URL_BACKUP;
@@ -17,8 +18,8 @@ async function postOnce(url: string, text: string): Promise<{ ok: true } | { ok:
       return { ok: false, reason: `HTTP ${res.status}` };
     }
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, reason: err?.message || 'fetch threw' };
+  } catch (err: unknown) {
+    return { ok: false, reason: errMessage(err) || 'fetch threw' };
   }
 }
 

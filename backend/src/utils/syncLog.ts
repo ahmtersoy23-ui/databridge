@@ -1,4 +1,5 @@
 import { pool } from '../config/database';
+import { errMessage } from './errors';
 import logger from '../config/logger';
 import { notify } from './notify';
 import { getSafetyDropThreshold } from './safetyThreshold';
@@ -44,14 +45,14 @@ export async function withSyncLog(
         }
       }
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     const durationMs = Date.now() - start;
     await pool.query(
       'UPDATE sync_log SET status=$1, error_message=$2, duration_ms=$3, finished_at=NOW() WHERE id=$4',
-      ['failed', err.message?.slice(0, 500), durationMs, logId],
+      ['failed', errMessage(err)?.slice(0, 500), durationMs, logId],
     ).catch(() => {}); // don't throw on logging failure
-    logger.error(`[SyncLog] ${jobName} FAILED after ${(durationMs / 1000).toFixed(1)}s:`, err.message);
-    await notify(`🔴 [${jobName}] Sync failed: ${err.message?.slice(0, 200)}`);
+    logger.error(`[SyncLog] ${jobName} FAILED after ${(durationMs / 1000).toFixed(1)}s:`, errMessage(err));
+    await notify(`🔴 [${jobName}] Sync failed: ${errMessage(err)?.slice(0, 200)}`);
     // Sentry'ye final fail kaydı (transient hatalar instrument.ts beforeSend ile filtrelenir)
     captureIfInitialized(err, { tags: { component: 'syncLog', job: jobName } });
     throw err; // re-throw so caller's catch still works

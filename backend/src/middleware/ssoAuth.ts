@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { errMessage } from '../utils/errors';
 import crypto from 'crypto';
 import axios from 'axios';
 import { pool } from '../config/database';
@@ -39,8 +40,8 @@ async function verifySSOToken(token: string): Promise<{ user: { id: string; emai
       };
     }
     return null;
-  } catch (err: any) {
-    logger.error('[SSOAuth] Verify failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[SSOAuth] Verify failed:', errMessage(err));
     return null;
   }
 }

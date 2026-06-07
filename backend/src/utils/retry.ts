@@ -1,4 +1,5 @@
 import logger from '../config/logger';
+import { errMessage } from './errors';
 
 interface RetryOptions {
   maxRetries?: number;
@@ -89,23 +90,23 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await fn();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const status = getHttpStatus(err);
       const statusInfo = status ? ` [HTTP ${status}]` : '';
       const transient = isRetryable(err);
 
       if (!transient) {
-        logger.warn(`[Retry] ${label} permanent error${statusInfo}, not retrying: ${err.message}`);
+        logger.warn(`[Retry] ${label} permanent error${statusInfo}, not retrying: ${errMessage(err)}`);
         throw err;
       }
       if (attempt === maxRetries) {
-        logger.error(`[Retry] ${label} failed after ${maxRetries} attempts${statusInfo}: ${err.message}`);
+        logger.error(`[Retry] ${label} failed after ${maxRetries} attempts${statusInfo}: ${errMessage(err)}`);
         throw err;
       }
       const retryAfter = getRetryAfterMs(err);
       const delay = retryAfter ?? baseDelayMs * attempt * attempt;
       const source = retryAfter ? 'Retry-After' : 'exponential';
-      logger.warn(`[Retry] ${label} attempt ${attempt}/${maxRetries}${statusInfo} failed: ${err.message}. Retrying in ${delay / 1000}s (${source})...`);
+      logger.warn(`[Retry] ${label} attempt ${attempt}/${maxRetries}${statusInfo} failed: ${errMessage(err)}. Retrying in ${delay / 1000}s (${source})...`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }

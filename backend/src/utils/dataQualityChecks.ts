@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../config/database';
+import { errMessage } from './errors';
 import logger from '../config/logger';
 import { notify } from './notify';
 
@@ -125,8 +126,8 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
           : `No duplicates for ${targetDate}`,
         passed: rows.length === 0,
       });
-    } catch (err: any) {
-      results.push({ check: `dupe:${cfg.table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+    } catch (err: unknown) {
+      results.push({ check: `dupe:${cfg.table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
     }
 
     // 2. Satir sayisi anomali (bugun vs dun)
@@ -156,8 +157,8 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
       } else {
         results.push({ check: `count:${cfg.table}`, severity: 'INFO', message: `${today_count} rows (no yesterday data)`, passed: true });
       }
-    } catch (err: any) {
-      results.push({ check: `count:${cfg.table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+    } catch (err: unknown) {
+      results.push({ check: `count:${cfg.table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
     }
 
     // 3. NULL critical field
@@ -174,8 +175,8 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
           message: cnt > 0 ? `${cnt} NULL ${col} rows` : 'OK',
           passed: cnt === 0,
         });
-      } catch (err: any) {
-        results.push({ check: `null:${cfg.table}.${col}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+      } catch (err: unknown) {
+        results.push({ check: `null:${cfg.table}.${col}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
       }
     }
 
@@ -210,8 +211,8 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
             passed: false,
           });
         }
-      } catch (err: any) {
-        results.push({ check: `acos:${cfg.table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+      } catch (err: unknown) {
+        results.push({ check: `acos:${cfg.table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
       }
     }
   }
@@ -235,8 +236,8 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
         passed: diff <= 0.1,
       });
     }
-  } catch (err: any) {
-    results.push({ check: 'cross:adv_vs_targeting_spend', severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+  } catch (err: unknown) {
+    results.push({ check: 'cross:adv_vs_targeting_spend', severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
   }
 
   return results;
@@ -295,8 +296,8 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
           passed: false,
         });
       }
-    } catch (err: any) {
-      results.push({ check: `gap:${table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+    } catch (err: unknown) {
+      results.push({ check: `gap:${table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
     }
   }
 
@@ -322,8 +323,8 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
         });
       }
     }
-  } catch (err: any) {
-    results.push({ check: 'gap:business_report_asin_consistency', severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+  } catch (err: unknown) {
+    results.push({ check: 'gap:business_report_asin_consistency', severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
   }
 
   return results;
@@ -373,8 +374,8 @@ export async function runCoreTableFreshness(): Promise<CheckResult[]> {
       } else {
         results.push({ check: `fresh:${table}`, severity: 'INFO', message: `${cnt} rows, updated ${ageHours.toFixed(1)}h ago`, passed: true });
       }
-    } catch (err: any) {
-      results.push({ check: `fresh:${table}`, severity: 'WARNING', message: `Check error: ${err.message}`, passed: false });
+    } catch (err: unknown) {
+      results.push({ check: `fresh:${table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
     }
   }
 
@@ -469,8 +470,8 @@ export async function validateImport(
           : 'No duplicates after import',
         passed: dupes.length === 0,
       });
-    } catch (err: any) {
-      results.push({ check: `import:${tableName}:dupes`, severity: 'WARNING', message: err.message, passed: false });
+    } catch (err: unknown) {
+      results.push({ check: `import:${tableName}:dupes`, severity: 'WARNING', message: errMessage(err), passed: false });
     }
   }
 
@@ -597,7 +598,7 @@ export async function runPostSyncChecksAndAlert(reportDate?: string, prefix?: Ad
     if (failed.length > 0) {
       logger.warn(`[DataQuality] Post-sync${prefix ? ` ${prefix.toUpperCase()}` : ''}: ${failed.length} issue(s) detected`);
     }
-  } catch (err: any) {
-    logger.error('[DataQuality] Post-sync check error:', err.message);
+  } catch (err: unknown) {
+    logger.error('[DataQuality] Post-sync check error:', errMessage(err));
   }
 }
