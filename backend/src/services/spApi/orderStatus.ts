@@ -66,6 +66,41 @@ export async function fetchOrderStatusesByIds(orderIds: string[]): Promise<Order
   return out;
 }
 
+export interface OrderDates {
+  latestShipDate?: string;     // Amazon'a sözlü son SEVK tarihi (ISO)
+  latestDeliveryDate?: string; // Amazon'a sözlü son TESLİM tarihi (ISO)
+}
+
+/**
+ * Belirli sipariş ID'lerinin Amazon SLA tarihleri (LatestShipDate / LatestDeliveryDate).
+ * getOrder yanıtı bu alanları zaten içerir — sadece okunur, ek SP-API maliyeti yok.
+ * fetchOrderStatusesByIds ile aynı çok-hesap deseni. Sadece Amazon US siparişleri.
+ */
+export async function fetchOrderDatesByIds(orderIds: string[]): Promise<Record<string, OrderDates>> {
+  const credIds = await getActiveNaCredentialIds();
+  const out: Record<string, OrderDates> = {};
+
+  for (const orderId of orderIds) {
+    for (const credId of credIds) {
+      try {
+        const client = await getSpApiClient(credId);
+        const resp: any = await client.callAPI({ operation: 'getOrder', endpoint: 'orders', path: { orderId } });
+        if (resp?.AmazonOrderId || resp?.OrderStatus) {
+          out[orderId] = {
+            latestShipDate: resp?.LatestShipDate ?? undefined,
+            latestDeliveryDate: resp?.LatestDeliveryDate ?? undefined,
+          };
+          break;
+        }
+      } catch {
+        continue; // yanlış hesap / geçici hata → sonraki hesap
+      }
+    }
+  }
+
+  return out;
+}
+
 /**
  * `since`'ten beri güncellenmiş ve iptal edilmiş US siparişlerinin ID kümesi.
  * Tüm aktif NA hesapları taranır (hesap-agnostik), NextToken ile sayfalanır.

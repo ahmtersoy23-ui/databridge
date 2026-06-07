@@ -3,7 +3,7 @@ import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate';
 import { adminOpsAuth } from '../middleware/adminOps';
-import { fetchOrderStatusesByIds, fetchCanceledOrdersSince } from '../services/spApi/orderStatus';
+import { fetchOrderStatusesByIds, fetchCanceledOrdersSince, fetchOrderDatesByIds } from '../services/spApi/orderStatus';
 import logger from '../config/logger';
 
 /**
@@ -30,6 +30,19 @@ router.post('/by-ids', validateBody(byIdsSchema), async (req: Request, res: Resp
     res.json({ success: true, statuses });
   } catch (err: unknown) {
     logger.error('[AmazonOrderStatus] by-ids error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
+  }
+});
+
+// POST /api/amazon-order-status/dates  { amazonOrderIds: ["111-...", ...] }
+// → { dates: { id: { latestShipDate, latestDeliveryDate } } } (Amazon SLA, getOrder'dan)
+router.post('/dates', validateBody(byIdsSchema), async (req: Request, res: Response) => {
+  const { amazonOrderIds } = req.body as { amazonOrderIds: string[] };
+  try {
+    const dates = await fetchOrderDatesByIds(amazonOrderIds);
+    res.json({ success: true, dates });
+  } catch (err: unknown) {
+    logger.error('[AmazonOrderStatus] dates error:', errMessage(err));
     res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
