@@ -275,7 +275,7 @@ function categorizeSettlementType(txnType: string, amtType: string, amtDesc: str
 
 // --- Flatten structured events into flat AmzSellMetrics rows ---
 
-function flattenFinancialEvents(events: any, credentialId: number | null): FinancialTransaction[] {
+export function flattenFinancialEvents(events: any, credentialId: number | null): FinancialTransaction[] {
   const transactions: FinancialTransaction[] = [];
   if (!events) return transactions;
 
@@ -330,34 +330,42 @@ function flattenFinancialEvents(events: any, credentialId: number | null): Finan
 }
 
 // --- Amount helpers ---
+// SP-API Finances yaniti tiplenmemis JSON gelir, ama bu helper'larin BEKLEDIGI
+// alan adlari (ChargeType/ChargeAmount.CurrencyAmount, FeeType/FeeAmount...) kilitli
+// olmali — bir typo sessizce 0 doner ve parayi eksiltir. Bu yuzden tipli.
+interface MoneyAmount { CurrencyAmount?: number }
+export interface ChargeComponent { ChargeType?: string; ChargeAmount?: MoneyAmount }
+export interface FeeComponent { FeeType?: string; FeeAmount?: MoneyAmount }
+export interface PromotionComponent { PromotionAmount?: MoneyAmount }
+export interface TaxWithheldComponent { TaxesWithheld?: ChargeComponent[] }
 
-function getChargeAmount(list: any[], type: string): number {
+export function getChargeAmount(list: ChargeComponent[] | undefined, type: string): number {
   if (!Array.isArray(list)) return 0;
-  return list.find((c: any) => c.ChargeType === type)?.ChargeAmount?.CurrencyAmount || 0;
+  return list.find(c => c.ChargeType === type)?.ChargeAmount?.CurrencyAmount || 0;
 }
 
-function getFeeAmount(list: any[], type: string): number {
+export function getFeeAmount(list: FeeComponent[] | undefined, type: string): number {
   if (!Array.isArray(list)) return 0;
-  return list.find((f: any) => f.FeeType === type)?.FeeAmount?.CurrencyAmount || 0;
+  return list.find(f => f.FeeType === type)?.FeeAmount?.CurrencyAmount || 0;
 }
 
-function sumFees(list: any[], exclude: string[] = []): number {
+export function sumFees(list: FeeComponent[] | undefined, exclude: string[] = []): number {
   if (!Array.isArray(list)) return 0;
-  return list.filter((f: any) => !exclude.includes(f.FeeType))
-    .reduce((s: number, f: any) => s + (f.FeeAmount?.CurrencyAmount || 0), 0);
+  return list.filter(f => !exclude.includes(f.FeeType ?? ''))
+    .reduce((s, f) => s + (f.FeeAmount?.CurrencyAmount || 0), 0);
 }
 
-function sumCharges(list: any[]): number {
+export function sumCharges(list: ChargeComponent[] | undefined): number {
   if (!Array.isArray(list)) return 0;
-  return list.reduce((s: number, c: any) => s + (c.ChargeAmount?.CurrencyAmount || 0), 0);
+  return list.reduce((s, c) => s + (c.ChargeAmount?.CurrencyAmount || 0), 0);
 }
 
-function sumPromotions(list: any[]): number {
+export function sumPromotions(list: PromotionComponent[] | undefined): number {
   if (!Array.isArray(list)) return 0;
-  return list.reduce((s: number, p: any) => s + (p.PromotionAmount?.CurrencyAmount || 0), 0);
+  return list.reduce((s, p) => s + (p.PromotionAmount?.CurrencyAmount || 0), 0);
 }
 
-function sumTaxWithheld(list: any[]): number {
+export function sumTaxWithheld(list: TaxWithheldComponent[] | undefined): number {
   if (!Array.isArray(list)) return 0;
   let total = 0;
   for (const tw of list) {
@@ -370,7 +378,7 @@ function sumTaxWithheld(list: any[]): number {
 
 // --- Event type flatteners ---
 
-function flattenShipmentEvent(event: any, categoryType: string, credentialId: number | null): FinancialTransaction[] {
+export function flattenShipmentEvent(event: any, categoryType: string, credentialId: number | null): FinancialTransaction[] {
   const transactions: FinancialTransaction[] = [];
   const postedDate = event.PostedDate ? new Date(event.PostedDate) : null;
   if (!postedDate || isNaN(postedDate.getTime())) return transactions;

@@ -8,8 +8,8 @@ const BATCH_SIZE = 500;
  * Prevents "ON CONFLICT DO UPDATE command cannot affect row a second time" error
  * when Amazon returns duplicate rows in the same report.
  */
-function deduplicateRows(rows: any[], keyFn: (r: any) => string): any[] {
-  const map = new Map<string, any>();
+export function deduplicateRows<T>(rows: T[], keyFn: (r: T) => string): T[] {
+  const map = new Map<string, T>();
   for (const r of rows) {
     map.set(keyFn(r), r);
   }

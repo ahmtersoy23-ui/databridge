@@ -1,21 +1,28 @@
 /**
  * Schema Contract Tests
  *
- * These tests verify that the shared pricelab_db tables have the columns
- * that downstream apps (StockPulse, AmzSellMetrics, SwiftStock, PriceLab) expect.
+ * pricelab_db tablolarinin (sales_data, fba_inventory, sku_master) downstream
+ * app'lerin (StockPulse, AmzSellMetrics, SwiftStock, PriceLab) bekledigi
+ * kolonlara sahip oldugunu dogrular.
  *
- * If a migration changes these tables, update the snapshots below AND verify
- * that ALL consumer apps still work.
+ * IKI KATMAN:
+ *  1. STATIK (her zaman kosar): consumer contract'lari (her app'in okudugu/yazdigi
+ *     kolonlar) asagidaki SNAPSHOT'a karsi tutarli mi? Bu, snapshot'in GERCEK DB ile
+ *     ayni oldugunu KANITLAMAZ — sadece developer'in contract listesini snapshot'a
+ *     uygun tuttugunu yakalar (manuel bakim). Migration DB'de kolon dusurse YESIL kalir.
+ *  2. CANLI DB (TEST_PRICELAB_DB_URL set ise; CI'da skip): contract kolonlarinin
+ *     gercekten `information_schema.columns`'ta var oldugunu dogrular = gercek drift
+ *     koruması. Lokal/integration kosumunda: `TEST_PRICELAB_DB_URL=postgres://... npm test`.
  *
- * Shared tables: sales_data, fba_inventory, sku_master
- * Writer: DataBridge
- * Readers: StockPulse, AmzSellMetrics, SwiftStock, PriceLab
+ * Migration bu tablolara dokunursa: snapshot'i guncelle + TUM consumer'lari dogrula.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { Pool } from 'pg';
 
 // ============================================
-// SCHEMA SNAPSHOTS (source of truth from pricelab_db)
-// Last verified: 2026-04-04
+// SCHEMA SNAPSHOT — son bilinen sema (2026-04-04 dogrulandi).
+// DEGIL "source of truth": gercek kaynak pricelab_db. Bu sadece statik katman
+// icin referans + canli katmanin drift karsilastirma tabani.
 // ============================================
 
 const SALES_DATA_COLUMNS = [
@@ -201,4 +208,59 @@ describe('sku_master schema contract', () => {
   it('snapshot has expected column count', () => {
     expect(SKU_MASTER_COLUMNS).toHaveLength(11);
   });
+});
+
+// ============================================
+// KATMAN 2 — CANLI DB DRIFT KONTROLU (DB-gated)
+// TEST_PRICELAB_DB_URL set degilse (CI) tum suite skip edilir.
+// ============================================
+
+const DB_URL = process.env.TEST_PRICELAB_DB_URL;
+
+// Her tablo icin downstream'in GERCEKTEN bagimli oldugu kolonlar (read ∪ write).
+// Bunlar canli sema'da YOKSA bir consumer kirilir.
+const REQUIRED: Record<string, string[]> = {
+  sales_data: [
+    'iwasku', 'asin', 'channel', 'fulfillment_channel', 'updated_at',
+    'last3', 'last7', 'last30', 'last90', 'last180', 'last366',
+    'pre_year_last7', 'pre_year_last30', 'pre_year_last90', 'pre_year_last180', 'pre_year_last365',
+    'pre_year_next7', 'pre_year_next30', 'pre_year_next90', 'pre_year_next180',
+  ],
+  fba_inventory: [
+    'iwasku', 'asin', 'warehouse', 'fnsku', 'fulfillable_quantity', 'total_quantity',
+    'inbound_shipped_quantity', 'inbound_working_quantity', 'inbound_receiving_quantity',
+    'total_reserved_quantity', 'total_unfulfillable_quantity', 'shipping_cost', 'updated_at',
+  ],
+  sku_master: [
+    'sku', 'marketplace', 'country_code', 'asin', 'iwasku',
+    'custom_shipping', 'fbm_source', 'fulfillment',
+  ],
+};
+
+describe.skipIf(!DB_URL)('CANLI pricelab_db drift kontrolu', () => {
+  let pool: Pool;
+  const liveColumns: Record<string, Set<string>> = {};
+
+  beforeAll(async () => {
+    pool = new Pool({ connectionString: DB_URL });
+    for (const table of Object.keys(REQUIRED)) {
+      const { rows } = await pool.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'public' AND table_name = $1`,
+        [table],
+      );
+      liveColumns[table] = new Set(rows.map(r => r.column_name));
+    }
+  });
+
+  afterAll(async () => { await pool?.end(); });
+
+  for (const [table, cols] of Object.entries(REQUIRED)) {
+    it(`${table}: tum gerekli kolonlar canli sema'da var`, () => {
+      const live = liveColumns[table];
+      expect(live.size, `${table} bos/yok — DB baglantisi?`).toBeGreaterThan(0);
+      const missing = cols.filter(c => !live.has(c));
+      expect(missing, `${table} canli sema'da EKSIK kolon(lar): ${missing.join(', ')}`).toEqual([]);
+    });
+  }
 });

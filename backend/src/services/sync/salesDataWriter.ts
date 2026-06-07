@@ -12,33 +12,47 @@ const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
 // Global toggle filtreleri bu üç satırdan birini seçer.
 export type FulfillmentTag = null | 'Amazon' | 'Merchant' | 'Wayfair';
 
-function buildRollingSql(opts: { filterByFulfillment: boolean; euAggregate: boolean }): string {
+// Rolling satis pencereleri — TEK KAYNAK. SQL kolonlari bunlardan uretilir.
+// Eskiden 17 satir elle yazili SUM(CASE WHEN) vardi; pencere eklemek/cikarmak
+// icin sadece bu listeleri degistir. Davranis salesRollingSql.test.ts ile kilitli.
+const PREV_YEAR = `(CURRENT_DATE - INTERVAL '1 year')::date`;
+
+// trailing: bugunden geriye N gun. pre_year_last: gecen yil ayni gun -N..0.
+// pre_year_next: gecen yil ayni gun 0..+N.
+const SALES_WINDOWS: { name: string; when: string }[] = [
+  ...[3, 7, 30, 90, 180, 366].map(n => ({
+    name: `last${n}`,
+    when: `o.purchase_date_local >= CURRENT_DATE - ${n}`,
+  })),
+  ...[7, 30, 90, 180, 365].map(n => ({
+    name: `pre_year_last${n}`,
+    when: `o.purchase_date_local BETWEEN ${PREV_YEAR} - ${n} AND ${PREV_YEAR}`,
+  })),
+  ...[7, 30, 90, 180].map(n => ({
+    name: `pre_year_next${n}`,
+    when: `o.purchase_date_local BETWEEN ${PREV_YEAR} AND ${PREV_YEAR} + ${n}`,
+  })),
+];
+
+export function buildRollingSql(opts: { filterByFulfillment: boolean; euAggregate: boolean }): string {
   const channelClause = opts.euAggregate
     ? `o.channel IN ('de', 'fr', 'it', 'es', 'others')`
     : `o.channel = $1`;
   const fulfillmentClause = opts.filterByFulfillment
     ? `AND o.fulfillment_channel = $${opts.euAggregate ? 1 : 2}`
     : '';
+
+  const innerCols = SALES_WINDOWS
+    .map(w => `COALESCE(SUM(CASE WHEN ${w.when} THEN o.quantity END), 0)::int as ${w.name}`)
+    .join(',\n      ');
+  const outerCols = SALES_WINDOWS.map(w => `SUM(${w.name})::int as ${w.name}`).join(', ');
+
   return `
   WITH per_sku AS (
     SELECT
       COALESCE(o.iwasku, o.sku) as iwasku,
       o.asin,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 3 THEN o.quantity END), 0)::int as last3,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::int as last7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 30 THEN o.quantity END), 0)::int as last30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 90 THEN o.quantity END), 0)::int as last90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 180 THEN o.quantity END), 0)::int as last180,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 366 THEN o.quantity END), 0)::int as last366,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 7 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 30 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 90 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 180 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last180,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date - 365 AND (CURRENT_DATE - INTERVAL '1 year')::date THEN o.quantity END), 0)::int as pre_year_last365,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 7 THEN o.quantity END), 0)::int as pre_year_next7,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 30 THEN o.quantity END), 0)::int as pre_year_next30,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 90 THEN o.quantity END), 0)::int as pre_year_next90,
-      COALESCE(SUM(CASE WHEN o.purchase_date_local BETWEEN (CURRENT_DATE - INTERVAL '1 year')::date AND (CURRENT_DATE - INTERVAL '1 year')::date + 180 THEN o.quantity END), 0)::int as pre_year_next180
+      ${innerCols}
     FROM raw_orders o
     WHERE ${channelClause}
       AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
@@ -50,25 +64,17 @@ function buildRollingSql(opts: { filterByFulfillment: boolean; euAggregate: bool
   SELECT
     iwasku,
     (array_agg(asin ORDER BY last30 DESC))[1] as asin,
-    SUM(last3)::int as last3,
-    SUM(last7)::int as last7, SUM(last30)::int as last30,
-    SUM(last90)::int as last90, SUM(last180)::int as last180,
-    SUM(last366)::int as last366,
-    SUM(pre_year_last7)::int as pre_year_last7, SUM(pre_year_last30)::int as pre_year_last30,
-    SUM(pre_year_last90)::int as pre_year_last90, SUM(pre_year_last180)::int as pre_year_last180,
-    SUM(pre_year_last365)::int as pre_year_last365,
-    SUM(pre_year_next7)::int as pre_year_next7, SUM(pre_year_next30)::int as pre_year_next30,
-    SUM(pre_year_next90)::int as pre_year_next90, SUM(pre_year_next180)::int as pre_year_next180
+    ${outerCols}
   FROM per_sku
   GROUP BY iwasku
   ORDER BY iwasku
   `;
 }
 
-const ROLLING_WINDOW_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: false });
-const ROLLING_WINDOW_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: false });
-const EU_AGGREGATE_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: true });
-const EU_AGGREGATE_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: true });
+export const ROLLING_WINDOW_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: false });
+export const ROLLING_WINDOW_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: false });
+export const EU_AGGREGATE_SQL = buildRollingSql({ filterByFulfillment: false, euAggregate: true });
+export const EU_AGGREGATE_FBA_SQL = buildRollingSql({ filterByFulfillment: true, euAggregate: true });
 
 export interface SalesRow {
   iwasku: string;
