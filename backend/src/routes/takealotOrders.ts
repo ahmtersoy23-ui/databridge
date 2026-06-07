@@ -70,15 +70,15 @@ router.get('/analysis', async (req: Request, res: Response) => {
       [days],
     );
 
-    const rows = result.rows;
-    const matched = rows.filter((r: any) => r.iwasku).length;
+    const rows: { iwasku: string | null; total_qty: number | string; total_revenue: number | string }[] = result.rows;
+    const matched = rows.filter(r => r.iwasku).length;
     res.json({
       success: true,
       data: rows,
       summary: {
         totalSkus: rows.length,
-        totalQty: rows.reduce((s: number, r: any) => s + Number(r.total_qty), 0),
-        totalRevenue: rows.reduce((s: number, r: any) => s + Number(r.total_revenue), 0),
+        totalQty: rows.reduce((s: number, r) => s + Number(r.total_qty), 0),
+        totalRevenue: rows.reduce((s: number, r) => s + Number(r.total_revenue), 0),
         matched,
         unmatched: rows.length - matched,
         days,

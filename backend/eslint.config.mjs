@@ -29,4 +29,12 @@ export default defineConfig([
       'preserve-caught-error': 'warn',
     },
   },
+  {
+    // Test dosyalarinda `any` bilerek kullanilir (vi.mock cikti tipleri, fixture
+    // govdeleri) — burada uyari gurultu. Uretim kodunda kural acik kalir.
+    files: ['**/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
 ])

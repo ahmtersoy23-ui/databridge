@@ -6,8 +6,8 @@ const BATCH_SIZE = 500;
 /**
  * Deduplicate rows by a key function — keeps last occurrence (latest values).
  */
-function deduplicateRows(rows: any[], keyFn: (r: any) => string): any[] {
-  const map = new Map<string, any>();
+function deduplicateRows<T>(rows: T[], keyFn: (r: T) => string): T[] {
+  const map = new Map<string, T>();
   for (const r of rows) {
     map.set(keyFn(r), r);
   }
