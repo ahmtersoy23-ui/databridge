@@ -50,6 +50,30 @@ router.post('/mark-ready', validateBody(markReadySchema), async (req: Request, r
   }
 });
 
+// POST /api/wisersell-routing/reopen  { ids: [299136, ...] }
+// "Kargoya Hazır"ı geri al → Wisersell'de "açık" (status open=2) + routing candidate'ı
+// yeniden görünür kıl (gone_at=NULL). ManuMaestro "Açık Siparişe Geri Al" akışı.
+router.post('/reopen', validateBody(markReadySchema), async (req: Request, res: Response) => {
+  const { ids } = req.body as { ids: number[] };
+  const openStatus = WISERSELL_STATUS_CODES.open[0]; // 2
+  try {
+    const affected = await markOrdersStatus(ids, openStatus);
+    // Candidate'ı Onay Bekliyor'a geri getir (poll'u beklemeden)
+    const upd = await pool.query(
+      `UPDATE wisersell_routing_candidates SET gone_at = NULL
+       WHERE wisersell_order_id = ANY($1::bigint[]) AND gone_at IS NOT NULL`,
+      [ids],
+    );
+    await auditLog('wisersell-routing-reopen', 'success', affected.length);
+    logger.info(`[WisersellRouting] reopen OK: ${affected.length}/${ids.length} → status ${openStatus} (candidate gone_at temizlendi: ${upd.rowCount})`);
+    res.json({ success: true, affected, count: affected.length, candidatesRevived: upd.rowCount ?? 0 });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-reopen', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] reopen error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
+  }
+});
+
 const closeSchema = z.object({
   orderId: z.number().int().positive(),
   carrierId: z.number().int().positive(),
