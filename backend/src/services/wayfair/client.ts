@@ -2,6 +2,7 @@ import axios from 'axios';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
+import { errMessage } from '../../utils/errors';
 
 // -- Account type ----------------------------------------------------------
 
@@ -138,11 +139,11 @@ async function getToken(account: WayfairAccount): Promise<{ token: string; graph
         timeout: 15_000,
       }
     );
-  } catch (err: any) {
-    if (err.response?.status === 401) {
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 401) {
       throw new Error(`Wayfair auth failed for account '${account.label}': invalid credentials`);
     }
-    throw new Error(`Wayfair token request failed (${account.label}): ${err.message}`);
+    throw new Error(`Wayfair token request failed (${account.label}): ${errMessage(err)}`);
   }
 
   const token: string = res.data.access_token;

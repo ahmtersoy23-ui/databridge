@@ -3,6 +3,7 @@ import { createHmac } from 'crypto';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
+import { errMessage } from '../../utils/errors';
 
 // -- Account type ----------------------------------------------------------
 
@@ -150,11 +151,11 @@ export async function kauflandRequest<T = unknown>(
     const res = await axios.request<T>(config);
     if (!opts.skipCircuitBreaker) recordSuccess(account.id);
     return res.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!opts.skipCircuitBreaker) recordFailure(account.id);
-    const status = err.response?.status;
-    const data = err.response?.data;
-    const msg = data ? `${status} ${JSON.stringify(data).slice(0, 300)}` : err.message;
+    const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+    const data = axios.isAxiosError(err) ? err.response?.data : undefined;
+    const msg = data ? `${status} ${JSON.stringify(data).slice(0, 300)}` : errMessage(err);
     throw new Error(`Kaufland ${method} ${path} failed: ${msg}`);
   }
 }

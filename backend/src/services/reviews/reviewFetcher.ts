@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import logger from '../../config/logger';
+import { errMessage } from '../../utils/errors';
 
 // --- Amazon domain + language config ---
 
@@ -103,12 +104,12 @@ async function fetchPage(url: string, countryCode: string): Promise<string | nul
     }
 
     return html;
-  } catch (err: any) {
-    if (err.response?.status === 503 || err.response?.status === 403) {
-      logger.warn(`[ReviewFetcher] Blocked (${err.response.status}) for ${url}`);
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 503 || err.response?.status === 403)) {
+      logger.warn(`[ReviewFetcher] Blocked (${err.response?.status}) for ${url}`);
       return null;
     }
-    logger.error(`[ReviewFetcher] Fetch error for ${url}: ${err.message}`);
+    logger.error(`[ReviewFetcher] Fetch error for ${url}: ${errMessage(err)}`);
     return null;
   }
 }
@@ -220,8 +221,8 @@ export async function fetchReviewsPage(asin: string, countryCode: string): Promi
     }
 
     return { rating, reviewCount, reviews };
-  } catch (err: any) {
-    logger.error(`[ReviewFetcher] Parse error for ${asin} (${countryCode}): ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[ReviewFetcher] Parse error for ${asin} (${countryCode}): ${errMessage(err)}`);
     return null;
   }
 }

@@ -4,6 +4,7 @@ import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
 import { parseRetryAfterHeader } from '../../utils/retry';
+import { errMessage } from '../../utils/errors';
 
 // -- Account type ----------------------------------------------------------
 
@@ -126,11 +127,11 @@ async function getToken(account: WalmartAccount): Promise<string> {
         timeout: 15_000,
       }
     );
-  } catch (err: any) {
-    if (err.response?.status === 401 || err.response?.status === 400) {
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 400)) {
       throw new Error(`Walmart auth failed for '${account.label}': invalid credentials`);
     }
-    throw new Error(`Walmart token request failed (${account.label}): ${err.message}`);
+    throw new Error(`Walmart token request failed (${account.label}): ${errMessage(err)}`);
   }
 
   const token: string = res.data.access_token;
@@ -194,11 +195,11 @@ export async function walmartGet<T = unknown>(
 
     recordSuccess(account.id);
     return res.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     recordFailure(account.id);
 
     // 429 — surface replenish time so callers can back off
-    if (err.response?.status === 429) {
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
       const replenishAt = err.response.headers?.['x-next-replenishment-time'];
       // Walmart `x-next-replenishment-time` HTTP-date veya saniye olabilir; ikisini de parseRetryAfterHeader yakalar.
       const sec = parseRetryAfterHeader(replenishAt);

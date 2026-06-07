@@ -3,6 +3,7 @@ import { createGunzip } from 'zlib';
 import { Readable } from 'stream';
 import axios from 'axios';
 import logger from '../../config/logger';
+import { errMessage } from '../../utils/errors';
 import type { AdsReportType, SbReportType, SdReportType, AdsReportStatusResponse } from '../../types/ads';
 import { ADS_REPORT_TYPE_MAP, SB_REPORT_TYPE_MAP, SD_REPORT_TYPE_MAP, ADS_REPORT_COLUMNS, ADS_REPORT_GROUP_BY, ADS_REPORT_AD_PRODUCT } from '../../types/ads';
 
@@ -136,8 +137,8 @@ async function findAndDownloadPendingReport<T>(
       const downloadUrl = await waitForAdsReport(client, reportId);
       return await downloadAdsReport<T>(downloadUrl);
     }
-  } catch (err: any) {
-    logger.warn(`[AdsAPI] 425 recovery failed for ${reportType}: ${err.message}`);
+  } catch (err: unknown) {
+    logger.warn(`[AdsAPI] 425 recovery failed for ${reportType}: ${errMessage(err)}`);
   }
   return null;
 }
@@ -156,8 +157,8 @@ export async function fetchAdsReport<T = Record<string, any>>(
 
   try {
     reportId = await createAdsReport(client, reportType, startDate, endDate);
-  } catch (err: any) {
-    if (err.response?.status === 425) {
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 425) {
       logger.warn(`[AdsAPI] 425 for ${reportType} — attempting recovery from existing report`);
       const recovered = await findAndDownloadPendingReport<T>(client, reportType);
       if (recovered) {
@@ -166,7 +167,7 @@ export async function fetchAdsReport<T = Record<string, any>>(
       }
       throw new Error(`425 Too Early for ${reportType} and no recoverable report found`);
     }
-    if (err.response?.status) {
+    if (axios.isAxiosError(err) && err.response?.status) {
       const body = typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data);
       logger.error(`[AdsAPI] ${err.response.status} for ${reportType}: ${body}`);
     }

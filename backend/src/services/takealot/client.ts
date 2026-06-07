@@ -102,10 +102,10 @@ export async function takealotGet<T = unknown>(
 
     if (!opts.skipCircuitBreaker) recordSuccess(account.id);
     return res.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!opts.skipCircuitBreaker) recordFailure(account.id);
 
-    if (err.response?.status === 429) {
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
       const retryAfter = err.response.headers?.['retry-after'];
       const sec = parseRetryAfterHeader(retryAfter);
       const e: any = new Error(`Takealot rate limit (429). Retry-After: ${retryAfter ?? 'unknown'}`);

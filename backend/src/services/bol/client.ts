@@ -3,6 +3,7 @@ import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
 import { parseRetryAfterHeader } from '../../utils/retry';
+import { errMessage } from '../../utils/errors';
 
 // -- Account type ----------------------------------------------------------
 
@@ -126,11 +127,11 @@ async function getToken(account: BolAccount): Promise<string> {
         timeout: 15_000,
       }
     );
-  } catch (err: any) {
-    if (err.response?.status === 401 || err.response?.status === 400) {
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && (err.response?.status === 401 || err.response?.status === 400)) {
       throw new Error(`Bol auth failed for '${account.label}': invalid credentials`);
     }
-    throw new Error(`Bol token request failed (${account.label}): ${err.message}`);
+    throw new Error(`Bol token request failed (${account.label}): ${errMessage(err)}`);
   }
 
   const token: string = res.data.access_token;
@@ -177,21 +178,23 @@ export async function bolGet<T = unknown>(
 
     if (!opts.skipCircuitBreaker) recordSuccess(account.id);
     return res.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (!opts.skipCircuitBreaker) recordFailure(account.id);
 
-    if (err.response?.status === 404) {
-      // 404 — empty collection (Bol uses 404 for "no orders in this filter")
-      return ({ orders: [] } as unknown) as T;
-    }
+    if (axios.isAxiosError(err)) {
+      if (err.response?.status === 404) {
+        // 404 — empty collection (Bol uses 404 for "no orders in this filter")
+        return ({ orders: [] } as unknown) as T;
+      }
 
-    if (err.response?.status === 429) {
-      const retryAfter = err.response.headers?.['retry-after'];
-      const sec = parseRetryAfterHeader(retryAfter);
-      const e: any = new Error(`Bol rate limit (429). Retry-After: ${retryAfter ?? 'unknown'}`);
-      e.status = 429;
-      if (sec !== null) e.retryAfterMs = sec * 1000;
-      throw e;
+      if (err.response?.status === 429) {
+        const retryAfter = err.response.headers?.['retry-after'];
+        const sec = parseRetryAfterHeader(retryAfter);
+        const e: any = new Error(`Bol rate limit (429). Retry-After: ${retryAfter ?? 'unknown'}`);
+        e.status = 429;
+        if (sec !== null) e.retryAfterMs = sec * 1000;
+        throw e;
+      }
     }
 
     throw err;

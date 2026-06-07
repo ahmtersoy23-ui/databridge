@@ -2,6 +2,7 @@ import axios from 'axios';
 import { pool, sharedPool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
+import { errMessage } from '../../utils/errors';
 
 interface WisersellProduct {
   id: number;
@@ -56,8 +57,8 @@ async function getToken(): Promise<string> {
       email: creds.email,
       password: creds.password,
     }, { timeout: 15_000 });
-  } catch (err: any) {
-    if (err.response?.status === 429) {
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
       const retryAfter = err.response.headers['retry-after'];
       const resetAt = err.response.headers['x-ratelimit-reset'];
       const waitSec = retryAfter ? Math.ceil(Number(retryAfter)) : 60;
@@ -335,9 +336,9 @@ export async function syncWisersell(): Promise<number> {
     await updateSyncJob(jobId, 'completed', products.length);
     logger.info(`[WisersellSync] Completed: ${products.length} products, ${categories.length} categories`);
     return products.length;
-  } catch (err: any) {
-    logger.error('[WisersellSync] Failed:', err.message);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error('[WisersellSync] Failed:', errMessage(err));
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }
