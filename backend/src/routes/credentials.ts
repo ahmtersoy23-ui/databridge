@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 
@@ -28,8 +29,8 @@ router.get('/', async (_req: Request, res: Response) => {
       ORDER BY region
     `);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -49,9 +50,9 @@ router.post('/', validateBody(credentialSchema), async (req: Request, res: Respo
 
     logger.info(`[Credentials] Added credentials for region: ${region} (${account_name || 'unnamed'})`);
     res.json({ success: true, data: result.rows[0] });
-  } catch (err: any) {
-    logger.error('[Credentials] Error saving:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[Credentials] Error saving:', errMessage(err));
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -104,9 +105,9 @@ router.put('/:id', validateBody(updateSchema), async (req: Request, res: Respons
     clearClientCache();
     logger.info(`[Credentials] Updated credential id: ${id}`);
     res.json({ success: true, data: result.rows[0] });
-  } catch (err: any) {
-    logger.error('[Credentials] Error updating:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[Credentials] Error updating:', errMessage(err));
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -125,8 +126,8 @@ router.patch('/:id/toggle', async (req: Request, res: Response) => {
     const cred = result.rows[0];
     logger.info(`[Credentials] Toggled credential ${cred.id} (${cred.account_name}): is_active=${cred.is_active}`);
     res.json({ success: true, data: cred });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -139,8 +140,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
     );
     clearClientCache();
     res.json({ success: true, message: 'Credentials deactivated' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

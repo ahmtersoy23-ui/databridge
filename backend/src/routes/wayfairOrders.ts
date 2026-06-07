@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { getAccountById, getAccountByLabel, graphqlQuery, getDropshipApiBase } from '../services/wayfair/client';
 import { fetchWayfairPurchaseOrders } from '../services/wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../services/wayfair/dropshipOrders';
@@ -65,8 +66,8 @@ router.get('/browse', async (req: Request, res: Response) => {
       data: rows.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -125,8 +126,8 @@ router.get('/analysis', async (req: Request, res: Response) => {
         unmatched: rows.length - matched,
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -141,8 +142,8 @@ router.get('/', async (req: Request, res: Response) => {
       : undefined;
     const orders = await fetchWayfairPurchaseOrders(account, undefined, hasResponse);
     res.json({ data: orders, total: orders.length });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -157,8 +158,8 @@ router.get('/dropship', async (req: Request, res: Response) => {
       : undefined;
     const orders = await fetchDropshipOrders(account, undefined, hasResponse);
     res.json({ data: orders, total: orders.length });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -176,8 +177,8 @@ router.get('/dropship/raw', async (req: Request, res: Response) => {
       }
     `, { limit: 5, hasResponse: null, sortOrder: 'DESC' }, endpoint);
     res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -195,8 +196,8 @@ router.get('/raw', async (req: Request, res: Response) => {
       }
     `, { limit: 5, hasResponse: null, sortOrder: 'DESC' }, endpoint);
     res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 

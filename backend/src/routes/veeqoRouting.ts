@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -168,10 +169,10 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
       quotes,
       destState: ((order.deliver_to as { state?: string } | undefined)?.state) ?? null, // kıyas için (FedEx Izmir eyalet bazlı)
     });
-  } catch (err: any) {
-    await auditLog('veeqo-routing-rates', 'failed', 0, err.message);
-    logger.error('[VeeqoRouting] rates error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('veeqo-routing-rates', 'failed', 0, errMessage(err));
+    logger.error('[VeeqoRouting] rates error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -217,10 +218,10 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
       labelBase64,
       labelFormat,
     });
-  } catch (err: any) {
-    await auditLog('veeqo-routing-book', 'failed', 0, err.message);
-    logger.error('[VeeqoRouting] book error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('veeqo-routing-book', 'failed', 0, errMessage(err));
+    logger.error('[VeeqoRouting] book error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -233,10 +234,10 @@ router.post('/cancel', validateBody(cancelSchema), async (req: Request, res: Res
     await cancelShipment(shipmentId);
     await auditLog('veeqo-routing-cancel', 'success', 1);
     res.json({ success: true });
-  } catch (err: any) {
-    await auditLog('veeqo-routing-cancel', 'failed', 0, err.message);
-    logger.error('[VeeqoRouting] cancel error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('veeqo-routing-cancel', 'failed', 0, errMessage(err));
+    logger.error('[VeeqoRouting] cancel error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 

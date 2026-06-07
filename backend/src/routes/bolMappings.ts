@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { pool } from '../config/database';
@@ -84,8 +85,8 @@ router.get('/', async (req: Request, res: Response) => {
       data: data.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -94,8 +95,8 @@ router.post('/', validateBody(mappingSchema), async (req: Request, res: Response
   try {
     await applyMapping(sku, iwasku);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -108,8 +109,8 @@ router.post('/bulk', validateBody(bulkSchema), async (req: Request, res: Respons
       upserted++;
     }
     res.json({ success: true, upserted });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -119,8 +120,8 @@ router.delete('/:sku', async (req: Request, res: Response) => {
     await pool.query('DELETE FROM bol_sku_mapping WHERE sku = $1', [sku]);
     await pool.query('UPDATE bol_raw_orders SET iwasku = NULL WHERE sku = $1', [sku]);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -154,8 +155,8 @@ router.get('/export', async (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="bol_mappings.xlsx"');
     res.send(buf);
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

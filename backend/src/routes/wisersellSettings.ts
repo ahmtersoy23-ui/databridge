@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -24,8 +25,8 @@ router.get('/', async (_req: Request, res: Response) => {
       return;
     }
     res.json({ configured: true, ...result.rows[0] });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -61,8 +62,8 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
 
     clearWisersellTokenCache();
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

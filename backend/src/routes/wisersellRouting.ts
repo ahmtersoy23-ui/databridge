@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -42,10 +43,10 @@ router.post('/mark-ready', validateBody(markReadySchema), async (req: Request, r
     await auditLog('wisersell-routing-mark-ready', 'success', affected.length);
     logger.info(`[WisersellRouting] mark-ready OK: ${affected.length}/${ids.length} → status ${readyStatus}`);
     res.json({ success: true, affected, count: affected.length });
-  } catch (err: any) {
-    await auditLog('wisersell-routing-mark-ready', 'failed', 0, err.message);
-    logger.error('[WisersellRouting] mark-ready error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-mark-ready', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] mark-ready error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -63,10 +64,10 @@ router.post('/close', validateBody(closeSchema), async (req: Request, res: Respo
     await auditLog('wisersell-routing-close', 'success', 1);
     logger.info(`[WisersellRouting] external-close OK: order ${orderId} (carrier ${carrierId}, ${trackingCode})`);
     res.json({ success: true, orderId });
-  } catch (err: any) {
-    await auditLog('wisersell-routing-close', 'failed', 0, err.message);
-    logger.error('[WisersellRouting] close error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-close', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] close error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -84,10 +85,10 @@ router.post('/platform-close', validateBody(platformCloseSchema), async (req: Re
     await auditLog('wisersell-routing-platform-close', 'success', 1);
     logger.info(`[WisersellRouting] platform-close OK: order ${orderId}`);
     res.json({ success: true, orderId });
-  } catch (err: any) {
-    await auditLog('wisersell-routing-platform-close', 'failed', 0, err.message);
-    logger.error('[WisersellRouting] platform-close error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-platform-close', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] platform-close error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -104,10 +105,10 @@ router.post('/cancel', validateBody(cancelSchema), async (req: Request, res: Res
     await auditLog('wisersell-routing-cancel', 'success', 1);
     logger.info(`[WisersellRouting] cancel OK: order ${orderId}`);
     res.json({ success: true, orderId });
-  } catch (err: any) {
-    await auditLog('wisersell-routing-cancel', 'failed', 0, err.message);
-    logger.error('[WisersellRouting] cancel error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-cancel', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] cancel error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -133,10 +134,10 @@ router.post('/wayfair-map', validateBody(wayfairMapSchema), async (req: Request,
     await auditLog('wisersell-routing-wayfair-map', 'success', 1);
     logger.info(`[WisersellRouting] wayfair-map OK: ${partNumber} → ${iwasku}`);
     res.json({ success: true });
-  } catch (err: any) {
-    await auditLog('wisersell-routing-wayfair-map', 'failed', 0, err.message);
-    logger.error('[WisersellRouting] wayfair-map error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-wayfair-map', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] wayfair-map error:', errMessage(err));
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

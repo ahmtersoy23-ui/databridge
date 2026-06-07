@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -27,8 +28,8 @@ router.get('/', async (_req: Request, res: Response) => {
        FROM walmart_credentials ORDER BY id`,
     );
     res.json({ accounts: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -55,8 +56,8 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
 
     clearWalmartTokenCache(result.rows[0].id);
     res.json({ success: true, id: result.rows[0].id });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -91,8 +92,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     );
     clearWalmartTokenCache(id);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -103,8 +104,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await pool.query('DELETE FROM walmart_credentials WHERE id = $1', [id]);
     clearWalmartTokenCache(id);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -132,8 +133,8 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       sandbox: account.use_sandbox,
       message: `Connection successful (probe returned ${orderCount} order${orderCount === 1 ? '' : 's'})`,
     });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 import logger from '../config/logger';
 
@@ -75,8 +76,8 @@ router.get('/', async (req: Request, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (err: any) {
-    logger.error('[Orders] Browse error:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Orders] Browse error:', errMessage(err));
     res.status(500).json({ success: false, error: 'Failed to fetch orders' });
   }
 });
@@ -86,8 +87,8 @@ router.get('/channels', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT DISTINCT channel FROM raw_orders ORDER BY channel');
     res.json({ success: true, data: result.rows.map((r: any) => r.channel) });
-  } catch (err: any) {
-    logger.error('[Orders] Channels error:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Orders] Channels error:', errMessage(err));
     res.status(500).json({ success: false, error: 'Failed to fetch channels' });
   }
 });

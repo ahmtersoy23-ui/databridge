@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import multer from 'multer';
 import { pool } from '../config/database';
@@ -24,8 +25,8 @@ router.get('/profiles', async (_req: Request, res: Response) => {
       ORDER BY ap.country_code
     `);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -39,9 +40,9 @@ router.post('/profiles/discover', validateBody(discoverSchema), async (req: Requ
   try {
     const count = await discoverProfiles(credential_id);
     res.json({ success: true, message: `Discovered ${count} profiles`, count });
-  } catch (err: any) {
-    logger.error(`[AdsRoute] Profile discovery failed: ${err.message}`);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error(`[AdsRoute] Profile discovery failed: ${errMessage(err)}`);
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -58,8 +59,8 @@ router.patch('/profiles/:id/toggle', async (req: Request, res: Response) => {
       return;
     }
     res.json({ success: true, data: result.rows[0] });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -82,8 +83,8 @@ router.put('/credentials/:id', validateBody(credentialSchema), async (req: Reque
       return;
     }
     res.json({ success: true, message: `Ads refresh token saved for ${result.rows[0].account_name}` });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -97,8 +98,8 @@ router.get('/credentials', async (_req: Request, res: Response) => {
       ORDER BY id
     `);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -113,8 +114,8 @@ router.get('/sync/status', async (_req: Request, res: Response) => {
       ORDER BY profile_id, report_type, created_at DESC
     `);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -130,8 +131,8 @@ router.get('/sync/jobs', async (req: Request, res: Response) => {
       LIMIT $1
     `, [limit]);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -160,7 +161,7 @@ router.post('/sync/trigger', validateBody(triggerSchema), async (req: Request, r
 
       const profile = profileResult.rows[0];
       syncAdsForProfile(profile.credential_id, profile.profile_id, days)
-        .catch(err => logger.error(`[AdsRoute] Manual sync error: ${err.message}`));
+        .catch(err => logger.error(`[AdsRoute] Manual sync error: ${errMessage(err)}`));
 
       res.json({ success: true, message: `SP sync started for profile ${profile.country_code} (${days} days)` });
     } else {
@@ -168,22 +169,22 @@ router.post('/sync/trigger', validateBody(triggerSchema), async (req: Request, r
       const targets: string[] = [];
 
       if (product === 'all' || product === 'sp') {
-        syncAllAdsProfiles(days).catch(err => logger.error(`[AdsRoute] SP sync error: ${err.message}`));
+        syncAllAdsProfiles(days).catch(err => logger.error(`[AdsRoute] SP sync error: ${errMessage(err)}`));
         targets.push('SP');
       }
       if (product === 'all' || product === 'sb') {
-        syncAllSbProfiles(days).catch(err => logger.error(`[AdsRoute] SB sync error: ${err.message}`));
+        syncAllSbProfiles(days).catch(err => logger.error(`[AdsRoute] SB sync error: ${errMessage(err)}`));
         targets.push('SB');
       }
       if (product === 'all' || product === 'sd') {
-        syncAllSdProfiles(days).catch(err => logger.error(`[AdsRoute] SD sync error: ${err.message}`));
+        syncAllSdProfiles(days).catch(err => logger.error(`[AdsRoute] SD sync error: ${errMessage(err)}`));
         targets.push('SD');
       }
 
       res.json({ success: true, message: `${targets.join('+')} sync started for all active profiles (${days} days)` });
     }
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -439,9 +440,9 @@ router.post('/backfill/upload', upload.single('file'), async (req: Request, res:
         unmapped_ad_groups: unmappedAdGroups || undefined,
       },
     });
-  } catch (err: any) {
-    logger.error(`[AdsBackfill] ${reportType} error: ${err.message}`);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error(`[AdsBackfill] ${reportType} error: ${errMessage(err)}`);
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

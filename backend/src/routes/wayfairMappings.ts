@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { pool } from '../config/database';
@@ -79,8 +80,8 @@ router.get('/', async (req: Request, res: Response) => {
       data: dataResult.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -104,8 +105,8 @@ router.post('/', validateBody(mappingSchema), async (req: Request, res: Response
     await refreshWayfairAggregation();
 
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -147,8 +148,8 @@ router.post('/bulk', validateBody(bulkSchema), async (req: Request, res: Respons
     const aggregated = await refreshWayfairAggregation();
 
     res.json({ success: true, upserted, aggregated });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -159,8 +160,8 @@ router.get('/all', async (_req: Request, res: Response) => {
     const map: Record<string, string> = {};
     for (const r of result.rows) map[r.part_number] = r.iwasku;
     res.json({ success: true, data: map });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -178,8 +179,8 @@ router.delete('/:partNumber', async (req: Request, res: Response) => {
 
     await refreshWayfairAggregation();
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -237,8 +238,8 @@ router.get('/export', async (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="wayfair_mappings.xlsx"');
     res.send(buf);
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

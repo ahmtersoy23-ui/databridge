@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -18,8 +19,8 @@ router.get('/', async (_req, res) => {
       `SELECT id, label, is_active, created_at, updated_at FROM takealot_credentials ORDER BY id`,
     );
     res.json({ accounts: r.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -40,8 +41,8 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
       [label, encrypted],
     );
     res.json({ success: true, id: r.rows[0].id });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -62,8 +63,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     fields.push('updated_at = NOW()');
     await pool.query(`UPDATE takealot_credentials SET ${fields.join(', ')} WHERE id = $1`, params);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -71,8 +72,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
   try {
     await pool.query('DELETE FROM takealot_credentials WHERE id = $1', [parseInt(req.params.id, 10)]);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -90,8 +91,8 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       success: true,
       message: `Connection OK — today total: ${total} sales (auth scheme works)`,
     });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message || 'failed' });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) || 'failed' });
   }
 });
 

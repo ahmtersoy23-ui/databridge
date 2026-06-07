@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { ssoAuthMiddleware, deleteSession } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -17,8 +18,8 @@ router.post('/logout', ssoAuthMiddleware, async (req: Request, res: Response) =>
     }
     res.clearCookie('auth_token', { path: '/' });
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

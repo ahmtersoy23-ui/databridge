@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { graphqlQuery, getSupplierId, getAccountById, getAccountByLabel } from '../services/wayfair/client';
 import { pool } from '../config/database';
 
@@ -59,8 +60,8 @@ router.get('/', async (req: Request, res: Response) => {
       data: rows.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -101,8 +102,8 @@ router.get('/raw', async (req: Request, res: Response) => {
       }
     `, { supplierId, first: 5 });
     res.json(result);
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -118,8 +119,8 @@ router.put('/shipping-cost', async (req: Request, res: Response) => {
       [cost, part_number]
     );
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

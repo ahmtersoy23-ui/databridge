@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -60,8 +61,8 @@ router.get('/summary', async (req: Request, res: Response) => {
         period: { from: row.period_from, to: row.period_to },
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -118,8 +119,8 @@ router.get('/search-terms', async (req: Request, res: Response) => {
         offset,
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -150,8 +151,8 @@ router.get('/campaigns', async (req: Request, res: Response) => {
     );
 
     res.json({ success: true, data: { rows: result.rows } });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

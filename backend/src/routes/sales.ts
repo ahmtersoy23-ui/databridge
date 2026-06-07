@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 import logger from '../config/logger';
 
@@ -87,8 +88,8 @@ router.get('/:channel', async (req: Request, res: Response) => {
 
     logger.info(`[Sales] Serving ${channel}: ${result.rows.length} items`);
     res.json(result.rows);
-  } catch (err: any) {
-    logger.error(`[Sales] Error for channel ${channel}:`, err.message);
+  } catch (err: unknown) {
+    logger.error(`[Sales] Error for channel ${channel}:`, errMessage(err));
     res.status(500).json({ error: 'Failed to fetch sales data' });
   }
 });

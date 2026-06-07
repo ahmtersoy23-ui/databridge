@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -56,8 +57,8 @@ router.get('/browse', async (req: Request, res: Response) => {
       data: dataRes.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -99,8 +100,8 @@ router.get('/analysis', async (req: Request, res: Response) => {
         days,
       },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -115,8 +116,8 @@ router.get('/statuses', async (_req: Request, res: Response) => {
        ORDER BY cnt DESC`,
     );
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

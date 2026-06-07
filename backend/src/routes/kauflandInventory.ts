@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -29,8 +30,8 @@ router.get('/', async (req: Request, res: Response) => {
       params,
     );
     res.json({ data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

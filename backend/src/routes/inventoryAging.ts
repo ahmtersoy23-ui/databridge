@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import multer from 'multer';
 import { pool } from '../config/database';
 import { mapBulkSkusToIwasku } from '../services/skuMapper';
@@ -150,9 +151,9 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
     logger.info(`[InventoryAging] Uploaded ${items.length} items for warehouse ${warehouse}`);
     res.json({ success: true, warehouse, items: items.length });
-  } catch (err: any) {
-    logger.error('[InventoryAging] Upload error:', err.message);
-    res.status(500).json({ error: 'Failed to process upload: ' + err.message });
+  } catch (err: unknown) {
+    logger.error('[InventoryAging] Upload error:', errMessage(err));
+    res.status(500).json({ error: 'Failed to process upload: ' + errMessage(err) });
   }
 });
 
@@ -184,8 +185,8 @@ router.get('/summary/:warehouse', async (req: Request, res: Response) => {
     `, [warehouse]);
 
     res.json(result.rows[0] || null);
-  } catch (err: any) {
-    logger.error(`[InventoryAging] Summary error for ${warehouse}:`, err.message);
+  } catch (err: unknown) {
+    logger.error(`[InventoryAging] Summary error for ${warehouse}:`, errMessage(err));
     res.status(500).json({ error: 'Failed to fetch aging summary' });
   }
 });
@@ -226,8 +227,8 @@ router.get('/:warehouse', async (req: Request, res: Response) => {
 
     logger.info(`[InventoryAging] Serving ${warehouse}: ${result.rows.length} items`);
     res.json(result.rows);
-  } catch (err: any) {
-    logger.error(`[InventoryAging] Error for warehouse ${warehouse}:`, err.message);
+  } catch (err: unknown) {
+    logger.error(`[InventoryAging] Error for warehouse ${warehouse}:`, errMessage(err));
     res.status(500).json({ error: 'Failed to fetch inventory aging data' });
   }
 });

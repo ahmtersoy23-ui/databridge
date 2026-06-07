@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { validateBody } from '../middleware/validate';
 import { adminOpsAuth } from '../middleware/adminOps';
@@ -27,9 +28,9 @@ router.post('/by-ids', validateBody(byIdsSchema), async (req: Request, res: Resp
   try {
     const statuses = await fetchOrderStatusesByIds(amazonOrderIds);
     res.json({ success: true, statuses });
-  } catch (err: any) {
-    logger.error('[AmazonOrderStatus] by-ids error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[AmazonOrderStatus] by-ids error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -47,9 +48,9 @@ router.post('/canceled-since', validateBody(canceledSinceSchema), async (req: Re
   try {
     const canceled = await fetchCanceledOrdersSince(since);
     res.json({ success: true, canceled: [...canceled] });
-  } catch (err: any) {
-    logger.error('[AmazonOrderStatus] canceled-since error:', err.message);
-    res.status(502).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[AmazonOrderStatus] canceled-since error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
 

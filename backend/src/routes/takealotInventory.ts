@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 
 const router = Router();
@@ -22,8 +23,8 @@ router.get('/', async (_req: Request, res: Response) => {
       ORDER BY stock_at_takealot DESC NULLS LAST, iwasku
     `);
     res.json({ data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

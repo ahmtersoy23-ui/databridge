@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { runInventorySync, runSalesSync, runTransactionSync, runWisersellSync, runWayfairSync, runReviewSync, runAdsSync, runAgingSyncJob, runSkuMasterDiffJob, runBusinessReportSyncJob, runCampaignSnapshotJob, runBrandAnalyticsSyncJob, runSbAdsSync, runSdAdsSync, runFeeRatesJob, runFedexSync, runWisersellShipmentSync, runWisersellPendingSync, runWalmartOrdersSync, runBolOrdersSync, runTakealotSync, runKauflandSync, runChannelPricesSyncJob, getActiveMarketplaces, writeSalesData, writeInventoryData } from '../services/sync/scheduler';
@@ -201,9 +202,9 @@ router.post('/trigger', validateBody(triggerSchema), async (req: Request, res: R
       backfillSales(mp, months || 13).catch(err => logger.error('[Sync] Backfill error:', err));
       res.json({ success: true, message: `Sales backfill started for ${marketplace}${siblingNote} (${months || 13} months)` });
     }
-  } catch (err: any) {
-    logger.error('[Sync] Trigger error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[Sync] Trigger error:', errMessage(err));
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -226,9 +227,9 @@ router.post('/fedex-track-trackings', validateBody(fedexTrackTrackingsSchema), a
       return result.fetched;
     });
     res.json({ success: true, data: result });
-  } catch (err: any) {
-    logger.error('[Sync] FedEx track-trackings error:', err.message);
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    logger.error('[Sync] FedEx track-trackings error:', errMessage(err));
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -243,8 +244,8 @@ router.get('/jobs', async (_req: Request, res: Response) => {
       LIMIT 50
     `);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 

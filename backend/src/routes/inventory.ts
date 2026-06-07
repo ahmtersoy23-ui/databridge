@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 import logger from '../config/logger';
 
@@ -58,8 +59,8 @@ router.get('/:warehouse', async (req: Request, res: Response) => {
 
     logger.info(`[Inventory] Serving ${warehouse}: ${result.rows.length} items`);
     res.json(result.rows);
-  } catch (err: any) {
-    logger.error(`[Inventory] Error for warehouse ${warehouse}:`, err.message);
+  } catch (err: unknown) {
+    logger.error(`[Inventory] Error for warehouse ${warehouse}:`, errMessage(err));
     res.status(500).json({ error: 'Failed to fetch inventory data' });
   }
 });

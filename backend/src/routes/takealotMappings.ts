@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { pool } from '../config/database';
@@ -71,15 +72,15 @@ router.get('/', async (req: Request, res: Response) => {
       data: data.rows,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
 router.post('/', validateBody(mappingSchema), async (req: Request, res: Response) => {
   const { sku, iwasku } = req.body;
   try { await applyMapping(sku, iwasku); res.json({ success: true }); }
-  catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  catch (err: unknown) { res.status(500).json({ success: false, error: errMessage(err) }); }
 });
 
 router.post('/bulk', validateBody(bulkSchema), async (req: Request, res: Response) => {
@@ -88,7 +89,7 @@ router.post('/bulk', validateBody(bulkSchema), async (req: Request, res: Respons
     let upserted = 0;
     for (const m of mappings) { await applyMapping(m.sku, m.iwasku); upserted++; }
     res.json({ success: true, upserted });
-  } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err: unknown) { res.status(500).json({ success: false, error: errMessage(err) }); }
 });
 
 router.delete('/:sku', async (req: Request, res: Response) => {
@@ -97,7 +98,7 @@ router.delete('/:sku', async (req: Request, res: Response) => {
     await pool.query('UPDATE takealot_raw_orders SET iwasku = NULL WHERE sku = $1', [req.params.sku]);
     await pool.query('UPDATE takealot_inventory   SET iwasku = NULL WHERE sku = $1', [req.params.sku]);
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err: unknown) { res.status(500).json({ success: false, error: errMessage(err) }); }
 });
 
 router.get('/export', async (_req: Request, res: Response) => {
@@ -125,7 +126,7 @@ router.get('/export', async (_req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="takealot_mappings.xlsx"');
     res.send(buf);
-  } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
+  } catch (err: unknown) { res.status(500).json({ success: false, error: errMessage(err) }); }
 });
 
 export default router;

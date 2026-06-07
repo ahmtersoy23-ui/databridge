@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 import logger from '../config/logger';
 
@@ -64,8 +65,8 @@ router.get('/', async (req: Request, res: Response) => {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (err: any) {
-    logger.error('[InventoryDetail] Browse error:', err.message);
+  } catch (err: unknown) {
+    logger.error('[InventoryDetail] Browse error:', errMessage(err));
     res.status(500).json({ success: false, error: 'Failed to fetch inventory' });
   }
 });
@@ -75,8 +76,8 @@ router.get('/warehouses', async (_req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT DISTINCT warehouse FROM fba_inventory ORDER BY warehouse');
     res.json({ success: true, data: result.rows.map((r: any) => r.warehouse) });
-  } catch (err: any) {
-    logger.error('[InventoryDetail] Warehouses error:', err.message);
+  } catch (err: unknown) {
+    logger.error('[InventoryDetail] Warehouses error:', errMessage(err));
     res.status(500).json({ success: false, error: 'Failed to fetch warehouses' });
   }
 });

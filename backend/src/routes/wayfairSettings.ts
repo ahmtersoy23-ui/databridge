@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -27,8 +28,8 @@ router.get('/', async (_req: Request, res: Response) => {
       'SELECT id, label, client_id, use_sandbox, supplier_id, channel, warehouse, is_active, updated_at FROM wayfair_credentials ORDER BY id'
     );
     res.json({ accounts: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -57,8 +58,8 @@ router.post('/', validateBody(credSchema), async (req: Request, res: Response) =
 
     clearWayfairTokenCache(result.rows[0].id);
     res.json({ success: true, id: result.rows[0].id });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -89,8 +90,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     await pool.query(`UPDATE wayfair_credentials SET ${fields.join(', ')} WHERE id = $1`, params);
     clearWayfairTokenCache(id);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -101,8 +102,8 @@ router.delete('/:id', async (req: Request, res: Response) => {
     await pool.query('DELETE FROM wayfair_credentials WHERE id = $1', [id]);
     clearWayfairTokenCache(id);
     res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -131,8 +132,8 @@ router.post('/:id/test', async (req: Request, res: Response) => {
       supplierId,
       message: `Connection successful${supplierMessage}`,
     });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -145,8 +146,8 @@ router.get('/schema', async (_req: Request, res: Response) => {
     }>(account, `{ __schema { queryType { fields { name description } } } }`);
     const fields = result.__schema.queryType.fields.map(f => ({ name: f.name, description: f.description }));
     res.json({ fields });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -167,8 +168,8 @@ router.get('/type/:typeName', async (req: Request, res: Response) => {
       return;
     }
     res.json({ type: typeName, fields: result.__type.fields });
-  } catch (err: any) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(400).json({ success: false, error: errMessage(err) });
   }
 });
 

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { errMessage } from '../utils/errors';
 import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
@@ -68,8 +69,8 @@ router.get('/', async (req: Request, res: Response) => {
 
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -88,8 +89,8 @@ router.get('/fetch-status', async (_req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: { lastJob, nextAvailableAt } });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -111,8 +112,8 @@ router.get('/:asin/history', async (req: Request, res: Response) => {
 
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -134,8 +135,8 @@ router.get('/:asin/items', async (req: Request, res: Response) => {
 
     const result = await pool.query(query, params);
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -146,8 +147,8 @@ router.get('/tracked', async (_req: Request, res: Response) => {
       'SELECT id, asin, country_code, label, iwasku, is_active, created_at FROM review_tracked_asins WHERE is_active = true ORDER BY country_code, asin'
     );
     res.json({ success: true, data: result.rows });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -175,8 +176,8 @@ router.post('/fetch', async (_req: Request, res: Response) => {
 
     runReviewSync().catch(err => logger.error('[Reviews] Manual fetch error:', err));
     res.json({ success: true, message: 'Review fetch started' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -202,8 +203,8 @@ router.post('/tracked', validateBody(addSchema), async (req: Request, res: Respo
       [asin.toUpperCase(), country_code.toUpperCase(), label || null, iwasku || null]
     );
     res.json({ success: true, data: result.rows[0] });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -236,8 +237,8 @@ router.post('/tracked/bulk', validateBody(bulkSchema), async (req: Request, res:
     }
 
     res.json({ success: true, message: `${added} ASINs added/updated` });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -247,8 +248,8 @@ router.delete('/tracked/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     await pool.query('UPDATE review_tracked_asins SET is_active = false WHERE id = $1', [id]);
     res.json({ success: true, message: 'ASIN deactivated' });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
@@ -259,8 +260,8 @@ router.post('/reset-blocks', async (_req: Request, res: Response) => {
       'UPDATE product_reviews SET is_blocked = false, block_count = 0 WHERE is_blocked = true'
     );
     res.json({ success: true, message: `${result.rowCount} ASINs unblocked` });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+  } catch (err: unknown) {
+    res.status(500).json({ success: false, error: errMessage(err) });
   }
 });
 
