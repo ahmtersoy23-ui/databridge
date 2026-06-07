@@ -5,17 +5,24 @@ vi.mock('../config/logger', () => ({
 }));
 
 const mockPoolQuery = vi.fn();
+const mockSharedQuery = vi.fn();
 const mockClientQuery = vi.fn();
 const mockClientRelease = vi.fn();
 
 vi.mock('../config/database', () => ({
   pool: { query: (...args: any[]) => mockPoolQuery(...args) },
   sharedPool: {
+    query: (...args: any[]) => mockSharedQuery(...args),
     connect: vi.fn().mockResolvedValue({
       query: (...args: any[]) => mockClientQuery(...args),
       release: () => mockClientRelease(),
     }),
   },
+}));
+
+const mockNotify = vi.fn();
+vi.mock('../utils/notify', () => ({
+  notify: (...args: any[]) => mockNotify(...args),
 }));
 
 const mockFetchInventory = vi.fn().mockResolvedValue([]);
@@ -203,6 +210,66 @@ describe('syncWayfairAccount', () => {
       expect.stringContaining('UPDATE sync_jobs'),
       expect.arrayContaining([1, 'completed']),
     );
+  });
+
+  // -- fba_inventory safety threshold (invariant #2) --------------------------
+  // Bir item fetch'lendiginde aggregateToFbaInventory calisir; mevcut fba_inventory'yi
+  // sildikten sonra yeniden yazar. Kismi pull mevcut depoyu silmemeli.
+  const inventoryItem = {
+    partNumber: 'WF-001', warehouseId: 'WH1', warehouseName: 'CastleGate',
+    quantity: 5, availableQty: 5,
+  };
+  // Aggregate SELECT (FROM wayfair_inventory wi) → N satir donduren mock impl.
+  const poolImplWithAggRows = (aggRowCount: number) => (sql: string) => {
+    if (typeof sql === 'string') {
+      if (sql.includes('INSERT INTO sync_jobs')) return { rows: [{ id: 1 }] };
+      if (sql.includes('UPDATE sync_jobs')) return {};
+      if (sql.includes('FROM wayfair_inventory wi')) {
+        return { rows: Array.from({ length: aggRowCount }, (_, i) => ({
+          iwasku: `SKU${i}`, total_quantity: 5, fulfillable_quantity: 5,
+          part_number: 'WF-001', shipping_cost: null,
+        })) };
+      }
+      if (sql.includes('wayfair_sku_mapping')) return { rows: [{ part_number: 'WF-001', iwasku: 'TESTSKU00001' }] };
+      if (sql.includes('MAX(po_date)')) return { rows: [{ last_date: null }] };
+      if (sql.includes('DISTINCT po_number')) return { rows: [] };
+      if (sql.includes('FROM wayfair_orders')) return { rows: [] };
+    }
+    return { rows: [], rowCount: 0 };
+  };
+
+  it('SKIPS fba_inventory write + alerts when new rows collapse below threshold', async () => {
+    mockFetchInventory.mockResolvedValue([inventoryItem]);
+    mockFetchCGOrders.mockResolvedValue([]);
+    mockFetchDSOrders.mockResolvedValue([]);
+    mockPoolQuery.mockImplementation(poolImplWithAggRows(2));       // 2 new rows
+    mockSharedQuery.mockResolvedValue({ rows: [{ cnt: 100 }] });    // 100 existing → 2 < 100*0.2
+
+    await syncWayfairAccount(makeAccount());
+
+    // fba_inventory DELETE must NOT run (write skipped)
+    const deleteCall = mockClientQuery.mock.calls.find(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('DELETE FROM fba_inventory'),
+    );
+    expect(deleteCall).toBeUndefined();
+    // Slack alert fired
+    expect(mockNotify).toHaveBeenCalledWith(expect.stringContaining('fba_inventory write skipped'));
+  });
+
+  it('PROCEEDS with fba_inventory write when new rows are within threshold', async () => {
+    mockFetchInventory.mockResolvedValue([inventoryItem]);
+    mockFetchCGOrders.mockResolvedValue([]);
+    mockFetchDSOrders.mockResolvedValue([]);
+    mockPoolQuery.mockImplementation(poolImplWithAggRows(90));      // 90 new rows
+    mockSharedQuery.mockResolvedValue({ rows: [{ cnt: 100 }] });    // 90 >= 100*0.2 → write
+
+    await syncWayfairAccount(makeAccount());
+
+    const deleteCall = mockClientQuery.mock.calls.find(
+      (c: any[]) => typeof c[0] === 'string' && c[0].includes('DELETE FROM fba_inventory'),
+    );
+    expect(deleteCall).toBeDefined();
+    expect(mockNotify).not.toHaveBeenCalledWith(expect.stringContaining('skipped'));
   });
 });
 

@@ -7,8 +7,10 @@ import logger from '../../config/logger';
 // Sonra sales_data tablosuna channel='walmart' olarak upsert eder (StockPulse okur).
 //
 // Filtreler:
-//   - iwasku IS NOT NULL  (resolve olmamis SKU'lar aggregation'a girmez)
-//   - quantity > 0        (iade/iptal satirlari item_price=0 olur, dahil edilmez)
+//   - iwasku IS NOT NULL                      (resolve olmamis SKU'lar aggregation'a girmez)
+//   - quantity > 0                            (sifir miktarli satirlar)
+//   - order_status IS DISTINCT FROM 'Cancelled' (iptal siparisler satis sayilmaz; Bol/Takealot/
+//     Kaufland ile ayni semantik. NULL status = sale sayilir, IS DISTINCT FROM ile NULL-guvenli.)
 //
 // ASIN: ayni iwasku icin gozlemlenen en yakin tarihli ASIN'i kullanir (raw_orders'da ASIN kolonu yok,
 // bu yuzden sku alanini ASIN gibi degerlendiririz — Walmart seller cogunlukla ASIN'i SKU olarak giriyor).
@@ -35,6 +37,7 @@ const WALMART_ROLLING_WINDOW_SQL = `
     FROM walmart_raw_orders
     WHERE iwasku IS NOT NULL
       AND quantity > 0
+      AND order_status IS DISTINCT FROM 'Cancelled'
       AND order_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, sku
   )

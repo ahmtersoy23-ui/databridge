@@ -6,6 +6,8 @@ import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
 import { fetchCancellations } from '../wayfair/cancellations';
 import { getActiveAccounts, type WayfairAccount } from '../wayfair/client';
 import { writeWayfairSalesData } from './wayfairSalesDataWriter';
+import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
+import { notify } from '../../utils/notify';
 import logger from '../../config/logger';
 
 const BATCH_SIZE = 500;
@@ -233,6 +235,20 @@ async function aggregateToFbaInventory(account: WayfairAccount): Promise<number>
   `, [account.id]);
 
   if (result.rows.length === 0) return 0;
+
+  // Safety: kismi/bozuk pull mevcut fba_inventory'yi silmesin (invariant #2).
+  // Amazon writer'i (inventoryDataWriter.ts:155) ile ayni guard — Wayfair'de eksikti.
+  const existing = await sharedPool.query(
+    'SELECT COUNT(*)::int as cnt FROM fba_inventory WHERE warehouse = $1',
+    [account.warehouse],
+  );
+  const existingCount = existing.rows[0].cnt;
+  const threshold = getSafetyDropThreshold('WAYFAIR_INVENTORY');
+  if (existingCount > 10 && result.rows.length < existingCount * threshold) {
+    logger.error(`[WayfairSync][${account.label}] SKIPPED fba_inventory write — new ${result.rows.length} vs existing ${existingCount} (threshold ${threshold}, warehouse ${account.warehouse})`);
+    await notify(`⚠️ [WayfairSync] ${account.warehouse} fba_inventory write skipped: ${result.rows.length} rows vs ${existingCount} existing (threshold ${threshold})`);
+    return 0;
+  }
 
   const client = await sharedPool.connect();
   try {
