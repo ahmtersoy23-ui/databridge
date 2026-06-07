@@ -147,6 +147,19 @@ describe('EU_AGGREGATE_SQL — de+fr+it+es+others tek iwasku altinda toplanir (i
     const { rows } = await query(EU_AGGREGATE_SQL);
     expect(rows).toHaveLength(0);
   });
+
+  it('se/nl/pl/be EU agregatina dahil, tr (AB-disi) HARIC', async () => {
+    seed([
+      { sku: 'AHM1', channel: 'se', qty: 2, daysAgo: 1 },
+      { sku: 'AHM1', channel: 'nl', qty: 3, daysAgo: 1 },
+      { sku: 'AHM1', channel: 'pl', qty: 1, daysAgo: 1 },
+      { sku: 'AHM1', channel: 'be', qty: 4, daysAgo: 1 },
+      { sku: 'AHM1', channel: 'tr', qty: 50, daysAgo: 1 }, // AB-disi → haric
+    ]);
+    const { rows } = await query(EU_AGGREGATE_SQL);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].last3).toBe(10); // 2+3+1+4, tr 50 HARIC
+  });
 });
 
 describe('EU_AGGREGATE_FBA_SQL — EU + fulfillment, param index ($1=fulfillment)', () => {

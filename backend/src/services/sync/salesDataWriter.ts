@@ -4,7 +4,11 @@ import { notify } from '../../utils/notify';
 import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 
 const INDIVIDUAL_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'others'];
-const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'others'];
+// 'eu' agregatina giren kanallar. se/nl/pl/be EU pazarlari — standalone sales_data
+// satiri YOK (INDIVIDUAL_CHANNELS'da degiller), sadece 'eu' icinde toplanirlar.
+// 'tr' (Turkiye, AB-disi) bilincli HARIC. 'others' catch-all dahil (EU-ici belirsizler).
+// TEK KAYNAK: /amazonsales route (routes/sales.ts) bunu import eder (drift onlenir).
+export const EU_CHANNELS = ['de', 'fr', 'it', 'es', 'se', 'nl', 'pl', 'be', 'others'];
 
 // 'combined' = NULL fulfillment (eski format, tüm Amazon dahil)
 // 'Amazon'   = FBA (raw_orders.fulfillment_channel='Amazon')
@@ -36,7 +40,7 @@ const SALES_WINDOWS: { name: string; when: string }[] = [
 
 export function buildRollingSql(opts: { filterByFulfillment: boolean; euAggregate: boolean }): string {
   const channelClause = opts.euAggregate
-    ? `o.channel IN ('de', 'fr', 'it', 'es', 'others')`
+    ? `o.channel IN (${EU_CHANNELS.map(c => `'${c}'`).join(', ')})`
     : `o.channel = $1`;
   const fulfillmentClause = opts.filterByFulfillment
     ? `AND o.fulfillment_channel = $${opts.euAggregate ? 1 : 2}`

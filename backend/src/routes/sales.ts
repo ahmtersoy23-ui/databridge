@@ -2,11 +2,14 @@ import { Router, Request, Response } from 'express';
 import { errMessage } from '../utils/errors';
 import { pool } from '../config/database';
 import logger from '../config/logger';
+// EU kanal seti TEK KAYNAK: writer ile ayni tanim (se/nl/pl/be dahil, tr haric,
+// others dahil). Eskiden burada ayri ['de','fr','it','es'] vardi → writer ile
+// uyumsuzdu (ayni SKU icin farkli 'eu' sayisi). Import ile drift onlendi.
+import { EU_CHANNELS } from '../services/sync/salesDataWriter';
 
 const router = Router();
 
 const VALID_CHANNELS = ['us', 'uk', 'de', 'fr', 'it', 'es', 'ca', 'au', 'ae', 'sa', 'eu'];
-const EU_CHANNELS = ['de', 'fr', 'it', 'es'];
 
 const ROLLING_WINDOW_COLUMNS = `
   COALESCE(SUM(CASE WHEN o.purchase_date_local >= CURRENT_DATE - 7 THEN o.quantity END), 0)::numeric as "last7",
