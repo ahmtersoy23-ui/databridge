@@ -119,33 +119,72 @@ const parcelSchema = z.object({
   dimension_unit: z.enum(['in', 'cm']).default('in'),
 });
 
+/** Amazon-dışı (standalone) için ManuMaestro'nun gönderdiği alıcı adresi. */
+const addressSchema = z.object({
+  name: z.string().min(1),
+  company: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+  line1: z.string().min(1),
+  line2: z.string().optional(),
+  town: z.string().min(1),
+  county: z.string().optional(),
+  postcode: z.string().min(1),
+  country_code: z.string().min(2).max(2).default('US'),
+});
+
 const ratesSchema = z.object({
-  amazonOrderNumber: z.string().min(3),
+  /** Amazon yolu: Veeqo'da sipariş no ile aranır (deliver_to + line_items oradan). */
+  amazonOrderNumber: z.string().min(3).optional(),
+  /** Standalone (Amazon-dışı) yol: adres ManuMaestro'dan gelir, Veeqo'da sipariş aranmaz. */
+  toAddress: addressSchema.optional(),
+  /** Standalone customer_reference (genelde sipariş no). */
+  reference: z.string().max(60).optional(),
   parcel: parcelSchema,
   contents: z.string().max(120).optional(),
   /** 'NJ' → Somerset, 'SHOWROOM' → Fairfield ship-from */
   warehouse: z.string().optional(),
   /** false → düz domestic quote (Amazon push YOK); default true (Buy Shipping + auto-push) */
   isAmazonOrder: z.boolean().default(true),
+}).refine((d) => Boolean(d.amazonOrderNumber || d.toAddress), {
+  message: 'amazonOrderNumber veya toAddress gerekli',
 });
 
 router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Response) => {
-  const { amazonOrderNumber, parcel, contents, warehouse, isAmazonOrder } = req.body as {
-    amazonOrderNumber: string; parcel: VeeqoParcel; contents?: string; warehouse?: string; isAmazonOrder: boolean;
+  const { amazonOrderNumber, toAddress, reference, parcel, contents, warehouse, isAmazonOrder } = req.body as {
+    amazonOrderNumber?: string; toAddress?: VeeqoAddress; reference?: string; parcel: VeeqoParcel; contents?: string; warehouse?: string; isAmazonOrder: boolean;
   };
   try {
-    const order = await getOrderByNumber(amazonOrderNumber);
-    if (!order) {
-      return res.status(404).json({ success: false, error: `Veeqo'da sipariş bulunamadı: ${amazonOrderNumber}` });
+    // İki kaynak: (a) standalone → adres body'den, Veeqo lookup YOK, is_amazon_order:false
+    //            (b) Amazon → Veeqo'da sipariş no ile bul (deliver_to + channel_items)
+    let to_address: VeeqoAddress;
+    let channelItems: unknown[] = [];
+    let customerRef: string;
+    let destState: string | null = null;
+
+    if (toAddress) {
+      to_address = toAddress;
+      customerRef = reference || 'standalone';
+      destState = toAddress.county ?? null;
+    } else {
+      const order = await getOrderByNumber(amazonOrderNumber as string);
+      if (!order) {
+        return res.status(404).json({ success: false, error: `Veeqo'da sipariş bulunamadı: ${amazonOrderNumber}` });
+      }
+      to_address = toAddressFromOrder(order);
+      channelItems = channelItemsFromOrder(order);
+      customerRef = amazonOrderNumber as string;
+      destState = ((order.deliver_to as { state?: string } | undefined)?.state) ?? null;
     }
-    const channelItems = channelItemsFromOrder(order);
+
     const result = await getRates({
-      to_address: toAddressFromOrder(order),
+      to_address,
       from_address: getShipFrom(warehouse),
       parcels: [parcel],
-      customer_reference: amazonOrderNumber,
+      customer_reference: customerRef,
       contents: contents || 'Metal Wall Art',
-      ...(isAmazonOrder && channelItems.length ? { is_amazon_order: true, channel_items: channelItems } : {}),
+      // Amazon push (Buy Shipping) yalnız Amazon yolunda + channel_items varsa; standalone'da KAPALI
+      ...(!toAddress && isAmazonOrder && channelItems.length ? { is_amazon_order: true, channel_items: channelItems } : {}),
     });
     // UI'a sade quote listesi (ucuzdan pahalıya) + her quote için booking'de
     // gönderilmesi gereken value-added-service'leri (zorunlu confirmation vb.) önceden çöz.
@@ -167,7 +206,7 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
       requestToken: result.request_token,
       expiresAt: result.expires_at,
       quotes,
-      destState: ((order.deliver_to as { state?: string } | undefined)?.state) ?? null, // kıyas için (FedEx Izmir eyalet bazlı)
+      destState, // kıyas için (FedEx Izmir eyalet bazlı) — standalone'da toAddress.county, Amazon'da order.deliver_to.state
     });
   } catch (err: unknown) {
     await auditLog('veeqo-routing-rates', 'failed', 0, errMessage(err));
