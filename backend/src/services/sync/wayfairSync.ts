@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchWayfairInventory } from '../wayfair/inventory';
 import { fetchWayfairPurchaseOrders } from '../wayfair/purchaseOrders';
 import { fetchDropshipOrders } from '../wayfair/dropshipOrders';
@@ -178,8 +179,8 @@ async function syncOrders(account: WayfairAccount, mappings: Map<string, string>
 
     // Cross-check cancellations via dedicated cancellation API (more reliable than isCancelled field)
     await syncCancellations(account);
-  } catch (err: any) {
-    logger.warn(`[WayfairSync][${account.label}] Order sync failed (non-fatal): ${err.message}`);
+  } catch (err: unknown) {
+    logger.warn(`[WayfairSync][${account.label}] Order sync failed (non-fatal): ${errMessage(err)}`);
   }
 
   return totalUpserted;
@@ -213,8 +214,8 @@ async function syncCancellations(account: WayfairAccount): Promise<void> {
     if (updated > 0) {
       logger.info(`[WayfairSync][${account.label}] Cancellation cross-check: ${updated} orders marked cancelled`);
     }
-  } catch (err: any) {
-    logger.warn(`[WayfairSync][${account.label}] Cancellation cross-check failed (non-fatal): ${err.message}`);
+  } catch (err: unknown) {
+    logger.warn(`[WayfairSync][${account.label}] Cancellation cross-check failed (non-fatal): ${errMessage(err)}`);
   }
 }
 
@@ -301,8 +302,8 @@ export async function syncWayfairAccount(account: WayfairAccount): Promise<numbe
         const aggregated = await aggregateToFbaInventory(account);
         logger.info(`[WayfairSync][${account.label}] Aggregated ${aggregated} rows to fba_inventory (${account.warehouse})`);
       }
-    } catch (err: any) {
-      logger.warn(`[WayfairSync][${account.label}] Inventory sync skipped: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(`[WayfairSync][${account.label}] Inventory sync skipped: ${errMessage(err)}`);
     }
 
     // 2. Orders (CG + Dropship)
@@ -315,9 +316,9 @@ export async function syncWayfairAccount(account: WayfairAccount): Promise<numbe
     await updateSyncJob(jobId, 'completed', inventoryCount + orderLines);
     logger.info(`[WayfairSync][${account.label}] Completed: ${inventoryCount} inv + ${orderLines} orders`);
     return inventoryCount;
-  } catch (err: any) {
-    logger.error(`[WayfairSync][${account.label}] Failed: ${err.message}`);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error(`[WayfairSync][${account.label}] Failed: ${errMessage(err)}`);
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }
@@ -333,8 +334,8 @@ export async function syncWayfair(): Promise<void> {
   for (const account of accounts) {
     try {
       await syncWayfairAccount(account);
-    } catch (err: any) {
-      logger.error(`[WayfairSync] Account '${account.label}' failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[WayfairSync] Account '${account.label}' failed: ${errMessage(err)}`);
       // Continue to next account
     }
   }

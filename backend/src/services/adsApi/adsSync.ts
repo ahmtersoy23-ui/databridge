@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { getAdsClient, getActiveProfiles } from './client';
 import { fetchAdsReport } from './reports';
@@ -113,10 +114,10 @@ export async function syncAdsForProfile(
       total += count;
 
       logger.info(`[AdsSync] ${reportType}: ${count} rows for profile ${profileId}`);
-    } catch (err: any) {
-      await failSyncJob(jobId, err.message);
-      errors.push(`${reportType}: ${err.message}`);
-      logger.error(`[AdsSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
+    } catch (err: unknown) {
+      await failSyncJob(jobId, errMessage(err));
+      errors.push(`${reportType}: ${errMessage(err)}`);
+      logger.error(`[AdsSync] ${reportType} failed for profile ${profileId}: ${errMessage(err)}`);
     }
 
     // Small delay between report types to respect rate limits
@@ -154,8 +155,8 @@ export async function syncAllAdsProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, d
       } else {
         logger.info(`[AdsSync] Profile ${profile.profile_id} (${profile.country_code}): ${total} rows synced`);
       }
-    } catch (err: any) {
-      logger.error(`[AdsSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[AdsSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${errMessage(err)}`);
     }
 
     // Delay between profiles
@@ -195,10 +196,10 @@ export async function syncSbForProfile(
       total += count;
 
       logger.info(`[SbSync] ${reportType}: ${count} rows for profile ${profileId}`);
-    } catch (err: any) {
-      await failSyncJob(jobId, err.message);
-      errors.push(`${reportType}: ${err.message}`);
-      logger.error(`[SbSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
+    } catch (err: unknown) {
+      await failSyncJob(jobId, errMessage(err));
+      errors.push(`${reportType}: ${errMessage(err)}`);
+      logger.error(`[SbSync] ${reportType} failed for profile ${profileId}: ${errMessage(err)}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 30_000));
@@ -235,8 +236,8 @@ export async function syncAllSbProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, da
       } else {
         logger.info(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}): ${total} rows synced`);
       }
-    } catch (err: any) {
-      logger.error(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[SbSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${errMessage(err)}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 5_000));
@@ -275,10 +276,10 @@ export async function syncSdForProfile(
       total += count;
 
       logger.info(`[SdSync] ${reportType}: ${count} rows for profile ${profileId}`);
-    } catch (err: any) {
-      await failSyncJob(jobId, err.message);
-      errors.push(`${reportType}: ${err.message}`);
-      logger.error(`[SdSync] ${reportType} failed for profile ${profileId}: ${err.message}`);
+    } catch (err: unknown) {
+      await failSyncJob(jobId, errMessage(err));
+      errors.push(`${reportType}: ${errMessage(err)}`);
+      logger.error(`[SdSync] ${reportType} failed for profile ${profileId}: ${errMessage(err)}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 30_000));
@@ -315,8 +316,8 @@ export async function syncAllSdProfiles(lookbackDays = DEFAULT_LOOKBACK_DAYS, da
       } else {
         logger.info(`[SdSync] Profile ${profile.profile_id} (${profile.country_code}): ${total} rows synced`);
       }
-    } catch (err: any) {
-      logger.error(`[SdSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[SdSync] Profile ${profile.profile_id} (${profile.country_code}) failed: ${errMessage(err)}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 5_000));

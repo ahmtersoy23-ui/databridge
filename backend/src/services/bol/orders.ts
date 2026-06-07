@@ -1,4 +1,5 @@
 import logger from '../../config/logger';
+import { errMessage } from '../../utils/errors';
 import { bolGet, type BolAccount } from './client';
 
 // -- /orders response types ------------------------------------------------
@@ -235,10 +236,10 @@ export async function fetchShipments(
       if (fetched % 50 === 0) {
         logger.info(`[Bol] '${account.label}' detail progress: ${fetched}/${shipmentIds.length}`);
       }
-    } catch (err: any) {
-      logger.warn(`[Bol] '${account.label}' detail ${id} failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(`[Bol] '${account.label}' detail ${id} failed: ${errMessage(err)}`);
       // On 429, wait extra
-      if (err.message?.includes('429') || err.message?.includes('rate limit')) {
+      if (errMessage(err)?.includes('429') || errMessage(err)?.includes('rate limit')) {
         logger.info(`[Bol] '${account.label}' 429 backoff: 5s`);
         await new Promise(r => setTimeout(r, 5000));
       }

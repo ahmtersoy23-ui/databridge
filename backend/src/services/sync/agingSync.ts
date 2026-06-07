@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchAndWriteAgingReport } from '../spApi/agingReport';
 import { withRetry } from '../../utils/retry';
 import logger from '../../config/logger';
@@ -38,8 +39,8 @@ export async function runAgingSync(): Promise<void> {
       logger.info(`[AgingSync] Fetching aging for ${key} (${mp.country_code}, warehouse: ${mp.warehouse})`);
       const count = await withRetry(() => fetchAndWriteAgingReport(mp), { label: `aging:${key}` });
       totalRows += count;
-    } catch (err: any) {
-      logger.error(`[AgingSync] Failed for ${key} (${mp.country_code}):`, err.message);
+    } catch (err: unknown) {
+      logger.error(`[AgingSync] Failed for ${key} (${mp.country_code}):`, errMessage(err));
     }
     // Rate limit between credential calls
     await new Promise(resolve => setTimeout(resolve, 5000));

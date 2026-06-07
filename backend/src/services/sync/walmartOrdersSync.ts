@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type WalmartAccount } from '../walmart/client';
@@ -202,9 +203,9 @@ export async function syncWalmartOrders(days?: number): Promise<number> {
   for (const account of accounts) {
     try {
       total += await syncWalmartOrdersForAccount(account, days);
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error(
-        `[Walmart] '${account.label}' sync failed: ${err.message}`
+        `[Walmart] '${account.label}' sync failed: ${errMessage(err)}`
       );
       // Continue with other accounts
     }
@@ -213,8 +214,8 @@ export async function syncWalmartOrders(days?: number): Promise<number> {
   // Aggregate raw_orders -> sales_data (channel='walmart') for StockPulse consumption
   try {
     await writeWalmartSalesData();
-  } catch (err: any) {
-    logger.error(`[Walmart] writeWalmartSalesData failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[Walmart] writeWalmartSalesData failed: ${errMessage(err)}`);
   }
 
   return total;

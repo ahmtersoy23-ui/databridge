@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { errMessage } from '../../utils/errors';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { downloadOrdersExcel } from '../wisersell/webClient';
@@ -303,8 +304,8 @@ export async function syncWisersellOrders(opts: OrderSyncOptions = {}): Promise<
         if (row.inserted) result.inserted++;
         else result.updated++;
       }
-    } catch (err: any) {
-      logger.error(`[WisersellOrderSync] batch ${i}/${parsed.length} hata: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[WisersellOrderSync] batch ${i}/${parsed.length} hata: ${errMessage(err)}`);
       result.errors += slice.length;
     }
   }

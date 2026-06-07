@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { trackBatch, TRACK_BATCH_LIMIT, type FedexTrackResult } from '../fedex/client';
 import { parseTrackResult, type ParsedShipment } from '../fedex/parser';
 import logger from '../../config/logger';
@@ -178,8 +179,8 @@ export async function syncFedexTrackings(trackingNumbers: string[]): Promise<Fed
     let results: FedexTrackResult[];
     try {
       results = await trackBatch(batch);
-    } catch (err: any) {
-      logger.error(`[FedexSync] Batch ${batchIdx}/${totalBatches} başarısız: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[FedexSync] Batch ${batchIdx}/${totalBatches} başarısız: ${errMessage(err)}`);
       result.errors += batch.length;
       await sleep(INTER_BATCH_DELAY_MS * 5);
       continue;
@@ -198,8 +199,8 @@ export async function syncFedexTrackings(trackingNumbers: string[]): Promise<Fed
         result.fetched++;
         if (parsed.not_found) result.notFound++;
         else if (parsed.latest_status_code === 'DL') result.delivered++;
-      } catch (err: any) {
-        logger.error(`[FedexSync] ${r.trackingNumber} upsert hatası: ${err.message}`);
+      } catch (err: unknown) {
+        logger.error(`[FedexSync] ${r.trackingNumber} upsert hatası: ${errMessage(err)}`);
         result.errors++;
       }
     }

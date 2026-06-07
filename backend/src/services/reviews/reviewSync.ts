@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchReviewsPage, randomDelay, shuffle, ParsedReview } from './reviewFetcher';
 import logger from '../../config/logger';
 
@@ -115,9 +116,9 @@ export async function runReviewTracking(): Promise<void> {
 
     await updateSyncJob(jobId, 'completed', processed);
     logger.info(`[ReviewSync] Completed. Processed ${processed}/${tracked.length} ASINs`);
-  } catch (err: any) {
-    logger.error('[ReviewSync] Fatal error:', err.message);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error('[ReviewSync] Fatal error:', errMessage(err));
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }

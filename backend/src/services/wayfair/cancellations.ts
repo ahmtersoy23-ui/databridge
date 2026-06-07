@@ -1,4 +1,5 @@
 import { graphqlQuery, getApiBase, type WayfairAccount } from './client';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 
 export interface CancellationRecord {
@@ -62,8 +63,8 @@ export async function fetchCancellations(
           cancelledKeys.add(`${rec.purchaseOrder.poNumber}|${rec.cancelledProduct.partNumber}`);
         }
       }
-    } catch (err: any) {
-      logger.warn(`[Wayfair Cancel][${account.label}] Cancellation check failed (non-fatal): ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(`[Wayfair Cancel][${account.label}] Cancellation check failed (non-fatal): ${errMessage(err)}`);
       break;
     }
   }

@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchFbaInventory } from '../spApi/inventory';
 import { mapBulkSkusToIwasku } from '../skuMapper';
 import logger from '../../config/logger';
@@ -32,9 +33,9 @@ export async function syncInventoryForMarketplace(marketplace: MarketplaceConfig
     await updateSyncJob(jobId, 'completed', items.length);
     logger.info(`[Sync] Inventory sync completed for ${marketplace.country_code}: ${items.length} items`);
     return items.length;
-  } catch (err: any) {
-    logger.error(`[Sync] Inventory sync failed for ${marketplace.country_code}:`, err.message);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error(`[Sync] Inventory sync failed for ${marketplace.country_code}:`, errMessage(err));
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }

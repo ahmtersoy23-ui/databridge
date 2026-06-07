@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchBusinessReport } from '../spApi/businessReport';
 import { withRetry } from '../../utils/retry';
 import logger from '../../config/logger';
@@ -55,8 +56,8 @@ export async function runBusinessReportSync(): Promise<number> {
         { label: `business-report:${mp.country_code}` },
       );
       totalRows += count;
-    } catch (err: any) {
-      logger.error(`[BusinessReportSync] Failed for ${mp.country_code}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[BusinessReportSync] Failed for ${mp.country_code}: ${errMessage(err)}`);
     }
     // Rate limit between marketplace calls
     await new Promise(resolve => setTimeout(resolve, 5_000));

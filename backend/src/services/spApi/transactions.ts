@@ -1,4 +1,5 @@
 import https from 'https';
+import { errMessage } from '../../utils/errors';
 import { getSpApiClient, getSpApiClientByRegion } from './client';
 import {
   detectMarketplaceCode,
@@ -111,8 +112,8 @@ export async function fetchSettlementTransactions(
       allTransactions.push(...transactions);
 
       logger.info(`[SP-API] Settlement ${settlementId}: ${transactions.length} supplementary transactions`);
-    } catch (err: any) {
-      logger.error(`[SP-API] Failed to process settlement ${settlementId}:`, err.message);
+    } catch (err: unknown) {
+      logger.error(`[SP-API] Failed to process settlement ${settlementId}:`, errMessage(err));
     }
 
     // Rate limit

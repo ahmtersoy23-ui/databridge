@@ -1,4 +1,5 @@
 import { graphqlQuery, getSupplierId, type WayfairAccount } from './client';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 
 export interface WayfairInventoryItem {
@@ -82,8 +83,8 @@ export async function fetchWayfairInventory(account: WayfairAccount): Promise<Wa
         first: 100,
         cursor: cursor ?? undefined,
       });
-    } catch (err: any) {
-      const msg: string = err.message || '';
+    } catch (err: unknown) {
+      const msg: string = errMessage(err) || '';
       if (
         msg.includes('wrongly returned a null value') ||
         msg.includes('Internal Server Error')

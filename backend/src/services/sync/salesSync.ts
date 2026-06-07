@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchOrdersByDateRange } from '../spApi/orders';
 import { mapBulkSkusToIwasku } from '../skuMapper';
 import logger from '../../config/logger';
@@ -40,9 +41,9 @@ export async function syncSalesForMarketplace(
     await updateSyncJob(jobId, 'completed', orders.length);
     logger.info(`[Sync] Sales sync completed for ${marketplace.country_code}: ${orders.length} orders`);
     return orders.length;
-  } catch (err: any) {
-    logger.error(`[Sync] Sales sync failed for ${marketplace.country_code}:`, err.message);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error(`[Sync] Sales sync failed for ${marketplace.country_code}:`, errMessage(err));
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }
@@ -82,8 +83,8 @@ export async function backfillSales(marketplace: MarketplaceConfig, months: numb
 
       // Wait between months to respect rate limits
       if (m > 0) await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (err: any) {
-      logger.error(`[Sync] Backfill month ${months - m}/${months} failed for ${marketplace.country_code}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Sync] Backfill month ${months - m}/${months} failed for ${marketplace.country_code}: ${errMessage(err)}`);
       // Continue with next month
     }
   }

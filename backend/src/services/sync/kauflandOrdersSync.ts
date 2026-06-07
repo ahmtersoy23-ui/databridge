@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type KauflandAccount } from '../kaufland/client';
@@ -261,16 +262,16 @@ export async function syncKaufland(days?: number): Promise<number> {
   for (const account of accounts) {
     try {
       total += await syncKauflandForAccount(account, days);
-    } catch (err: any) {
-      logger.error(`[Kaufland] '${account.label}' sync failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Kaufland] '${account.label}' sync failed: ${errMessage(err)}`);
     }
   }
 
   // Aggregate raw_orders -> sales_data per channel
   try {
     await writeKauflandSalesData();
-  } catch (err: any) {
-    logger.error(`[Kaufland] writeKauflandSalesData failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[Kaufland] writeKauflandSalesData failed: ${errMessage(err)}`);
   }
 
   return total;

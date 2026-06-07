@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type TakealotAccount } from '../takealot/client';
@@ -228,16 +229,16 @@ export async function syncTakealot(days?: number): Promise<number> {
   for (const account of accounts) {
     try {
       total += await syncTakealotForAccount(account, days);
-    } catch (err: any) {
-      logger.error(`[Takealot] '${account.label}' sync failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Takealot] '${account.label}' sync failed: ${errMessage(err)}`);
     }
   }
 
   // Aggregate raw_orders -> sales_data (channel='takealot')
   try {
     await writeTakealotSalesData();
-  } catch (err: any) {
-    logger.error(`[Takealot] writeTakealotSalesData failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[Takealot] writeTakealotSalesData failed: ${errMessage(err)}`);
   }
 
   return total;

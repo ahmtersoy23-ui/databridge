@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchBrandAnalyticsSqp } from '../spApi/brandAnalyticsSqp';
 import { withRetry } from '../../utils/retry';
 import logger from '../../config/logger';
@@ -48,8 +49,8 @@ export async function runBrandAnalyticsSync(): Promise<number> {
         { label: `brand-analytics:${mp.country_code}` },
       );
       totalRows += count;
-    } catch (err: any) {
-      logger.error(`[BrandAnalyticsSync] Failed for ${mp.country_code}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[BrandAnalyticsSync] Failed for ${mp.country_code}: ${errMessage(err)}`);
     }
     await new Promise(resolve => setTimeout(resolve, 5_000));
   }

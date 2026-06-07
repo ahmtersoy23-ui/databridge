@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { getAdsClient, getActiveProfiles } from './client';
 import { withRetry } from '../../utils/retry';
 import logger from '../../config/logger';
@@ -165,8 +166,8 @@ export async function syncAllCampaignSnapshots(): Promise<void> {
         { label: `campaign-snapshot:${profile.profile_id}`, maxRetries: 2 },
       );
       logger.info(`[CampaignSnapshot] Profile ${profile.profile_id} (${profile.country_code}): ${campaigns} campaigns, ${productAds} product ads`);
-    } catch (err: any) {
-      logger.error(`[CampaignSnapshot] Profile ${profile.profile_id} (${profile.country_code}) failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[CampaignSnapshot] Profile ${profile.profile_id} (${profile.country_code}) failed: ${errMessage(err)}`);
     }
 
     await new Promise(resolve => setTimeout(resolve, 3_000));

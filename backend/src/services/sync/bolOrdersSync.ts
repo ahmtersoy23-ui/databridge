@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getActiveAccounts, type BolAccount } from '../bol/client';
@@ -202,8 +203,8 @@ export async function syncBolOrders(
   for (const account of accounts) {
     try {
       total += await syncBolOrdersForAccount(account, days, mode);
-    } catch (err: any) {
-      logger.error(`[Bol] '${account.label}' sync failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Bol] '${account.label}' sync failed: ${errMessage(err)}`);
     }
   }
 
@@ -211,8 +212,8 @@ export async function syncBolOrders(
   for (const account of accounts) {
     try {
       await writeBolSalesData(account);
-    } catch (err: any) {
-      logger.error(`[Bol] writeBolSalesData '${account.label}' failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Bol] writeBolSalesData '${account.label}' failed: ${errMessage(err)}`);
     }
   }
 

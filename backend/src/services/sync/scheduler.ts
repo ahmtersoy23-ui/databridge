@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { errMessage } from '../../utils/errors';
 import { pool } from '../../config/database';
 import { syncInventoryForMarketplace } from './inventorySync';
 import { syncSalesForMarketplace } from './salesSync';
@@ -117,8 +118,8 @@ async function runInventorySync(): Promise<void> {
       try {
         logger.info(`[Scheduler] Inventory sync ${key}: ${channels} (via ${representative.country_code})`);
         await withRetry(() => syncInventoryForMarketplace(representative), { label: `inventory:${key}` });
-      } catch (err: any) {
-        logger.error(`[Scheduler] Inventory sync failed for ${key} (${representative.country_code}):`, err.message);
+      } catch (err: unknown) {
+        logger.error(`[Scheduler] Inventory sync failed for ${key} (${representative.country_code}):`, errMessage(err));
       }
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
@@ -126,8 +127,8 @@ async function runInventorySync(): Promise<void> {
     // Refresh aggregated fba_inventory in pricelab_db after all warehouse syncs
     try {
       await writeInventoryData();
-    } catch (err: any) {
-      logger.error('[Scheduler] writeInventoryData error:', err.message);
+    } catch (err: unknown) {
+      logger.error('[Scheduler] writeInventoryData error:', errMessage(err));
     }
   } finally {
     isSyncing = false;
@@ -161,8 +162,8 @@ async function runSalesSync(): Promise<void> {
       try {
         logger.info(`[Scheduler] Syncing credential ${credId}: ${channels} (via ${representative.country_code})`);
         await withRetry(() => syncSalesForMarketplace(representative), { label: `sales:cred${credId}` });
-      } catch (err: any) {
-        logger.error(`[Scheduler] Sales sync failed for credential ${credId} (${representative.country_code}):`, err.message);
+      } catch (err: unknown) {
+        logger.error(`[Scheduler] Sales sync failed for credential ${credId} (${representative.country_code}):`, errMessage(err));
       }
       await new Promise(resolve => setTimeout(resolve, 5000));
     }
@@ -170,8 +171,8 @@ async function runSalesSync(): Promise<void> {
     // Refresh aggregated sales_data in pricelab_db after all marketplace syncs
     try {
       await writeSalesData();
-    } catch (err: any) {
-      logger.error('[Scheduler] writeSalesData error:', err.message);
+    } catch (err: unknown) {
+      logger.error('[Scheduler] writeSalesData error:', errMessage(err));
     }
   } finally {
     isSyncing = false;
@@ -187,8 +188,8 @@ async function runWisersellSync(): Promise<void> {
   isWisersellSyncing = true;
   try {
     await withRetry(() => syncWisersell(), { label: 'wisersell' });
-  } catch (err: any) {
-    logger.error('[Scheduler] Wisersell sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wisersell sync failed:', errMessage(err));
   } finally {
     isWisersellSyncing = false;
   }
@@ -220,8 +221,8 @@ async function runTransactionSync(): Promise<void> {
       try {
         logger.info(`[Scheduler] Transaction sync credential ${credId}: ${channels} (via ${representative.country_code})`);
         await withRetry(() => syncTransactionsForMarketplace(representative), { label: `transactions:cred${credId}` });
-      } catch (err: any) {
-        logger.error(`[Scheduler] Transaction sync failed for credential ${credId} (${representative.country_code}):`, err.message);
+      } catch (err: unknown) {
+        logger.error(`[Scheduler] Transaction sync failed for credential ${credId} (${representative.country_code}):`, errMessage(err));
       }
       await new Promise(resolve => setTimeout(resolve, 10_000));
     }
@@ -244,8 +245,8 @@ async function runWayfairSync(): Promise<void> {
   isWayfairSyncing = true;
   try {
     await withRetry(() => syncWayfair(), { label: 'wayfair' });
-  } catch (err: any) {
-    logger.error('[Scheduler] Wayfair sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wayfair sync failed:', errMessage(err));
   } finally {
     isWayfairSyncing = false;
   }
@@ -260,8 +261,8 @@ async function runReviewSync(): Promise<void> {
   isReviewSyncing = true;
   try {
     await runReviewTracking();
-  } catch (err: any) {
-    logger.error('[Scheduler] Review sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Review sync failed:', errMessage(err));
   } finally {
     isReviewSyncing = false;
   }
@@ -277,8 +278,8 @@ async function runAdsSync(lookbackDays?: number, dateRange?: { startDate: string
   try {
     await syncAllAdsProfiles(lookbackDays, dateRange);
     await runPostSyncChecksAndAlert(undefined, 'sp');
-  } catch (err: any) {
-    logger.error('[Scheduler] Ads sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Ads sync failed:', errMessage(err));
   } finally {
     isAdsSyncing = false;
   }
@@ -293,8 +294,8 @@ async function runAgingSyncJob(): Promise<void> {
   isAgingSyncing = true;
   try {
     await runAgingSync();
-  } catch (err: any) {
-    logger.error('[Scheduler] Aging sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Aging sync failed:', errMessage(err));
   } finally {
     isAgingSyncing = false;
   }
@@ -309,8 +310,8 @@ async function runSkuMasterDiffJob(): Promise<void> {
   isSkuMasterDiffRunning = true;
   try {
     await runSkuMasterDiff();
-  } catch (err: any) {
-    logger.error('[Scheduler] SKU master diff failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] SKU master diff failed:', errMessage(err));
   } finally {
     isSkuMasterDiffRunning = false;
   }
@@ -324,8 +325,8 @@ async function runBusinessReportSyncJob(): Promise<number | void> {
   isBusinessReportSyncing = true;
   try {
     return await runBusinessReportSync();
-  } catch (err: any) {
-    logger.error('[Scheduler] Business report sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Business report sync failed:', errMessage(err));
   } finally {
     isBusinessReportSyncing = false;
   }
@@ -339,8 +340,8 @@ async function runCampaignSnapshotJob(): Promise<void> {
   isCampaignSnapshotSyncing = true;
   try {
     await syncAllCampaignSnapshots();
-  } catch (err: any) {
-    logger.error('[Scheduler] Campaign snapshot failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Campaign snapshot failed:', errMessage(err));
   } finally {
     isCampaignSnapshotSyncing = false;
   }
@@ -354,8 +355,8 @@ async function runBrandAnalyticsSyncJob(): Promise<number | void> {
   isBrandAnalyticsSyncing = true;
   try {
     return await runBrandAnalyticsSync();
-  } catch (err: any) {
-    logger.error('[Scheduler] Brand analytics sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Brand analytics sync failed:', errMessage(err));
   } finally {
     isBrandAnalyticsSyncing = false;
   }
@@ -383,8 +384,8 @@ async function runSbAdsSync(lookbackDays?: number, dateRange?: { startDate: stri
   try {
     await syncAllSbProfiles(lookbackDays, dateRange);
     await runPostSyncChecksAndAlert(undefined, 'sb');
-  } catch (err: any) {
-    logger.error('[Scheduler] SB Ads sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] SB Ads sync failed:', errMessage(err));
   } finally {
     isSbAdsSyncing = false;
   }
@@ -399,8 +400,8 @@ async function runSdAdsSync(lookbackDays?: number, dateRange?: { startDate: stri
   try {
     await syncAllSdProfiles(lookbackDays, dateRange);
     await runPostSyncChecksAndAlert(undefined, 'sd');
-  } catch (err: any) {
-    logger.error('[Scheduler] SD Ads sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] SD Ads sync failed:', errMessage(err));
   } finally {
     isSdAdsSyncing = false;
   }
@@ -414,8 +415,8 @@ async function runFedexSync(): Promise<number> {
   isFedexSyncing = true;
   try {
     return await syncFedex();
-  } catch (err: any) {
-    logger.error('[Scheduler] FedEx Track sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] FedEx Track sync failed:', errMessage(err));
     return 0;
   } finally {
     isFedexSyncing = false;
@@ -431,8 +432,8 @@ async function runWisersellShipmentSync(): Promise<number> {
   try {
     const summary = await syncWisersellShipments();
     return summary.inserted + summary.updated;
-  } catch (err: any) {
-    logger.error('[Scheduler] Wisersell shipment sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wisersell shipment sync failed:', errMessage(err));
     return 0;
   } finally {
     isWisersellShipmentSyncing = false;
@@ -455,8 +456,8 @@ async function runWisersellOrdersSync(): Promise<number> {
       mode: 'window_replace',
     });
     return summary.inserted + summary.updated;
-  } catch (err: any) {
-    logger.error('[Scheduler] Wisersell orders sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wisersell orders sync failed:', errMessage(err));
     return 0;
   } finally {
     isWisersellOrdersSyncing = false;
@@ -473,8 +474,8 @@ async function runWalmartOrdersSync(): Promise<number> {
   isWalmartOrdersSyncing = true;
   try {
     return await syncWalmartOrders();
-  } catch (err: any) {
-    logger.error('[Scheduler] Walmart orders sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Walmart orders sync failed:', errMessage(err));
     return 0;
   } finally {
     isWalmartOrdersSyncing = false;
@@ -491,8 +492,8 @@ async function runBolOrdersSync(): Promise<number> {
   isBolOrdersSyncing = true;
   try {
     return await syncBolOrders();
-  } catch (err: any) {
-    logger.error('[Scheduler] Bol orders sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Bol orders sync failed:', errMessage(err));
     return 0;
   } finally {
     isBolOrdersSyncing = false;
@@ -509,8 +510,8 @@ async function runTakealotSync(): Promise<number> {
   isTakealotSyncing = true;
   try {
     return await syncTakealot();
-  } catch (err: any) {
-    logger.error('[Scheduler] Takealot sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Takealot sync failed:', errMessage(err));
     return 0;
   } finally {
     isTakealotSyncing = false;
@@ -527,8 +528,8 @@ async function runKauflandSync(): Promise<number> {
   isKauflandSyncing = true;
   try {
     return await syncKaufland();
-  } catch (err: any) {
-    logger.error('[Scheduler] Kaufland sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Kaufland sync failed:', errMessage(err));
     return 0;
   } finally {
     isKauflandSyncing = false;
@@ -545,8 +546,8 @@ async function runChannelPricesSyncJob(): Promise<number> {
   isChannelPricesSyncing = true;
   try {
     return await runChannelPricesSync();
-  } catch (err: any) {
-    logger.error('[Scheduler] Channel-prices sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Channel-prices sync failed:', errMessage(err));
     return 0;
   } finally {
     isChannelPricesSyncing = false;
@@ -563,8 +564,8 @@ async function runWisersellRoutingPollJob(): Promise<number> {
   isWisersellRoutingPolling = true;
   try {
     return await runWisersellRoutingPoll();
-  } catch (err: any) {
-    logger.error('[Scheduler] Wisersell routing poll failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wisersell routing poll failed:', errMessage(err));
     return 0;
   } finally {
     isWisersellRoutingPolling = false;
@@ -589,8 +590,8 @@ async function runWisersellPendingSync(): Promise<number> {
       `retention-purged=${result.old_snapshots_removed}`,
     );
     return total;
-  } catch (err: any) {
-    logger.error('[Scheduler] Wisersell pending sync failed:', err.message);
+  } catch (err: unknown) {
+    logger.error('[Scheduler] Wisersell pending sync failed:', errMessage(err));
     return 0;
   } finally {
     isWisersellPendingSyncing = false;

@@ -1,4 +1,5 @@
 import { graphqlQuery, getDropshipApiBase, type WayfairAccount } from './client';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 
 export interface WayfairDropshipProduct {
@@ -73,8 +74,8 @@ export async function fetchDropshipOrders(
         },
         endpoint
       );
-    } catch (err: any) {
-      logger.info(`[Wayfair DS][${account.label}] ${err.message || ''}`);
+    } catch (err: unknown) {
+      logger.info(`[Wayfair DS][${account.label}] ${errMessage(err) || ''}`);
       break;
     }
 

@@ -1,4 +1,5 @@
 import logger from '../../config/logger';
+import { errMessage } from '../../utils/errors';
 import { kauflandRequest, storefrontCode, type KauflandAccount } from './client';
 
 // -- Response types (subset of Kaufland /v2/orders) ------------------------
@@ -172,9 +173,9 @@ export async function fetchOrdersWithUnits(
         { skipCircuitBreaker: true }
       );
       if (resp.data) allRows.push(...parseDetail(resp.data));
-    } catch (err: any) {
+    } catch (err: unknown) {
       detailFails++;
-      const msg = err.message ?? '';
+      const msg = errMessage(err) ?? '';
       if (/429/.test(msg)) {
         logger.warn(`[Kaufland] 429 on '${id}', sleeping 5s`);
         await new Promise(r => setTimeout(r, 5000));

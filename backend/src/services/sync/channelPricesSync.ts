@@ -1,4 +1,5 @@
 import { pool, sharedPool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
@@ -206,8 +207,8 @@ export async function syncWalmartListingPrices(): Promise<number> {
           extra: { wpid: it.wpid, gtin: it.gtin },
         });
       }
-    } catch (err: any) {
-      logger.error(`[ChannelPrices] Walmart '${account.label}' items fetch failed: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[ChannelPrices] Walmart '${account.label}' items fetch failed: ${errMessage(err)}`);
       allComplete = false;
     }
   }
@@ -225,13 +226,13 @@ export async function runChannelPricesSync(): Promise<number> {
   let total = 0;
   try {
     total += await syncAmazonListingPrices();
-  } catch (err: any) {
-    logger.error(`[ChannelPrices] Amazon listing sync failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[ChannelPrices] Amazon listing sync failed: ${errMessage(err)}`);
   }
   try {
     total += await syncWalmartListingPrices();
-  } catch (err: any) {
-    logger.error(`[ChannelPrices] Walmart listing sync failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`[ChannelPrices] Walmart listing sync failed: ${errMessage(err)}`);
   }
   return total;
 }

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { errMessage } from '../../utils/errors';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { decryptCredential } from '../../utils/crypto';
@@ -156,9 +157,9 @@ export async function listProfiles(credentialId: number): Promise<AdsProfileResp
     const res = await client.get('/v2/profiles');
     recordSuccess();
     return res.data;
-  } catch (err: any) {
+  } catch (err: unknown) {
     recordFailure();
-    throw new Error(`Failed to list Ads profiles for credential ${credentialId}: ${err.message}`);
+    throw new Error(`Failed to list Ads profiles for credential ${credentialId}: ${errMessage(err)}`);
   }
 }
 

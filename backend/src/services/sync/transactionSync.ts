@@ -1,4 +1,5 @@
 import { pool } from '../../config/database';
+import { errMessage } from '../../utils/errors';
 import { fetchSettlementTransactions } from '../spApi/transactions';
 import { fetchTransactionsV2024 } from '../spApi/transactionsV2';
 import logger from '../../config/logger';
@@ -29,8 +30,8 @@ export async function syncTransactionsForMarketplace(
     let settlementTransactions: FinancialTransaction[] = [];
     try {
       settlementTransactions = await fetchSettlementTransactions(marketplace, startDate);
-    } catch (err: any) {
-      logger.warn(`[Sync] Settlement report fetch failed for ${marketplace.country_code}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.warn(`[Sync] Settlement report fetch failed for ${marketplace.country_code}: ${errMessage(err)}`);
     }
 
     const allTransactions = [...financesTransactions, ...settlementTransactions];
@@ -44,9 +45,9 @@ export async function syncTransactionsForMarketplace(
     await updateSyncJob(jobId, 'completed', allTransactions.length);
     logger.info(`[Sync] Transaction sync completed for ${marketplace.country_code}: ${financesTransactions.length} finances + ${settlementTransactions.length} settlement = ${allTransactions.length} total`);
     return allTransactions.length;
-  } catch (err: any) {
-    logger.error(`[Sync] Transaction sync failed for ${marketplace.country_code}:`, err.message);
-    await updateSyncJob(jobId, 'failed', 0, err.message);
+  } catch (err: unknown) {
+    logger.error(`[Sync] Transaction sync failed for ${marketplace.country_code}:`, errMessage(err));
+    await updateSyncJob(jobId, 'failed', 0, errMessage(err));
     throw err;
   }
 }
@@ -79,8 +80,8 @@ export async function backfillTransactions(marketplace: MarketplaceConfig, month
 
       // Wait between months to respect rate limits
       if (m > 0) await new Promise(resolve => setTimeout(resolve, 5000));
-    } catch (err: any) {
-      logger.error(`[Sync] Transaction backfill month ${months - m}/${months} failed for ${marketplace.country_code}: ${err.message}`);
+    } catch (err: unknown) {
+      logger.error(`[Sync] Transaction backfill month ${months - m}/${months} failed for ${marketplace.country_code}: ${errMessage(err)}`);
       // Continue with next month
     }
   }
