@@ -12,6 +12,7 @@ import 'dotenv/config';
 import { syncBolOrders } from '../services/sync/bolOrdersSync';
 import { pool, sharedPool } from '../config/database';
 import logger from '../config/logger';
+import { errMessage } from '../utils/errors';
 
 function parseMode(): 'shipments' | 'orders-recent' {
   const idx = process.argv.indexOf('--mode');
@@ -28,9 +29,9 @@ async function main(): Promise<void> {
     const inserted = await syncBolOrders(undefined, mode);
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(`[BolBackfill] Done — ${inserted} rows upserted in ${durationSec}s`);
-  } catch (err: any) {
-    logger.error(`[BolBackfill] Failed: ${err.message}`);
-    if (err.stack) logger.error(err.stack);
+  } catch (err: unknown) {
+    logger.error(`[BolBackfill] Failed: ${errMessage(err)}`);
+    if (err instanceof Error && err.stack) logger.error(err.stack);
     await pool.end();
     await sharedPool.end();
     process.exit(1);

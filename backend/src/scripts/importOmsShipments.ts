@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import * as path from 'path';
 import { pool } from '../config/database';
 import logger from '../config/logger';
+import { errMessage } from '../utils/errors';
 
 /**
  * Wisersell shipment manifest Excel'ini oms_shipments tablosuna yükler.
@@ -255,9 +256,9 @@ async function main(): Promise<void> {
       logger.info(`[ImportOms]   ${c.padEnd(20)} ${n}`);
     }
     process.exit(0);
-  } catch (err: any) {
-    logger.error('[ImportOms] FATAL:', err.message);
-    if (err.stack) logger.error(err.stack);
+  } catch (err: unknown) {
+    logger.error('[ImportOms] FATAL:', errMessage(err));
+    if (err instanceof Error && err.stack) logger.error(err.stack);
     process.exit(1);
   }
 }

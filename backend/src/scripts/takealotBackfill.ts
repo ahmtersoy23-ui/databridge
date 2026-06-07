@@ -9,6 +9,7 @@ import 'dotenv/config';
 import { syncTakealot } from '../services/sync/takealotOrdersSync';
 import { pool, sharedPool } from '../config/database';
 import logger from '../config/logger';
+import { errMessage } from '../utils/errors';
 
 function parseDays(): number {
   const idx = process.argv.indexOf('--days');
@@ -28,9 +29,9 @@ async function main(): Promise<void> {
     const rows = await syncTakealot(days);
     const sec = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info(`[TakealotBackfill] Done — ${rows} rows in ${sec}s`);
-  } catch (err: any) {
-    logger.error(`[TakealotBackfill] Failed: ${err.message}`);
-    if (err.stack) logger.error(err.stack);
+  } catch (err: unknown) {
+    logger.error(`[TakealotBackfill] Failed: ${errMessage(err)}`);
+    if (err instanceof Error && err.stack) logger.error(err.stack);
     await pool.end(); await sharedPool.end();
     process.exit(1);
   }

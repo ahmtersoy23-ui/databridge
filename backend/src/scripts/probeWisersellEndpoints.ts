@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { errMessage } from '../utils/errors';
 import axios from 'axios';
 import { pool } from '../config/database';
 import { decryptCredential } from '../utils/crypto';
@@ -69,8 +70,8 @@ async function main(): Promise<void> {
           : String(res.data).slice(0, 120);
       const mark = status >= 200 && status < 300 ? '✓' : '✗';
       console.log(`${mark} ${ep.padEnd(20)} → ${status}  ${sample}`);
-    } catch (err: any) {
-      console.log(`✗ ${ep.padEnd(20)} → NET  ${err.message?.slice(0, 80) || ''}`);
+    } catch (err: unknown) {
+      console.log(`✗ ${ep.padEnd(20)} → NET  ${errMessage(err)?.slice(0, 80) || ''}`);
     }
     // küçük gap rate-limit'e takılmayalım
     await new Promise(r => setTimeout(r, 200));

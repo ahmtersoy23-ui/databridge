@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { errMessage } from '../utils/errors';
 import { getSpApiClient } from '../services/spApi/client';
 import { pool } from '../config/database';
 
@@ -26,8 +27,8 @@ async function main() {
         options: { version: '2026-01-01' },
       } as any);
       console.log(JSON.stringify(response, null, 2));
-    } catch (err: any) {
-      console.error('Error:', err?.message || err);
+    } catch (err: unknown) {
+      console.error('Error:', errMessage(err) || err);
       console.error('Full:', err);
     }
   }

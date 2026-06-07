@@ -17,6 +17,7 @@ import 'dotenv/config';
 import { syncWalmartOrders } from '../services/sync/walmartOrdersSync';
 import { pool, sharedPool } from '../config/database';
 import logger from '../config/logger';
+import { errMessage } from '../utils/errors';
 
 function parseDays(): number {
   const idx = process.argv.indexOf('--days');
@@ -38,9 +39,9 @@ async function main(): Promise<void> {
     logger.info(
       `[WalmartBackfill] Done — ${inserted} rows upserted in ${durationSec}s`
     );
-  } catch (err: any) {
-    logger.error(`[WalmartBackfill] Failed: ${err.message}`);
-    if (err.stack) logger.error(err.stack);
+  } catch (err: unknown) {
+    logger.error(`[WalmartBackfill] Failed: ${errMessage(err)}`);
+    if (err instanceof Error && err.stack) logger.error(err.stack);
     await pool.end();
     await sharedPool.end();
     process.exit(1);

@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { errMessage } from '../utils/errors';
 import { readFileSync, writeFileSync } from 'fs';
 import { getSpApiClient } from '../services/spApi/client';
 
@@ -88,9 +89,9 @@ async function main() {
       if (processed % 25 === 0) {
         console.log(`[tracking-pull] ${processed}/${orders.length} (packages=${withTracking}, empty=${noPackages}, err=${errors})`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       errors++;
-      const errMsg = (err?.message || String(err)).slice(0, 200);
+      const errMsg = (errMessage(err) || String(err)).slice(0, 200);
       console.error(`[tracking-pull] ${order.amazon_order_id}: ${errMsg}`);
       csvRows.push([
         csvEscape(order.amazon_order_id),

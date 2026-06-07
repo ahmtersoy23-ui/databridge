@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { errMessage } from '../utils/errors';
 import { Pool } from 'pg';
 import { trackBatch, TRACK_BATCH_LIMIT, type FedexTrackResult } from '../services/fedex/client';
 import { parseTrackResult } from '../services/fedex/parser';
@@ -100,8 +101,8 @@ async function main(): Promise<void> {
     let results: FedexTrackResult[];
     try {
       results = await trackBatch(batch);
-    } catch (err: any) {
-      console.error(`[backfill] Batch ${idx}/${totalBatches} hata: ${err.message}`);
+    } catch (err: unknown) {
+      console.error(`[backfill] Batch ${idx}/${totalBatches} hata: ${errMessage(err)}`);
       errors += batch.length;
       await sleep(INTER_BATCH_DELAY_MS * 5);
       continue;
@@ -114,8 +115,8 @@ async function main(): Promise<void> {
         fetched++;
         if (parsed.not_found) notFound++;
         if (parsed.shipper_reference && /etgb/i.test(parsed.shipper_reference)) withEtgb++;
-      } catch (err: any) {
-        console.error(`[backfill] ${r.trackingNumber} upsert hata: ${err.message}`);
+      } catch (err: unknown) {
+        console.error(`[backfill] ${r.trackingNumber} upsert hata: ${errMessage(err)}`);
         errors++;
       }
     }
