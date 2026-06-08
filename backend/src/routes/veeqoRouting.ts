@@ -26,11 +26,11 @@ import logger from '../config/logger';
 const router = Router();
 router.use(adminOpsAuth);
 
-async function auditLog(jobName: string, status: 'success' | 'failed', rows: number, error?: string): Promise<void> {
+async function auditLog(jobName: string, status: 'success' | 'failed', rows: number, error?: string, detail?: string): Promise<void> {
   await pool.query(
-    `INSERT INTO sync_log (job_name, status, rows_processed, error_message, finished_at)
-     VALUES ($1, $2, $3, $4, NOW())`,
-    [jobName, status, rows, error?.slice(0, 500) ?? null],
+    `INSERT INTO sync_log (job_name, status, rows_processed, error_message, detail, finished_at)
+     VALUES ($1, $2, $3, $4, $5, NOW())`,
+    [jobName, status, rows, error?.slice(0, 500) ?? null, detail?.slice(0, 300) ?? null],
   ).catch(() => { /* audit log hatası akışı bozmasın */ });
 }
 
@@ -223,11 +223,13 @@ const bookSchema = z.object({
   labelFormat: z.enum(['PDF', 'PNG', 'ZPL', 'JPEG']).default('PDF'),
   /** rates'ten gelen value-added-service değerleri (zorunlu confirmation vb.) */
   options: z.record(z.string(), z.string()).optional(),
+  /** Audit için sipariş no (ManuMaestro'dan) — sync_log.detail'e yazılır. */
+  orderNumber: z.string().max(100).optional(),
 });
 
 router.post('/book', validateBody(bookSchema), async (req: Request, res: Response) => {
-  const { remoteShipmentId, rateId, requestToken, labelFormat, options } = req.body as {
-    remoteShipmentId: string; rateId: string; requestToken?: string; labelFormat: 'PDF' | 'PNG' | 'ZPL' | 'JPEG'; options?: Record<string, string>;
+  const { remoteShipmentId, rateId, requestToken, labelFormat, options, orderNumber } = req.body as {
+    remoteShipmentId: string; rateId: string; requestToken?: string; labelFormat: 'PDF' | 'PNG' | 'ZPL' | 'JPEG'; options?: Record<string, string>; orderNumber?: string;
   };
   try {
     const result = await bookShipment({ remoteShipmentId, rateId, requestToken, labelFormat, options });
@@ -254,8 +256,8 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
         logger.warn(`[VeeqoRouting] book OK ama etiket alınamadı (shipment ${shipmentId}, tracking ${ok.tracking_number}): ${labelError}`);
       }
     }
-    await auditLog('veeqo-routing-book', 'success', 1);
-    logger.info(`[VeeqoRouting] book OK: tracking=${ok.tracking_number} service=${ok.service_name}${labelBase64 ? '' : ' (PDF YOK)'}`);
+    await auditLog('veeqo-routing-book', 'success', 1, undefined, `order=${orderNumber ?? '-'} ship=${shipmentId} trk=${ok.tracking_number ?? '-'}${labelBase64 ? '' : ' NOPDF'}`);
+    logger.info(`[VeeqoRouting] book OK: order=${orderNumber ?? '-'} tracking=${ok.tracking_number} service=${ok.service_name}${labelBase64 ? '' : ' (PDF YOK)'}`);
     res.json({
       success: true,
       shipmentId: String(shipmentId),
@@ -275,16 +277,17 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
 });
 
 // ---- POST /cancel ----
-const cancelSchema = z.object({ shipmentId: z.string().min(3) });
+const cancelSchema = z.object({ shipmentId: z.string().min(3), orderNumber: z.string().max(100).optional() });
 
 router.post('/cancel', validateBody(cancelSchema), async (req: Request, res: Response) => {
-  const { shipmentId } = req.body as { shipmentId: string };
+  const { shipmentId, orderNumber } = req.body as { shipmentId: string; orderNumber?: string };
   try {
     await cancelShipment(shipmentId);
-    await auditLog('veeqo-routing-cancel', 'success', 1);
+    await auditLog('veeqo-routing-cancel', 'success', 1, undefined, `order=${orderNumber ?? '-'} ship=${shipmentId}`);
+    logger.info(`[VeeqoRouting] cancel OK: order=${orderNumber ?? '-'} ship=${shipmentId}`);
     res.json({ success: true });
   } catch (err: unknown) {
-    await auditLog('veeqo-routing-cancel', 'failed', 0, errMessage(err));
+    await auditLog('veeqo-routing-cancel', 'failed', 0, errMessage(err), `order=${orderNumber ?? '-'} ship=${shipmentId}`);
     logger.error('[VeeqoRouting] cancel error:', errMessage(err));
     res.status(502).json({ success: false, error: errMessage(err) });
   }
