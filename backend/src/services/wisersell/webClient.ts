@@ -95,6 +95,21 @@ export async function getWebToken(forceRefresh = false): Promise<string> {
   return cachedToken.jwt;
 }
 
+/**
+ * Token yenilemeyi tetikleyecek "auth hatası" mı? Normalde 401, AMA Wisersell auth
+ * hatasını bazen HTTP 500 + gövde {"message":"Unauthorized"} olarak döner (2026-06-08
+ * platform-close 300471 vakası). Gövdesinde unauthorized/yetkisiz/token geçen 5xx'i de
+ * auth say → token yenile + 1 kez tekrar dene (aksi halde geçici auth blip'i sızıyordu).
+ */
+function isAuthFailure(res: { status: number; data?: unknown }): boolean {
+  if (res.status === 401) return true;
+  if (res.status >= 500) {
+    const body = typeof res.data === 'string' ? res.data : JSON.stringify(res.data ?? '');
+    return /unauthorized|yetkisiz|token/i.test(body);
+  }
+  return false;
+}
+
 export interface ShipmentExcelOptions {
   /** Status array — varsayılan [1] (Gönderilmiş). [1,2,3,...] çoklu */
   status?: number[];
@@ -276,8 +291,8 @@ export async function getOpenOrders(opts: { status?: number[]; pageSize?: number
     });
     let token = await getWebToken();
     let res = await doRequest(token);
-    if (res.status === 401) {
-      logger.warn('[WisersellWeb] orders poll 401 → token refresh + retry');
+    if (isAuthFailure(res)) {
+      logger.warn('[WisersellWeb] orders poll auth-fail → token refresh + retry');
       token = await getWebToken(true);
       res = await doRequest(token);
     }
@@ -327,7 +342,7 @@ export async function getOrderDetail(orderId: number): Promise<WisersellOrderDet
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) { token = await getWebToken(true); res = await doRequest(token); }
+  if (isAuthFailure(res)) { token = await getWebToken(true); res = await doRequest(token); }
   if (res.status !== 200 && res.status !== 201) return null;
   const d = res.data || {};
   return {
@@ -353,7 +368,7 @@ export async function markOrdersStatus(ids: number[], orderstatusId: number): Pr
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) {
+  if (isAuthFailure(res)) {
     token = await getWebToken(true);
     res = await doRequest(token);
   }
@@ -381,7 +396,7 @@ export async function markOrderItemsStatus(itemIds: number[], orderitemStatusId:
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) {
+  if (isAuthFailure(res)) {
     token = await getWebToken(true);
     res = await doRequest(token);
   }
@@ -413,7 +428,7 @@ export async function closeExternalOrder(
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) {
+  if (isAuthFailure(res)) {
     token = await getWebToken(true);
     res = await doRequest(token);
   }
@@ -440,7 +455,7 @@ export async function platformCloseOrder(orderId: number): Promise<void> {
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) {
+  if (isAuthFailure(res)) {
     token = await getWebToken(true);
     res = await doRequest(token);
   }
@@ -464,7 +479,7 @@ export async function cancelOrder(orderId: number): Promise<void> {
   });
   let token = await getWebToken();
   let res = await doRequest(token);
-  if (res.status === 401) {
+  if (isAuthFailure(res)) {
     token = await getWebToken(true);
     res = await doRequest(token);
   }
