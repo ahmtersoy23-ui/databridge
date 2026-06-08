@@ -365,6 +365,33 @@ export async function markOrdersStatus(ids: number[], orderstatusId: number): Pr
 }
 
 /**
+ * Orderitem(ler)in ÜRETİM durumunu değiştirir (PUT /api/orderitemstatuses/multistatusupdate).
+ * Üretim/Tedarik pipeline'ı (sipariş orderstatus'ünden AYRI): Yeni=1, Beklemede=5, Teslim Edildi=6.
+ * US-depo siparişleri üretim kuyruğundan düşürmek (Beklemede) / çıkışta kapatmak (Teslim Edildi) /
+ * geri almak (Yeni) için. ids[] toplu — çok kalemli sipariş tek çağrıda. (DevTools 2026-06-08 doğrulandı.)
+ */
+export async function markOrderItemsStatus(itemIds: number[], orderitemStatusId: number): Promise<void> {
+  if (!itemIds.length) return;
+  const { baseUrl } = await getWebCredentials();
+  const body = { query: { ids: itemIds, orderitemstatus_id: orderitemStatusId, operationalstatusId: null } };
+  const doRequest = (tk: string) => axios.put(`${baseUrl}/api/orderitemstatuses/multistatusupdate`, body, {
+    headers: { Authorization: tk, 'Content-Type': 'application/json', Accept: 'application/json, text/plain, */*', Origin: baseUrl, 'User-Agent': WS_UA },
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
+  let token = await getWebToken();
+  let res = await doRequest(token);
+  if (res.status === 401) {
+    token = await getWebToken(true);
+    res = await doRequest(token);
+  }
+  if (res.status !== 200 && res.status !== 201) {
+    const msg = typeof res.data === 'object' ? JSON.stringify(res.data) : String(res.data);
+    throw new Error(`Wisersell orderitem status HTTP ${res.status}: ${msg?.slice(0, 300)}`);
+  }
+}
+
+/**
  * Siparişi tracking ile harici kapatır (POST /api/orders/external-close/{id}).
  * Pratikte yalnız carrierId + trackingCode değişken; ölçüler 0 geçilir.
  */

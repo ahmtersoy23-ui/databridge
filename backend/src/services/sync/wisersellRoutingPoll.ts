@@ -25,6 +25,7 @@ interface StoreMapRow {
 }
 
 interface ResolvedItem {
+  id: number | null;             // Wisersell orderitem id — üretim durumu (Beklemede/Teslim/Yeni) yazmak için
   iwasku: string | null;
   qty: number;
   product_code: string | null;
@@ -89,6 +90,7 @@ export async function runWisersellRoutingPoll(): Promise<number> {
     const productCode = item.listing?.product?.code ?? null;
     const hasProductRef = !!(item.listing?.product?.id ?? productCode ?? item.marketplace_sku ?? item.listing?.product?.name);
     arr.push({
+      id: item.id ?? null,
       iwasku: resolutions[i]?.iwasku ?? null,
       qty: Number(item.quantity ?? 0),
       product_code: productCode,

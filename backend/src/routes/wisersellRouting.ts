@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { pool } from '../config/database';
 import { validateBody } from '../middleware/validate';
 import { adminOpsAuth } from '../middleware/adminOps';
-import { markOrdersStatus, closeExternalOrder, platformCloseOrder, cancelOrder } from '../services/wisersell/webClient';
+import { markOrdersStatus, markOrderItemsStatus, closeExternalOrder, platformCloseOrder, cancelOrder } from '../services/wisersell/webClient';
 import { refreshWayfairAggregation } from '../services/sync/wayfairSync';
 import { WISERSELL_STATUS_CODES } from '../config/constants';
 import logger from '../config/logger';
@@ -70,6 +70,30 @@ router.post('/reopen', validateBody(markReadySchema), async (req: Request, res: 
   } catch (err: unknown) {
     await auditLog('wisersell-routing-reopen', 'failed', 0, errMessage(err));
     logger.error('[WisersellRouting] reopen error:', errMessage(err));
+    res.status(502).json({ success: false, error: errMessage(err) });
+  }
+});
+
+// Orderitem ÜRETİM durumu (Üretim/Tedarik pipeline): Yeni=1, Beklemede=5, Teslim Edildi=6.
+const orderItemStatusSchema = z.object({
+  itemIds: z.array(z.number().int().positive()).min(1).max(200),
+  statusId: z.union([z.literal(1), z.literal(5), z.literal(6)]),
+});
+
+// POST /api/wisersell-routing/orderitem-status  { itemIds: [365577, ...], statusId: 5 }
+// US-depo siparişini üretim kuyruğundan düşür (5 Beklemede) / çıkışta kapat (6 Teslim Edildi) /
+// geri al (1 Yeni). ManuMaestro approve / close / reopen akışları çağırır (best-effort).
+// (İç s2s endpoint POST; Wisersell'e giden gerçek PUT webClient içinde.)
+router.post('/orderitem-status', validateBody(orderItemStatusSchema), async (req: Request, res: Response) => {
+  const { itemIds, statusId } = req.body as { itemIds: number[]; statusId: 1 | 5 | 6 };
+  try {
+    await markOrderItemsStatus(itemIds, statusId);
+    await auditLog('wisersell-routing-orderitem-status', 'success', itemIds.length);
+    logger.info(`[WisersellRouting] orderitem-status OK: ${itemIds.length} kalem → ${statusId}`);
+    res.json({ success: true, count: itemIds.length, statusId });
+  } catch (err: unknown) {
+    await auditLog('wisersell-routing-orderitem-status', 'failed', 0, errMessage(err));
+    logger.error('[WisersellRouting] orderitem-status error:', errMessage(err));
     res.status(502).json({ success: false, error: errMessage(err) });
   }
 });
