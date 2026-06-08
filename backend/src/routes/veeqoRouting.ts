@@ -34,6 +34,20 @@ async function auditLog(jobName: string, status: 'success' | 'failed', rows: num
   ).catch(() => { /* audit log hatası akışı bozmasın */ });
 }
 
+/**
+ * Veeqo "over-fulfill" hatası (errorCode SINGLE_PURCHASE_VALIDATION_RATE): siparişte
+ * takılı/yarım kalmış bir shipment varken yeni book reddedilir. Ham mesaj kriptik →
+ * operatöre net aksiyon ver + takılı shipment id'yi ayıkla. Eşleşmezse null (ham kullanılır).
+ * (Bu shipment çoğunlukla ücretsiz/yarım bir RS draft'ıdır; API'den silinemeyebilir →
+ *  Veeqo panelinden iptal gerekir. 2026-06-08 vakası: order 114-1536594-4934616 / 7d556ec4.)
+ */
+export function overFulfillMessage(raw: string): string | null {
+  if (!/SINGLE_PURCHASE_VALIDATION_RATE|over-?fulfill|Existing shipmentIds/i.test(raw)) return null;
+  const m = raw.match(/Existing shipmentIds for order:\s*\[([^\]]+)\]/i);
+  const ids = m ? m[1].trim() : null;
+  return `Veeqo'da bu siparişte takılı/tamamlanmamış bir shipment var${ids ? ` (${ids})` : ''} → yeni etiket alınamıyor (over-fulfill). Genelde ücretsiz/yarım kalmış bir kayıttır. Çöz: Veeqo panelinden siparişteki shipment'ı iptal edip tekrar dene; ya da etiketi Amazon Buy Shipping / manuel al. Takılı kalırsa Veeqo support'a shipment id ile bildir.`;
+}
+
 /** Sevkiyat çıkış (ShipFrom) adresleri — depo bazlı. Amazon ShipFrom için US-format
  *  telefon ŞART (TR telefonu reddedilir): VEEQO_SHIP_FROM_PHONE.
  *  warehouseCode 'NJ' → Somerset, 'SHOWROOM' → Fairfield. */
@@ -237,8 +251,9 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
     if (!ok) {
       const fail = result.failed?.[remoteShipmentId];
       const msg = fail?.error_messages?.join('; ') || 'Veeqo booking başarısız (successful boş)';
+      const friendly = overFulfillMessage(msg);
       await auditLog('veeqo-routing-book', 'failed', 0, msg);
-      return res.status(502).json({ success: false, error: msg });
+      return res.status(502).json({ success: false, error: friendly ?? msg, ...(friendly ? { code: 'VEEQO_STUCK_SHIPMENT', raw: msg } : {}) });
     }
     const shipmentId = (ok as any).id || (ok as any).shipment_id || remoteShipmentId;
     // label: book response'unda base64 gelmezse get-label ile çek (retry'lı).
@@ -270,9 +285,11 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
       ...(labelError ? { labelError } : {}),
     });
   } catch (err: unknown) {
-    await auditLog('veeqo-routing-book', 'failed', 0, errMessage(err));
-    logger.error('[VeeqoRouting] book error:', errMessage(err));
-    res.status(502).json({ success: false, error: errMessage(err) });
+    const raw = errMessage(err);
+    const friendly = overFulfillMessage(raw);
+    await auditLog('veeqo-routing-book', 'failed', 0, raw);
+    logger.error('[VeeqoRouting] book error:', raw);
+    res.status(502).json({ success: false, error: friendly ?? raw, ...(friendly ? { code: 'VEEQO_STUCK_SHIPMENT', raw } : {}) });
   }
 });
 
