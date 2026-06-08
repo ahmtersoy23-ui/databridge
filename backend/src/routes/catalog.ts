@@ -22,7 +22,7 @@ router.get('/', async (_req: Request, res: Response) => {
     const result = await pool.query(`
       SELECT wp.id, wp.name, wp.code, wp.weight, wp.deci,
              wp.width, wp.length, wp.height,
-             wp.arr_sku, wp.category_id, wp.size, wp.color,
+             wp.arr_sku, wp.category_id, wp.size, wp.color, wp.eans,
              wc.name AS category_name,
              wp.synced_at
       FROM wisersell_products wp
