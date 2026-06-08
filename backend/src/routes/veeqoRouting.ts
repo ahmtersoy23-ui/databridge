@@ -239,14 +239,23 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
       return res.status(502).json({ success: false, error: msg });
     }
     const shipmentId = (ok as any).id || (ok as any).shipment_id || remoteShipmentId;
-    // label: book response'unda base64 gelmezse get-label ile çek
-    let labelBase64 = ok.label;
+    // label: book response'unda base64 gelmezse get-label ile çek (retry'lı).
+    // KRİTİK: book BAŞARILI (para çekildi) → etiket alınamasa bile route PATLAMASIN; aksi halde
+    // çağıran hiçbir şey kaydetmez → sipariş DRAFT kalır → tekrar book = ÇİFT ÜCRET. Etiketsiz de
+    // tracking+bedel döndür; üst kat (ManuMaestro) kaydı açıp tekrar-book'u engeller.
+    let labelBase64: string | null = ok.label ?? null;
+    let labelError: string | null = null;
     if (!labelBase64) {
       const fmt = labelFormat.toLowerCase() as 'pdf' | 'png' | 'zpl' | 'jpeg';
-      labelBase64 = (await getLabel(String(shipmentId), fmt)).toString('base64');
+      try {
+        labelBase64 = (await getLabel(String(shipmentId), fmt)).toString('base64');
+      } catch (err: unknown) {
+        labelError = errMessage(err);
+        logger.warn(`[VeeqoRouting] book OK ama etiket alınamadı (shipment ${shipmentId}, tracking ${ok.tracking_number}): ${labelError}`);
+      }
     }
     await auditLog('veeqo-routing-book', 'success', 1);
-    logger.info(`[VeeqoRouting] book OK: tracking=${ok.tracking_number} service=${ok.service_name}`);
+    logger.info(`[VeeqoRouting] book OK: tracking=${ok.tracking_number} service=${ok.service_name}${labelBase64 ? '' : ' (PDF YOK)'}`);
     res.json({
       success: true,
       shipmentId: String(shipmentId),
@@ -256,6 +265,7 @@ router.post('/book', validateBody(bookSchema), async (req: Request, res: Respons
       totalCharge: ok.total_charge,
       labelBase64,
       labelFormat,
+      ...(labelError ? { labelError } : {}),
     });
   } catch (err: unknown) {
     await auditLog('veeqo-routing-book', 'failed', 0, errMessage(err));

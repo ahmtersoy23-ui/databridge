@@ -165,17 +165,31 @@ export async function bookShipment(input: {
   }
 }
 
-/** Etiket dosyasını indir (binary). format label_format ile uyumlu olmalı. */
+/**
+ * Etiket dosyasını indir (binary). format label_format ile uyumlu olmalı.
+ * Etiket book'tan hemen sonra hazır olmayabilir (özellikle Amazon Buy Shipping → async üretim)
+ * → 404'te de retry (5 deneme × 1.5sn). Yine de gelmezse çağıran (book) kaybetmeden devam eder.
+ */
 export async function getLabel(shipmentId: string, format: 'pdf' | 'png' | 'zpl' | 'jpeg' = 'pdf'): Promise<Buffer> {
-  try {
-    const res = await http().get(`${RS}/shipments/${encodeURIComponent(shipmentId)}/label.${format}`, {
-      responseType: 'arraybuffer',
-      headers: { accept: 'application/octet-stream' },
-    });
-    return Buffer.from(res.data as ArrayBuffer);
-  } catch (err) {
-    throw veeqoErr(err, 'get-label');
+  const maxAttempts = 5;
+  const delayMs = 1500;
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await http().get(`${RS}/shipments/${encodeURIComponent(shipmentId)}/label.${format}`, {
+        responseType: 'arraybuffer',
+        headers: { accept: 'application/octet-stream' },
+      });
+      return Buffer.from(res.data as ArrayBuffer);
+    } catch (err) {
+      lastErr = err;
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const retriable = status == null || status === 404 || status === 429 || status >= 500;
+      if (attempt < maxAttempts && retriable) { await new Promise((r) => setTimeout(r, delayMs)); continue; }
+      break;
+    }
   }
+  throw veeqoErr(lastErr, 'get-label');
 }
 
 /** Shipment'ı iptal et (test → kullanılmaz + ücret iadesi). */
