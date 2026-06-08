@@ -14,6 +14,7 @@ interface WisersellProduct {
   length: number | null;
   height: number | null;
   arrsku: string[] | null;
+  eans: string[] | null;
   categoryId: number | null;
   extradata: Record<string, unknown> | null;
 }
@@ -139,9 +140,9 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
     const params: unknown[] = [];
 
     batch.forEach((p, idx) => {
-      const offset = idx * 13;
+      const offset = idx * 14;
       values.push(
-        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13})`
+        `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14})`
       );
       params.push(
         p.id,
@@ -157,12 +158,13 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
         p.extradata ? JSON.stringify(p.extradata) : null,
         p.extradata?.['Size'] != null ? String(p.extradata['Size']) : null,
         p.extradata?.['Color'] != null ? String(p.extradata['Color']) : null,
+        Array.isArray(p.eans) && p.eans.length ? JSON.stringify(p.eans) : null,
       );
     });
 
     await pool.query(`
       INSERT INTO wisersell_products
-        (id, name, code, weight, deci, width, length, height, arr_sku, category_id, extra_data, size, color)
+        (id, name, code, weight, deci, width, length, height, arr_sku, category_id, extra_data, size, color, eans)
       VALUES ${values.join(', ')}
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
@@ -177,6 +179,7 @@ async function upsertProducts(products: WisersellProduct[]): Promise<void> {
         extra_data = EXCLUDED.extra_data,
         size = EXCLUDED.size,
         color = EXCLUDED.color,
+        eans = EXCLUDED.eans,
         synced_at = NOW()
     `, params);
   }
@@ -204,7 +207,7 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number;
   const result = await pool.query(`
     SELECT DISTINCT ON (wp.code)
            wp.code, wp.name, wp.weight, wp.deci,
-           wp.width, wp.length, wp.height,
+           wp.width, wp.length, wp.height, wp.eans,
            wc.name AS category_name
     FROM wisersell_products wp
     LEFT JOIN wisersell_categories wc ON wp.category_id = wc.id
@@ -231,6 +234,10 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number;
     const widths = batch.map((r: { width: string | null }) => r.width != null ? parseFloat(r.width) : null);
     const lengths = batch.map((r: { length: string | null }) => r.length != null ? parseFloat(r.length) : null);
     const heights = batch.map((r: { height: string | null }) => r.height != null ? parseFloat(r.height) : null);
+    // wp.eans jsonb → pg parsed JS array (or null). pricelab.products.eans de jsonb;
+    // UNNEST jsonb[] icin her eleman tekrar JSON string'e cevriliyor.
+    const eansList = batch.map((r: { eans: string[] | null }) =>
+      Array.isArray(r.eans) && r.eans.length ? JSON.stringify(r.eans) : null);
 
     // Diff için mevcut kayıtları önceden çek (sample_changes audit'i için)
     let existingMap = new Map<string, { name: string | null; category: string | null }>();
@@ -247,19 +254,21 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number;
     }
 
     const res = await sharedPool.query(`
-      INSERT INTO products (product_sku, name, category, weight, size, width, length, height, source)
-      SELECT t.product_sku, t.name, t.category, t.weight, t.size, t.width, t.length, t.height, 'wisersell'
+      INSERT INTO products (product_sku, name, category, weight, size, width, length, height, eans, source)
+      SELECT t.product_sku, t.name, t.category, t.weight, t.size, t.width, t.length, t.height, t.eans, 'wisersell'
       FROM UNNEST(
         $1::text[], $2::text[], $3::text[],
-        $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[]
-      ) AS t(product_sku, name, category, weight, size, width, length, height)
+        $4::numeric[], $5::numeric[], $6::numeric[], $7::numeric[], $8::numeric[], $9::jsonb[]
+      ) AS t(product_sku, name, category, weight, size, width, length, height, eans)
       ON CONFLICT (product_sku) DO UPDATE SET
         name = EXCLUDED.name,
         category = COALESCE(EXCLUDED.category, products.category),
+        eans = COALESCE(EXCLUDED.eans, products.eans),
         updated_at = NOW()
       WHERE products.name IS DISTINCT FROM EXCLUDED.name
          OR products.category IS DISTINCT FROM EXCLUDED.category
-    `, [codes, names, categories, weights, sizes, widths, lengths, heights]);
+         OR products.eans IS DISTINCT FROM EXCLUDED.eans
+    `, [codes, names, categories, weights, sizes, widths, lengths, heights, eansList]);
 
     const affected = (res as unknown as { rowCount?: number }).rowCount || 0;
     updated += affected;
