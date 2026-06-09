@@ -230,10 +230,28 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number;
     const names = batch.map((r: { name: string }) => r.name);
     const categories = batch.map((r: { category_name: string | null }) => r.category_name || null);
     const weights = batch.map((r: { weight: string | null }) => r.weight != null ? parseFloat(r.weight) : null);
-    const sizes = batch.map((r: { deci: string | null }) => r.deci != null ? parseFloat(r.deci) : null);
-    const widths = batch.map((r: { width: string | null }) => r.width != null ? parseFloat(r.width) : null);
-    const lengths = batch.map((r: { length: string | null }) => r.length != null ? parseFloat(r.length) : null);
-    const heights = batch.map((r: { height: string | null }) => r.height != null ? parseFloat(r.height) : null);
+    // Ham Wisersell dims. Yalnız GÜVENİLİR olanı (her biri > 1; 0×0×0 ve 1×1×1 placeholder'lar
+    // hariç) pricelab'a yaz; placeholder/null → null bırak ki aşağıdaki COALESCE mevcut değeri
+    // korusun (çöp ezilmesin).
+    const rawWidths = batch.map((r: { width: string | null }) => r.width != null ? parseFloat(r.width) : null);
+    const rawLengths = batch.map((r: { length: string | null }) => r.length != null ? parseFloat(r.length) : null);
+    const rawHeights = batch.map((r: { height: string | null }) => r.height != null ? parseFloat(r.height) : null);
+    const dimsReliable = batch.map((_r, i) => {
+      const w = rawWidths[i], l = rawLengths[i], h = rawHeights[i];
+      return w != null && l != null && h != null && w > 1 && l > 1 && h > 1;
+    });
+    const widths = rawWidths.map((v, i) => (dimsReliable[i] ? v : null));
+    const lengths = rawLengths.map((v, i) => (dimsReliable[i] ? v : null));
+    const heights = rawHeights.map((v, i) => (dimsReliable[i] ? v : null));
+    // desi (size) = max(hacim/5000, ağırlık). Wisersell `deci` passthrough DEĞİL — dims kapsamı
+    // (~12.7k ürün) deci kapsamından (~4k) çok daha geniş. Güvenilir dims yoksa null → COALESCE
+    // eski değeri korur.
+    const sizes = batch.map((_r, i) => {
+      if (!dimsReliable[i]) return null;
+      const vol = (rawWidths[i] as number) * (rawLengths[i] as number) * (rawHeights[i] as number) / 5000;
+      const w = weights[i] ?? 0;
+      return Math.round(Math.max(vol, w) * 1000) / 1000;
+    });
     // wp.eans jsonb → pg parsed JS array (or null). pricelab.products.eans de jsonb;
     // UNNEST jsonb[] icin her eleman tekrar JSON string'e cevriliyor.
     const eansList = batch.map((r: { eans: string[] | null }) =>
@@ -264,10 +282,20 @@ async function syncProductsTable(): Promise<{ updated: number; inserted: number;
         name = EXCLUDED.name,
         category = COALESCE(EXCLUDED.category, products.category),
         eans = COALESCE(EXCLUDED.eans, products.eans),
+        weight = COALESCE(EXCLUDED.weight, products.weight),
+        width  = COALESCE(EXCLUDED.width,  products.width),
+        length = COALESCE(EXCLUDED.length, products.length),
+        height = COALESCE(EXCLUDED.height, products.height),
+        size   = COALESCE(EXCLUDED.size,   products.size),
         updated_at = NOW()
       WHERE products.name IS DISTINCT FROM EXCLUDED.name
          OR products.category IS DISTINCT FROM EXCLUDED.category
          OR products.eans IS DISTINCT FROM EXCLUDED.eans
+         OR products.weight IS DISTINCT FROM COALESCE(EXCLUDED.weight, products.weight)
+         OR products.width  IS DISTINCT FROM COALESCE(EXCLUDED.width,  products.width)
+         OR products.length IS DISTINCT FROM COALESCE(EXCLUDED.length, products.length)
+         OR products.height IS DISTINCT FROM COALESCE(EXCLUDED.height, products.height)
+         OR products.size   IS DISTINCT FROM COALESCE(EXCLUDED.size,   products.size)
     `, [codes, names, categories, weights, sizes, widths, lengths, heights, eansList]);
 
     const affected = (res as unknown as { rowCount?: number }).rowCount || 0;
