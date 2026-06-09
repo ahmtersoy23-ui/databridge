@@ -61,6 +61,21 @@ function getShipFrom(warehouse?: string): VeeqoAddress {
   return { name: 'MDN LLC', company: 'MDN LLC', phone, line1: '142 Belmont Dr, Unit 3, Suite IWA', town: 'SOMERSET', county: 'NJ', postcode: '08873', country_code: 'US' };
 }
 
+/**
+ * Telefonu taşıyıcı/etiket üretimi için temizler. Amazon relay telefonları
+ * "+1 347-448-3190 ext. 59392" gibi gelir; uzantı + boşluk/tire taşıyıcının etiket
+ * DOSYASI üretimini patlatabilir ("There was an error in generating the file" → getLabel 404,
+ * shipment yine de oluşur → sahipsiz etiket). Uzantıyı at, yalnız +<rakam> bırak.
+ * Geçerli numara çıkmazsa placeholder (Veeqo phone zorunlu alan).
+ */
+export function cleanPhone(raw?: string | null): string {
+  if (!raw) return '0000000000';
+  const noExt = raw.replace(/\s*(ext\.?|extension|x)\s*\d+\s*$/i, '').trim();
+  const digits = noExt.replace(/\D/g, '');
+  if (digits.length < 7) return '0000000000';
+  return (noExt.trim().startsWith('+') ? '+' : '') + digits;
+}
+
 /** Veeqo order.deliver_to → VeeqoAddress (to_address). */
 function toAddressFromOrder(order: Record<string, any>): VeeqoAddress {
   const d = order.deliver_to || {};
@@ -68,8 +83,9 @@ function toAddressFromOrder(order: Record<string, any>): VeeqoAddress {
   return {
     name,
     company: d.company || undefined,
-    phone: d.phone || '0000000000',
-    email: d.email || undefined,
+    phone: cleanPhone(d.phone),
+    // deliver_to.email genelde boş (Amazon) → customer.email relay adresine düş (taşıyıcı boş email'de etiket üretemeyebilir).
+    email: d.email || order.customer?.email || undefined,
     line1: d.address1 || '',
     line2: d.address2 || undefined,
     town: d.city || '',
@@ -177,7 +193,7 @@ router.post('/rates', validateBody(ratesSchema), async (req: Request, res: Respo
     let destState: string | null = null;
 
     if (toAddress) {
-      to_address = toAddress;
+      to_address = { ...toAddress, phone: cleanPhone(toAddress.phone) };
       customerRef = reference || 'standalone';
       destState = toAddress.county ?? null;
     } else {
