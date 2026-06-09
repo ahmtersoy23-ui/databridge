@@ -44,6 +44,7 @@ const router = Router();
 router.use('/auth', authRouter);
 router.use('/amazonsales', salesRouter);   // StockPulse reads these
 router.use('/amazonfba', inventoryRouter); // StockPulse reads these
+router.use('/catalog', catalogRouter);     // StockPulse reads these (cache_catalog refresh) — read-only wisersell_products
 router.use('/status', statusRouter);       // Monitoring (UptimeRobot)
 router.use('/sync', syncRouter);           // Internal tool — localhost only
 router.use('/sentry-verify', sentryVerifyRouter); // Token-gated Sentry probe
@@ -57,7 +58,6 @@ router.use(ssoAuthMiddleware);
 // Browse endpoints
 router.use('/orders', ordersRouter);
 router.use('/inventory-detail', inventoryDetailRouter);
-router.use('/catalog', catalogRouter);
 router.use('/wisersell-settings', wisersellSettingsRouter);
 router.use('/wayfair/settings', wayfairSettingsRouter);
 router.use('/wayfair/mappings', wayfairMappingsRouter);

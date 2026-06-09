@@ -58,7 +58,7 @@ Schedule'lari burada tekrar listeleme — bayatliyor. Gruplar:
 5. SYSTEM.md'yi guncelle (agent haritasi) — yeni tablo/kolon eklediyse.
 
 ## Endpoint'ler (`routes/index.ts`)
-- **Public (no auth)**: `/status` (UptimeRobot), `/amazonsales` + `/amazonfba` (StockPulse cekiyor), `/health`
+- **Public (no auth)**: `/status` (UptimeRobot), `/amazonsales` + `/amazonfba` + `/catalog` (StockPulse cekiyor — catalog read-only wisersell_products), `/health`
 - **adminOpsAuth (API key ya da SSO)**: `/sync` (manuel tetik), `/wisersell-routing` + `/veeqo-routing` + `/amazon-order-status` (s2s)
-- **SSO-gated**: digerleri (orders, inventory-detail, catalog, */settings, */orders, ads, reviews, credentials...)
+- **SSO-gated**: digerleri (orders, inventory-detail, */settings, */orders, ads, reviews, credentials...)
 - Manuel sync tetik: `POST /api/v1/sync` body `{"type":"channel_prices"}` (INTERNAL_API_KEY header).
