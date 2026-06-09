@@ -192,6 +192,7 @@ export async function syncTakealotForAccount(
   );
 
   // Safety threshold for orders
+  let upsertedCount = 0;
   if (orderRows.length > 0) {
     const existing = await pool.query<{ cnt: string }>(
       `SELECT COUNT(*)::text AS cnt FROM takealot_raw_orders
@@ -206,8 +207,8 @@ export async function syncTakealotForAccount(
       logger.error(msg);
       await notify(`⚠️ ${msg}`);
     } else {
-      const upserted = await upsertOrderLines(orderRows, iwaskuMap);
-      logger.info(`[Takealot] '${account.label}' upserted ${upserted} order lines`);
+      upsertedCount = await upsertOrderLines(orderRows, iwaskuMap);
+      logger.info(`[Takealot] '${account.label}' upserted ${upsertedCount} order lines`);
     }
   }
 
@@ -215,7 +216,9 @@ export async function syncTakealotForAccount(
   const invCount = await upsertInventory(inventoryRows, iwaskuMap);
   logger.info(`[Takealot] '${account.label}' wrote ${invCount} inventory rows`);
 
-  return orderRows.length;
+  // rows_processed = gerçekten YAZILAN sipariş satırı (çekilen değil) — eşik skip'inde
+  // 0 döner ki sync_log yanlış tazelik göstermesin (row-drop alarmı da tetiklenir).
+  return upsertedCount;
 }
 
 export async function syncTakealot(days?: number): Promise<number> {

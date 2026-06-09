@@ -10,7 +10,15 @@ const mockClientQuery = vi.fn();
 const mockClientRelease = vi.fn();
 
 vi.mock('../config/database', () => ({
-  pool: { query: (...args: any[]) => mockPoolQuery(...args) },
+  pool: {
+    query: (...args: any[]) => mockPoolQuery(...args),
+    // upsertInventory artik transactional (pool.connect) — client query'leri ayni
+    // mockPoolQuery impl'ine delege edilir (BEGIN/DELETE/INSERT/COMMIT default doner).
+    connect: vi.fn().mockResolvedValue({
+      query: (...args: any[]) => mockPoolQuery(...args),
+      release: () => {},
+    }),
+  },
   sharedPool: {
     query: (...args: any[]) => mockSharedQuery(...args),
     connect: vi.fn().mockResolvedValue({

@@ -226,6 +226,7 @@ export async function syncKauflandForAccount(
   );
 
   // Safety: orders 80%+ drop block
+  let upsertedCount = 0;
   if (orderRows.length > 0) {
     const existing = await pool.query<{ cnt: string }>(
       `SELECT COUNT(*)::text AS cnt FROM kaufland_raw_orders
@@ -240,15 +241,16 @@ export async function syncKauflandForAccount(
       logger.error(msg);
       await notify(`⚠️ ${msg}`);
     } else {
-      const upserted = await upsertOrderLines(account, orderRows, iwaskuMap);
-      logger.info(`[Kaufland] '${account.label}' upserted ${upserted} order lines`);
+      upsertedCount = await upsertOrderLines(account, orderRows, iwaskuMap);
+      logger.info(`[Kaufland] '${account.label}' upserted ${upsertedCount} order lines`);
     }
   }
 
   const invCount = await upsertInventory(account, inventoryRows, iwaskuMap);
   logger.info(`[Kaufland] '${account.label}' wrote ${invCount} inventory rows`);
 
-  return orderRows.length;
+  // rows_processed = gerçekten YAZILAN sipariş satırı (çekilen değil) — eşik skip'inde 0.
+  return upsertedCount;
 }
 
 export async function syncKaufland(days?: number): Promise<number> {

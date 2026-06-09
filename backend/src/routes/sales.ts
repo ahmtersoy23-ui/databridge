@@ -57,6 +57,7 @@ router.get('/:channel', async (req: Request, res: Response) => {
           WHERE o.channel = ANY($1)
             AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
             AND o.sku NOT LIKE 'amzn.gr.%'
+            AND o.item_price > 0
           GROUP BY COALESCE(o.iwasku, o.sku), o.asin
         )
         SELECT
@@ -84,6 +85,7 @@ router.get('/:channel', async (req: Request, res: Response) => {
         WHERE o.channel = $1
           AND o.purchase_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
           AND o.sku NOT LIKE 'amzn.gr.%'
+          AND o.item_price > 0
         GROUP BY COALESCE(o.iwasku, o.sku), o.asin
         ORDER BY COALESCE(o.iwasku, o.sku)
       `, [channel]);

@@ -58,29 +58,43 @@ async function upsertInventory(
 ): Promise<void> {
   // Delete all existing inventory for this account, then re-insert fresh data.
   // This ensures stale warehouse rows (qty went to 0) are cleaned up.
-  await pool.query('DELETE FROM wayfair_inventory WHERE account_id = $1', [accountId]);
+  // Transaction: DELETE + INSERT loop atomik — batch ortasındaki bir hata
+  // wayfair_inventory'yi yarı-yazılmış bırakmasın (sonra aggregateToFbaInventory
+  // bu tabloyu okuyor; yarım snapshot eşiği yanlış tetikleyebilirdi).
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM wayfair_inventory WHERE account_id = $1', [accountId]);
 
-  for (let i = 0; i < items.length; i += BATCH_SIZE) {
-    const batch = items.slice(i, i + BATCH_SIZE);
-    const values: string[] = [];
-    const params: unknown[] = [];
+    for (let i = 0; i < items.length; i += BATCH_SIZE) {
+      const batch = items.slice(i, i + BATCH_SIZE);
+      const values: string[] = [];
+      const params: unknown[] = [];
 
-    batch.forEach((item, idx) => {
-      const offset = idx * 7;
-      values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
-      params.push(accountId, item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.availableQty, item.iwasku);
-    });
+      batch.forEach((item, idx) => {
+        const offset = idx * 7;
+        values.push(`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`);
+        params.push(accountId, item.partNumber, item.warehouseId, item.warehouseName, item.quantity, item.availableQty, item.iwasku);
+      });
 
-    await pool.query(`
-      INSERT INTO wayfair_inventory (account_id, part_number, warehouse_id, warehouse_name, quantity, available_qty, iwasku)
-      VALUES ${values.join(', ')}
-      ON CONFLICT (account_id, part_number, warehouse_id) DO UPDATE SET
-        warehouse_name = EXCLUDED.warehouse_name,
-        quantity = EXCLUDED.quantity,
-        available_qty = EXCLUDED.available_qty,
-        iwasku = EXCLUDED.iwasku,
-        last_synced_at = NOW()
-    `, params);
+      await client.query(`
+        INSERT INTO wayfair_inventory (account_id, part_number, warehouse_id, warehouse_name, quantity, available_qty, iwasku)
+        VALUES ${values.join(', ')}
+        ON CONFLICT (account_id, part_number, warehouse_id) DO UPDATE SET
+          warehouse_name = EXCLUDED.warehouse_name,
+          quantity = EXCLUDED.quantity,
+          available_qty = EXCLUDED.available_qty,
+          iwasku = EXCLUDED.iwasku,
+          last_synced_at = NOW()
+      `, params);
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
 }
 
