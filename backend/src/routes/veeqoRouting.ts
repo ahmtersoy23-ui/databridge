@@ -55,7 +55,7 @@ function getShipFrom(warehouse?: string): VeeqoAddress {
   const phone = process.env.VEEQO_SHIP_FROM_PHONE;
   if (!phone) throw new Error('VEEQO_SHIP_FROM_PHONE yapılandırılmamış (Amazon ShipFrom için geçerli US telefon gerekli)');
   if (warehouse === 'SHOWROOM') {
-    return { name: 'MDN LLC FAIRFIELD', company: 'MDN LLC', phone, line1: '16A Spielman Road', town: 'FAIRFIELD', county: 'NJ', postcode: '07004', country_code: 'US' };
+    return { name: 'MDN LLC FAIRFIELD', company: 'MDN LLC', phone, line1: '16 Spielman Road', town: 'FAIRFIELD', county: 'NJ', postcode: '07004', country_code: 'US' };
   }
   // default = Somerset (NJ)
   return { name: 'MDN LLC', company: 'MDN LLC', phone, line1: '142 Belmont Dr, Unit 3, Suite IWA', town: 'SOMERSET', county: 'NJ', postcode: '08873', country_code: 'US' };
