@@ -47,6 +47,27 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
     [skus],
   );
   for (const row of res.rows) map.set(row.lookup_key, row.iwasku);
+
+  // Prefix fallback: tam SKU eslesmeyenlerde "-"/"_" oncesi parca gecerli bir
+  // product_sku ise onu kullan. Varyant SKU'lari (or. IM299009QB7W_MS_L,
+  // DS027004CRSP-GRAPHITE-P9) sku_master'a girmeden cozulur. >=6 char guard:
+  // kisa/numerik prefix'lerde (5N, SSC, 3DMAP05, numerik) yanlis eslesme olmasin.
+  const unresolved = skus.filter((s) => !map.has(s));
+  if (unresolved.length) {
+    const prefixOf = (s: string) => s.split(/[-_]/)[0];
+    const prefixes = [...new Set(unresolved.map(prefixOf).filter((p) => p.length >= 6))];
+    if (prefixes.length) {
+      const pres = await sharedPool.query<{ product_sku: string }>(
+        'SELECT product_sku FROM products WHERE product_sku = ANY($1)',
+        [prefixes],
+      );
+      const validPrefix = new Set(pres.rows.map((r) => r.product_sku));
+      for (const s of unresolved) {
+        const p = prefixOf(s);
+        if (validPrefix.has(p)) map.set(s, p);
+      }
+    }
+  }
   return map;
 }
 
