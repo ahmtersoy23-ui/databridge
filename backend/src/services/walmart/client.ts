@@ -212,3 +212,45 @@ export async function walmartGet<T = unknown>(
     throw err;
   }
 }
+
+// -- Generic PUT wrapper (Inventory API yazma vb.) -------------------------
+
+export async function walmartPut<T = unknown>(
+  account: WalmartAccount,
+  path: string,
+  body: unknown,
+  opts: WalmartRequestOptions = {},
+): Promise<T> {
+  checkCircuitBreaker(account.id);
+  try {
+    const token = await getToken(account);
+    const base = getApiBase(account.use_sandbox);
+    const cleanParams: Record<string, string | number | boolean> = {};
+    for (const [k, v] of Object.entries(opts.params ?? {})) {
+      if (v !== undefined && v !== null && v !== '') cleanParams[k] = v;
+    }
+    const res = await axios.put<T>(`${base}${path}`, body, {
+      params: cleanParams,
+      headers: {
+        'WM_SEC.ACCESS_TOKEN': token,
+        'WM_QOS.CORRELATION_ID': randomUUID(),
+        'WM_SVC.NAME': 'Walmart Marketplace',
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      timeout: 60_000,
+    });
+    recordSuccess(account.id);
+    return res.data;
+  } catch (err: unknown) {
+    recordFailure(account.id);
+    if (axios.isAxiosError(err) && err.response?.status === 429) {
+      const sec = parseRetryAfterHeader(err.response.headers?.['x-next-replenishment-time']);
+      const e: any = new Error('Walmart rate limit (429) on PUT');
+      e.status = 429;
+      if (sec !== null) e.retryAfterMs = sec * 1000;
+      throw e;
+    }
+    throw err;
+  }
+}

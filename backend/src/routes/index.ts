@@ -37,6 +37,7 @@ import wisersellRoutingRouter from './wisersellRouting';
 import veeqoRoutingRouter from './veeqoRouting';
 import amazonOrderStatusRouter from './amazonOrderStatus';
 import amazonListingsRouter from './amazonListings';
+import walmartListingsRouter from './walmartListings';
 import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -53,6 +54,7 @@ router.use('/wisersell-routing', wisersellRoutingRouter); // ManuMaestro server-
 router.use('/veeqo-routing', veeqoRoutingRouter);         // ManuMaestro server-to-server — Veeqo etiket (rates/book/cancel)
 router.use('/amazon-order-status', amazonOrderStatusRouter); // ManuMaestro server-to-server — Amazon iptal kontrolü (sadece OKUR)
 router.use('/amazon-listings', amazonListingsRouter);     // ManuMaestro server-to-server — FBM stok push (Listings PATCH)
+router.use('/walmart-listings', walmartListingsRouter);   // ManuMaestro server-to-server — Walmart stok push (Inventory PUT)
 
 // Auth gate — everything below requires SSO session
 router.use(ssoAuthMiddleware);
