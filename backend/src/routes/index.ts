@@ -36,6 +36,7 @@ import sentryVerifyRouter from './sentryVerify';
 import wisersellRoutingRouter from './wisersellRouting';
 import veeqoRoutingRouter from './veeqoRouting';
 import amazonOrderStatusRouter from './amazonOrderStatus';
+import amazonListingsRouter from './amazonListings';
 import { ssoAuthMiddleware } from '../middleware/ssoAuth';
 
 const router = Router();
@@ -51,6 +52,7 @@ router.use('/sentry-verify', sentryVerifyRouter); // Token-gated Sentry probe
 router.use('/wisersell-routing', wisersellRoutingRouter); // ManuMaestro server-to-server (adminOpsAuth: API key veya SSO admin)
 router.use('/veeqo-routing', veeqoRoutingRouter);         // ManuMaestro server-to-server — Veeqo etiket (rates/book/cancel)
 router.use('/amazon-order-status', amazonOrderStatusRouter); // ManuMaestro server-to-server — Amazon iptal kontrolü (sadece OKUR)
+router.use('/amazon-listings', amazonListingsRouter);     // ManuMaestro server-to-server — FBM stok push (Listings PATCH)
 
 // Auth gate — everything below requires SSO session
 router.use(ssoAuthMiddleware);
