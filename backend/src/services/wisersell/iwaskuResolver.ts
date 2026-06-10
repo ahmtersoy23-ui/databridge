@@ -8,9 +8,9 @@ import logger from '../../config/logger';
  * burada batch-friendly halde:
  *   L1: urun_kodu / sku → products.product_sku           (en güçlü, doğrudan iwasku)
  *   L2: sku_master.sku VEYA .asin → iwasku                (Amazon MSKU/ASIN)
- *   L3: wisersell_sku_mappings.marketplace_sku + wayfair_sku_mapping.part_number → iwasku
- *       (manuel eşleşmeler + Wayfair; Wisersell marketplace_sku == Wayfair part_number olduğundan
- *        Wayfair siparişleri ayrı giriş olmadan çözülür. Wisersell mapping çakışmada önceliklidir.)
+ *   L3: wisersell_sku_mappings + kanal SKU mapping'leri (Wayfair/Walmart/Bol/Kaufland/Takealot)
+ *       → iwasku. Wisersell marketplace_sku bu kanalların kendi SKU/part_number'ı olduğundan her
+ *        kanalın siparişi kendi mevcut mapping'inden çözülür. Wisersell mapping çakışmada önceliklidir.
  *   L4: urun_basligi → products.name birebir              (title match — memory'de "en güçlü fallback")
  *
  * Hesaplama %99.93 kapsama veriyor (2026-05-12 analizi, 75K → 53 unmatched).
@@ -41,7 +41,7 @@ async function loadDictionaries(): Promise<ResolverDictionaries> {
   }
 
   // Paralel sözlük yüklemesi (pricelab + databridge query'ler)
-  const [productsRes, skuMasterRes, woMappingsRes, wayfairMapRes] = await Promise.all([
+  const [productsRes, skuMasterRes, woMappingsRes, channelMapRes] = await Promise.all([
     sharedPool.query<{ product_sku: string; name: string | null }>(
       'SELECT product_sku, name FROM products WHERE product_sku IS NOT NULL',
     ),
@@ -58,11 +58,17 @@ async function loadDictionaries(): Promise<ResolverDictionaries> {
        FROM wisersell_sku_mappings
        WHERE iwasku IS NOT NULL AND marketplace_sku IS NOT NULL`,
     ),
-    // Wayfair (CastleGate) eşleşmeleri — Wisersell marketplace_sku == Wayfair part_number
-    // olduğundan bunları da L3 havuzuna katarız (ayrı wisersell_sku_mappings girişi gerekmez).
-    pool.query<{ part_number: string; iwasku: string }>(
-      `SELECT part_number, iwasku FROM wayfair_sku_mapping
-       WHERE iwasku IS NOT NULL AND part_number IS NOT NULL`,
+    // Kanal-özel SKU mapping tabloları (Wayfair/Walmart/Bol/Kaufland/Takealot) — Wisersell
+    // marketplace_sku bu kanalların kendi SKU/part_number'ı olduğundan bunları da L3 havuzuna
+    // katarız (her kanal için ayrı wisersell_sku_mappings girişi gerekmez). key = kanal SKU'su.
+    pool.query<{ key: string; iwasku: string }>(
+      `SELECT key, iwasku FROM (
+         SELECT part_number     AS key, iwasku FROM wayfair_sku_mapping   WHERE iwasku IS NOT NULL AND part_number IS NOT NULL
+         UNION ALL SELECT sku            , iwasku FROM walmart_sku_mapping   WHERE iwasku IS NOT NULL AND sku IS NOT NULL
+         UNION ALL SELECT sku            , iwasku FROM bol_sku_mapping       WHERE iwasku IS NOT NULL AND sku IS NOT NULL
+         UNION ALL SELECT marketplace_sku, iwasku FROM kaufland_sku_mapping  WHERE iwasku IS NOT NULL AND marketplace_sku IS NOT NULL
+         UNION ALL SELECT sku            , iwasku FROM takealot_sku_mapping  WHERE iwasku IS NOT NULL AND sku IS NOT NULL
+       ) t`,
     ),
   ]);
 
@@ -95,12 +101,13 @@ async function loadDictionaries(): Promise<ResolverDictionaries> {
       woMappings.set(row.marketplace_sku, row.iwasku);
     }
   }
-  // Wayfair part_number → iwasku'yu da L3'e kat (Wisersell mapping öncelikli; çakışmada üzerine yazma).
-  let wayfairAdded = 0;
-  for (const row of wayfairMapRes.rows) {
-    if (!woMappings.has(row.part_number)) {
-      woMappings.set(row.part_number, row.iwasku);
-      wayfairAdded++;
+  // Kanal mapping'lerini (Wayfair/Walmart/Bol/Kaufland/Takealot) L3'e kat
+  // (Wisersell mapping öncelikli; çakışmada üzerine yazma).
+  let channelAdded = 0;
+  for (const row of channelMapRes.rows) {
+    if (row.key && !woMappings.has(row.key)) {
+      woMappings.set(row.key, row.iwasku);
+      channelAdded++;
     }
   }
 
@@ -112,7 +119,7 @@ async function loadDictionaries(): Promise<ResolverDictionaries> {
   logger.info(
     `[IwaskuResolver] Sözlük yüklendi: iwasku=${iwasku.size}, ` +
     `sku_master.sku=${skuMasterSku.size}, sku_master.asin=${skuMasterAsin.size}, ` +
-    `wo_mappings=${woMappings.size} (+wayfair ${wayfairAdded}), products.name=${productName.size}`,
+    `wo_mappings=${woMappings.size} (+kanal ${channelAdded}), products.name=${productName.size}`,
   );
   return cachedDicts;
 }
