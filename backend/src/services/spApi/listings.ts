@@ -51,9 +51,9 @@ export async function fetchMerchantListings(marketplace: MarketplaceConfig): Pro
     if (!sku) continue;
     // Giveaway SKU'lari atla (codebase kurali: sku NOT LIKE 'amzn.gr.%')
     if (/^amzn\.gr\./i.test(sku)) continue;
-    // Inactive listing'lerin guncel satis fiyati yok -> kiyasa girmesin
-    const statusStr = (row['status'] || '').toString();
-    if (statusStr.toLowerCase() === 'inactive') continue;
+    // NOT: "Inactive" (out-of-stock) listing'ler de YAZILIR — status saklanir.
+    // Fiyat kiyasi PriceLab tarafinda status<>'Inactive' ile filtrelenir; stok push
+    // ise tukenmis FBM listing'lerine bas(ip yeniden ac)mak icin bunlara ihtiyac duyar.
 
     const priceRaw = row['price'];
     const price = priceRaw !== undefined && priceRaw !== '' ? parseFloat(priceRaw) : NaN;
