@@ -48,13 +48,20 @@ const US_DEST_COUNTRY_ID = 238;
 
 /**
  * Siparişin fulfillment region'ı. null = kapsam dışı (US board'a girmez).
- * Mağaza allowlist'te (store_map.region) OLSA bile, ÇOK-ÜLKELİ mağazalar (Etsy/Shopify)
- * başka ülkelere de satıyor → US region için VARIŞ ÜLKESİ de ABD (238) olmalı.
- * Aksi halde Almanya/UK/TR siparişleri yanlışlıkla US deposuna düşer (bunlar EU/Ankara'dan gider).
+ *
+ * ADRES-BAZLI (2026-06-10): varış ülkesi ABD (countryId 238) ise MAĞAZA ne olursa olsun US —
+ * ABD'ye giden her sipariş US deposundan karşılanır. Böylece eBay-UK / Shopify (S_CFWEU) gibi
+ * US-allowlist'te OLMAYAN mağazaların ABD siparişleri de yakalanır (eskiden mağaza listede
+ * değilse adrese hiç bakılmadan eleniyordu → US-varışlı siparişler board'a düşmüyordu).
+ * ABD-dışı varış: US-mağaza bile olsa kapsam dışı (EU/Ankara'dan gider); diğer mağazalar kendi
+ * store_map.region'ı (ileride EU vb.). Stok yoksa board "stok teyidi" zaten gizler (güvenlik ağı).
+ *
+ * Sonraki aşama: bazı Etsy mağazaları için ürün-bazlı "US'e dahil" filtresi buraya eklenecek
+ * (mağaza → izinli iwasku/kategori). Mevcut adres-bazlı temel onun altyapısı.
  */
-function resolveRegion(order: WisersellOrderRow, sm: StoreMapRow | undefined): string | null {
-  if (sm?.region !== 'US') return sm?.region ?? null; // ileride EU vb. eklenince kendi ülke kuralı
-  return Number(order.countryId) === US_DEST_COUNTRY_ID ? 'US' : null;
+export function resolveRegion(order: WisersellOrderRow, sm: StoreMapRow | undefined): string | null {
+  if (Number(order.countryId) === US_DEST_COUNTRY_ID) return 'US';
+  return sm?.region === 'US' ? null : (sm?.region ?? null);
 }
 
 export async function runWisersellRoutingPoll(): Promise<number> {
