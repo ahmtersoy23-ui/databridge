@@ -5,7 +5,7 @@ import logger from '../../config/logger';
 // Per-storefront aggregation: each Kaufland storefront writes its own
 // channel ('kaufland_de', 'kaufland_cz', etc.). StockPulse combines them
 // client-side (similar to Amazon 'all' aggregation pattern).
-const KAUFLAND_ROLLING_WINDOW_SQL = `
+export const KAUFLAND_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
       iwasku,

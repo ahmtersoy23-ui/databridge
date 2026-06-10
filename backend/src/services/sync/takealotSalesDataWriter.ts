@@ -4,7 +4,7 @@ import logger from '../../config/logger';
 
 // Takealot sales_data aggregation (channel='takealot').
 // Filtreler: iwasku NOT NULL, quantity > 0, sale_status=true (iptal/iade haric).
-const TAKEALOT_ROLLING_WINDOW_SQL = `
+export const TAKEALOT_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
       iwasku,

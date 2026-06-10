@@ -6,7 +6,7 @@ import logger from '../../config/logger';
 // Bol icin sales_data agregasyonu (StockPulse'a giden veri).
 // Her hesap icin ayri channel: 'bol_pera' veya 'bol_onebv'.
 // Filtreler: iwasku NOT NULL, quantity > 0, is_cancelled=false.
-const BOL_ROLLING_WINDOW_SQL = `
+export const BOL_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
       iwasku,

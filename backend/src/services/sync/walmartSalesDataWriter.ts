@@ -9,12 +9,13 @@ import logger from '../../config/logger';
 // Filtreler:
 //   - iwasku IS NOT NULL                      (resolve olmamis SKU'lar aggregation'a girmez)
 //   - quantity > 0                            (sifir miktarli satirlar)
-//   - order_status IS DISTINCT FROM 'Cancelled' (iptal siparisler satis sayilmaz; Bol/Takealot/
-//     Kaufland ile ayni semantik. NULL status = sale sayilir, IS DISTINCT FROM ile NULL-guvenli.)
+//   - COALESCE(order_status,'') <> 'Cancelled' (iptal siparisler satis sayilmaz; Bol/Takealot/
+//     Kaufland ile ayni semantik. NULL status = sale sayilir — COALESCE ile NULL-guvenli ve
+//     pg-mem'de test edilebilir (IS DISTINCT FROM pg-mem grammar'inda yok).)
 //
 // ASIN: ayni iwasku icin gozlemlenen en yakin tarihli ASIN'i kullanir (raw_orders'da ASIN kolonu yok,
 // bu yuzden sku alanini ASIN gibi degerlendiririz — Walmart seller cogunlukla ASIN'i SKU olarak giriyor).
-const WALMART_ROLLING_WINDOW_SQL = `
+export const WALMART_ROLLING_WINDOW_SQL = `
   WITH per_sku AS (
     SELECT
       iwasku,
@@ -37,7 +38,7 @@ const WALMART_ROLLING_WINDOW_SQL = `
     FROM walmart_raw_orders
     WHERE iwasku IS NOT NULL
       AND quantity > 0
-      AND order_status IS DISTINCT FROM 'Cancelled'
+      AND COALESCE(order_status, '') <> 'Cancelled'
       AND order_date_local >= (CURRENT_DATE - INTERVAL '2 years')::date
     GROUP BY iwasku, sku
   )
