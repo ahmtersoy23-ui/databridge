@@ -4,14 +4,14 @@ import logger from '../../config/logger';
 import { notify } from '../../utils/notify';
 import { getSafetyDropThreshold } from '../../utils/safetyThreshold';
 import { getActiveAccounts } from '../walmart/client';
-import { fetchAllItems } from '../walmart/items';
+import { fetchAllItemsViaReport } from '../walmart/itemReport';
 import { fetchMerchantListings } from '../spApi/listings';
 import type { MarketplaceConfig } from '../../types';
 
 /**
  * PriceLab "Fiyat Kiyas" (channel_prices, pricelab_db) icin canli listing fiyati sync'i.
  * - Amazon US: GET_MERCHANT_LISTINGS_ALL_DATA -> amazon_fba / amazon_fbm
- * - Walmart:   GET /v3/items                  -> walmart
+ * - Walmart:   ITEM raporu (Reports API)      -> walmart
  * Manuel CSV upload yerine otomatik; eski seed/CSV satirlarini ayni anahtarla gunceller.
  */
 
@@ -218,14 +218,14 @@ export async function syncWalmartListingPrices(): Promise<number> {
   let allComplete = true; // bir hesap bile eksik/hata ise delete-stale yapma
   for (const account of accounts) {
     try {
-      const { items, complete } = await fetchAllItems(account);
+      const { items, complete } = await fetchAllItemsViaReport(account);
       if (!complete) allComplete = false;
       for (const it of items) {
         all.push({
           marketplace_sku: it.sku,
           price: it.price,
           status: it.status,
-          extra: { wpid: it.wpid, gtin: it.gtin },
+          extra: { wpid: it.wpid, gtin: it.gtin, fulfillmentType: it.fulfillmentType },
         });
       }
     } catch (err: unknown) {
