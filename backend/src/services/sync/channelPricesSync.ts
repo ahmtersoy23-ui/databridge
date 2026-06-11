@@ -48,6 +48,10 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
   );
   for (const row of res.rows) map.set(row.lookup_key, row.iwasku);
 
+  // GTIN/EAN'i bu fonksiyon GORMEZ (sadece SKU). EAN fallback upsertChannelPrices'ta
+  // resolveIwaskuByEan ile ayri yapilir (SKU eslesmeyen — or. "Antrasit"/"Ceviz" renk-adi
+  // Walmart SKU'lari — rapor GTIN'i verir → products.eans → iwasku).
+
   // Prefix fallback: tam SKU eslesmeyenlerde "-"/"_" oncesi parca gecerli bir
   // product_sku ise onu kullan. Varyant SKU'lari (or. IM299009QB7W_MS_L,
   // DS027004CRSP-GRAPHITE-P9) sku_master'a girmeden cozulur. >=6 char guard:
@@ -68,6 +72,31 @@ async function resolveIwaskuMap(skus: string[]): Promise<Map<string, string>> {
       }
     }
   }
+  return map;
+}
+
+/** GTIN/EAN'i normalize et: rakam-disi ve bastaki sifirlari at (GTIN-14 "08684..." → EAN-13 "8684..."). */
+function normEan(raw: string): string {
+  return raw.replace(/\D/g, '').replace(/^0+/, '');
+}
+
+/**
+ * SKU ile cozulemeyen satirlar icin GTIN→EAN fallback: rapor GTIN'i (channel_prices.extra.gtin)
+ * → pricelab.products.eans → product_sku (=iwasku). Walmart'ta merchant SKU'su saçma (renk adi
+ * gibi) olsa bile GTIN katalog EAN'ine eslesirse iwasku cozulur. Donen Map: normEan → iwasku.
+ */
+async function resolveIwaskuByEan(gtins: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const cleaned = [...new Set(gtins.map(normEan).filter((e) => e.length >= 8))];
+  if (cleaned.length === 0) return map;
+  const res = await sharedPool.query<{ ean: string; product_sku: string }>(
+    `SELECT ltrim(regexp_replace(ean, '\\D', '', 'g'), '0') AS ean, product_sku
+       FROM products, jsonb_array_elements_text(eans) AS ean
+      WHERE product_sku IS NOT NULL
+        AND ltrim(regexp_replace(ean, '\\D', '', 'g'), '0') = ANY($1)`,
+    [cleaned],
+  );
+  for (const row of res.rows) if (!map.has(row.ean)) map.set(row.ean, row.product_sku);
   return map;
 }
 
@@ -104,6 +133,14 @@ async function upsertChannelPrices(
 
   const iwaskuMap = await resolveIwaskuMap([...new Set(rows.map(r => r.marketplace_sku))]);
 
+  // SKU ile cozulemeyenler icin GTIN→EAN fallback (or. Walmart renk-adi SKU'lari).
+  const gtinOf = (r: PriceRow) => (typeof r.extra?.gtin === 'string' ? r.extra.gtin : null);
+  const unresolvedGtins = rows
+    .filter((r) => !iwaskuMap.has(r.marketplace_sku))
+    .map(gtinOf)
+    .filter((g): g is string => !!g);
+  const eanMap = unresolvedGtins.length ? await resolveIwaskuByEan(unresolvedGtins) : new Map<string, string>();
+
   const CHUNK = 500;
   let written = 0;
   const client = await sharedPool.connect();
@@ -116,8 +153,13 @@ async function upsertChannelPrices(
       chunk.forEach((row, idx) => {
         const b = idx * 9;
         placeholders.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8}::jsonb,$${b + 9},NOW(),NOW())`);
-        const iwasku = iwaskuMap.get(row.marketplace_sku) ?? null;
-        const resolvedBy = iwasku ? (iwasku === row.marketplace_sku ? 'L1_direct' : 'L2_sku_master') : null;
+        const skuIwasku = iwaskuMap.get(row.marketplace_sku) ?? null;
+        const gtin = gtinOf(row);
+        const eanIwasku = !skuIwasku && gtin ? eanMap.get(normEan(gtin)) ?? null : null;
+        const iwasku = skuIwasku ?? eanIwasku;
+        const resolvedBy = skuIwasku
+          ? (skuIwasku === row.marketplace_sku ? 'L1_direct' : 'L2_sku_master')
+          : (eanIwasku ? 'L2_ean' : null);
         values.push(
           channelCode,
           countryCode,
