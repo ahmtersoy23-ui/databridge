@@ -25,7 +25,7 @@ import { walmartGet, walmartPost, type WalmartAccount } from './client';
 const REPORT_TYPE = 'ITEM';
 const REPORT_VERSION = 'v4';      // v4 = Buy Box + lag time dahil; probe ile dogrulandi
 const POLL_INTERVAL_MS = 90_000;  // 90s — status endpoint 30s'de 429 veriyor
-const POLL_MAX_ATTEMPTS = 35;     // ~52 dk tavan (rapor tipik ~25 dk)
+const POLL_MAX_ATTEMPTS = 60;     // ~90 dk tavan; rapor suresi cok degisken (gozlem: 25 dk → 52+ dk)
 
 export interface WalmartParsedItem {
   sku: string;
