@@ -1,8 +1,33 @@
+import axios from 'axios';
 import { pool } from '../../config/database';
 import logger from '../../config/logger';
 import { getOpenOrders, getOrderDetail, type WisersellOrderRow, type WisersellOrderItem } from '../wisersell/webClient';
 import { resolveBatch } from '../wisersell/iwaskuResolver';
 import { WISERSELL_STATUS_CODES } from '../../config/constants';
+import { errMessage } from '../../utils/errors';
+
+/**
+ * Poll sonrası ManuMaestro auto-run'ı tetikler — uygun adaylar (Mobilya/Citi/Etsy hariç)
+ * "Onay Bekliyor"da BEKLEMEDEN, tespit edildikleri döngüde otomatik onaylanıp Etiket'e düşsün.
+ * Best-effort: hata/timeout poll'u bloklamaz. Manu'da WISERSELL_AUTO_APPROVE kapalıysa 409 (zararsız).
+ */
+async function triggerManuAutoApprove(): Promise<void> {
+  const base = process.env.MANU_BASE_URL;
+  const key = process.env.MANU_INTERNAL_API_KEY;
+  if (!base || !key) return; // yapılandırılmamış → sessiz geç
+  try {
+    const res = await axios.post(`${base}/api/siparis/auto-run?region=US`, null, {
+      headers: { 'x-internal-api-key': key },
+      timeout: 120_000,
+    });
+    const approved = (res.data as { approved?: number } | undefined)?.approved ?? 0;
+    if (approved > 0) logger.info(`[WisersellRouting] auto-run tetiklendi: ${approved} sipariş otomatik onaylandı`);
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } }).response?.status;
+    if (status === 409) return; // auto-approve kapalı — beklenen, sessiz
+    logger.warn(`[WisersellRouting] auto-run tetikleme hatası: ${errMessage(err)}`);
+  }
+}
 
 /**
  * Wisersell routing poll — açık siparişleri sık çekip US adaylarını
@@ -215,5 +240,8 @@ export async function runWisersellRoutingPoll(): Promise<number> {
   }
 
   logger.info(`[WisersellRouting] poll OK: ${usOrders.length} aday upsert edildi (region allowlist)`);
+
+  // Faz B: adaylar tazelendi → ManuMaestro auto-run (uygun olanları anında onayla).
+  await triggerManuAutoApprove();
   return usOrders.length;
 }
