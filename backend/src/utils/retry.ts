@@ -35,7 +35,15 @@ export function getRetryAfterMs(err: any): number | undefined {
 export function parseRetryAfterHeader(raw: string | undefined | null): number | null {
   if (!raw) return null;
   const num = Number(raw);
-  if (Number.isFinite(num) && num >= 0) return Math.floor(num);
+  if (Number.isFinite(num) && num >= 0) {
+    // Cok buyuk sayi = relatif saniye DEGIL, mutlak zaman damgasi. Walmart
+    // `x-next-replenishment-time` epoch-MS verir (or. 1781189744550); bazi API'ler
+    // epoch-saniye. Relatif saniye sanilirsa astronomik backoff -> Node timeout
+    // overflow -> 1ms -> backoff yok -> pes pese 429 -> circuit breaker acilir.
+    if (num >= 1e12) return Math.max(0, Math.ceil((num - Date.now()) / 1000)); // epoch-ms
+    if (num >= 1e9) return Math.max(0, Math.ceil(num - Date.now() / 1000));    // epoch-saniye
+    return Math.floor(num);                                                    // gercek relatif saniye
+  }
   const epoch = Date.parse(raw);
   if (Number.isFinite(epoch)) {
     const sec = Math.ceil((epoch - Date.now()) / 1000);

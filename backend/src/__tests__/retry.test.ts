@@ -150,6 +150,24 @@ describe('parseRetryAfterHeader', () => {
     expect(sec).toBeLessThanOrEqual(46);
   });
 
+  it('epoch-ms timestamp (Walmart x-next-replenishment-time) → relatif saniye', () => {
+    const epochMs = String(Date.now() + 60_000); // 60s sonrasi, ms
+    const sec = parseRetryAfterHeader(epochMs);
+    expect(sec).toBeGreaterThanOrEqual(58);
+    expect(sec).toBeLessThanOrEqual(62);
+  });
+
+  it('epoch-saniye timestamp → relatif saniye', () => {
+    const epochSec = String(Math.floor(Date.now() / 1000) + 90); // 90s sonrasi, saniye
+    const sec = parseRetryAfterHeader(epochSec);
+    expect(sec).toBeGreaterThanOrEqual(88);
+    expect(sec).toBeLessThanOrEqual(92);
+  });
+
+  it('gecmis epoch-ms → 0 (negatif backoff yok)', () => {
+    expect(parseRetryAfterHeader(String(Date.now() - 60_000))).toBe(0);
+  });
+
   it('returns 0 for past HTTP-date', () => {
     const past = new Date(Date.now() - 10_000).toUTCString();
     expect(parseRetryAfterHeader(past)).toBe(0);

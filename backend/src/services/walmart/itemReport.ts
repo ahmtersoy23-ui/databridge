@@ -76,9 +76,13 @@ async function waitForReady(account: WalmartAccount, requestId: string): Promise
       const resp = await walmartGet<StatusResp>(account, `/v3/reports/reportRequests/${requestId}`);
       status = resp?.requestStatus;
     } catch (err) {
-      // 429/transient: uzun poll dongusunde withRetry yerine elle geri cekil
+      // 429/transient: uzun poll dongusunde withRetry yerine elle geri cekil.
+      // 429 backoff'u makul araliga SIK ([interval, 5dk]) — bozuk/asiri retryAfter
+      // (epoch-ms) overflow'a, cok kisa backoff da pes pese 429 + breaker'a yol acar.
       const e = err as { status?: number; retryAfterMs?: number };
-      const waitMs = e.status === 429 ? (e.retryAfterMs ?? 120_000) : POLL_INTERVAL_MS;
+      const waitMs = e.status === 429
+        ? Math.min(Math.max((e.retryAfterMs ?? 0) + 1_000, POLL_INTERVAL_MS), 5 * 60_000)
+        : POLL_INTERVAL_MS;
       logger.warn(`[WalmartReport] status poll hata (attempt ${attempt}/${POLL_MAX_ATTEMPTS}): ${errMessage(err)} — ${Math.round(waitMs / 1000)}s bekle`);
       await sleep(waitMs);
       continue;
