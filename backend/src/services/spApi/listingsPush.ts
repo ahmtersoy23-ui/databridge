@@ -20,6 +20,8 @@ const MARKETPLACE_BY_COUNTRY: Record<string, string> = {
 export interface PushItem {
   sku: string;
   quantity: number;
+  /** Amazon handling time (lead_time_to_ship_max_days). null/undefined => gönderme (mevcut/Amazon default). */
+  handlingDays?: number | null;
 }
 
 export interface PushResult {
@@ -96,7 +98,8 @@ export async function pushListingQuantities(
         results.push({ sku: it.sku, status: 'failed', to: it.quantity, error: 'listing bulunamadi' });
         continue;
       }
-      if (cur.quantity === it.quantity) {
+      // handling verilmediyse ve adet aynıysa atla; handling verildiyse her zaman yaz (set et).
+      if (cur.quantity === it.quantity && it.handlingDays == null) {
         results.push({ sku: it.sku, status: 'skipped', from: cur.quantity, to: it.quantity });
         continue;
       }
@@ -121,7 +124,14 @@ export async function pushListingQuantities(
                 {
                   op: 'replace',
                   path: '/attributes/fulfillment_availability',
-                  value: [{ fulfillment_channel_code: 'DEFAULT', quantity: it.quantity }],
+                  value: [
+                    {
+                      fulfillment_channel_code: 'DEFAULT',
+                      quantity: it.quantity,
+                      // handling verildiyse bas (lead_time_to_ship_max_days); yoksa alanı hiç gönderme.
+                      ...(it.handlingDays != null ? { lead_time_to_ship_max_days: it.handlingDays } : {}),
+                    },
+                  ],
                 },
               ],
             },
