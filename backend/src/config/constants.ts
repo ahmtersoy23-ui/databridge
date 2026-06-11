@@ -37,8 +37,9 @@ export const SYNC_WISERSELL_ORDERS_CRON   = '0 9 * * *';          // 09:00 UTC (
 export const SYNC_WISERSELL_PENDING_CRON  = '15 9 * * *';         // 09:15 UTC (12:15 TR) — closed sync 09:00'da bitince
 
 // Wisersell routing poll — açık siparişleri sık çek (US adayları → wisersell_routing_candidates).
-// ManuMaestro buradan okuyup stok teyidi + onay yapar. Excel pending sync'ten ayrı, sık (varsayılan 20 dk).
-export const SYNC_WISERSELL_ROUTING_POLL_CRON = '*/20 * * * *';   // her 20 dk
+// ManuMaestro buradan okuyup stok teyidi + onay yapar. Excel pending sync'ten ayrı, sık.
+// Hafif (yalnız açık siparişler, tek sayfalı GET + upsert) → 5 dk güvenli; 429 görülürse geri çek.
+export const SYNC_WISERSELL_ROUTING_POLL_CRON = '*/5 * * * *';   // her 5 dk
 
 // Walmart Marketplace orders sync — daily after Amazon sales window.
 // Token TTL 15 dk, max 200 limit/page, son 30 gün rolling (kullanıcı tercihi).

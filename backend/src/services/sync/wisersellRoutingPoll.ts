@@ -46,6 +46,10 @@ async function loadStoreMap(): Promise<Map<number, StoreMapRow>> {
 // Wisersell varış ülke id'leri (GET /orders.countryId). Amazon US (sadece ABD'ye satar) → 238.
 const US_DEST_COUNTRY_ID = 238;
 
+// US fulfillment YAPMAYAN kanallar — varış ABD olsa bile board'a hiç düşmesin.
+// (eBay UK US çıkışı yapmıyor; ileride Etsy vb. ilaveleri buraya eklenir.)
+const EXCLUDED_MARKETPLACE_CODES = new Set<string>(['eBay-eBay-UK']);
+
 /**
  * Siparişin fulfillment region'ı. null = kapsam dışı (US board'a girmez).
  *
@@ -60,6 +64,8 @@ const US_DEST_COUNTRY_ID = 238;
  * (mağaza → izinli iwasku/kategori). Mevcut adres-bazlı temel onun altyapısı.
  */
 export function resolveRegion(order: WisersellOrderRow, sm: StoreMapRow | undefined): string | null {
+  // US çıkışı yapmayan kanallar (eBay UK vb.) varış ABD olsa bile kapsam dışı.
+  if (sm?.marketplace_code && EXCLUDED_MARKETPLACE_CODES.has(sm.marketplace_code)) return null;
   if (Number(order.countryId) === US_DEST_COUNTRY_ID) return 'US';
   return sm?.region === 'US' ? null : (sm?.region ?? null);
 }

@@ -7,11 +7,12 @@ vi.mock('../config/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), er
 import { resolveRegion } from '../services/sync/wisersellRoutingPoll';
 
 const order = (countryId?: number) => ({ countryId } as unknown as Parameters<typeof resolveRegion>[0]);
-const store = (region: string | null) => ({ region } as unknown as Parameters<typeof resolveRegion>[1]);
+const store = (region: string | null, marketplace_code?: string) =>
+  ({ region, marketplace_code } as unknown as Parameters<typeof resolveRegion>[1]);
 
 describe('resolveRegion (adres-bazlı)', () => {
   it('ABD varışı (238) → US, mağaza allowlist\'te olmasa bile', () => {
-    expect(resolveRegion(order(238), undefined)).toBe('US');     // eBay-UK / Shopify US siparişi (asıl fix)
+    expect(resolveRegion(order(238), undefined)).toBe('US');     // Shopify US siparişi (asıl fix)
     expect(resolveRegion(order(238), store('US'))).toBe('US');
     expect(resolveRegion(order(238), store('EU'))).toBe('US');   // EU mağaza ama US varış
   });
@@ -24,5 +25,10 @@ describe('resolveRegion (adres-bazlı)', () => {
   it('ABD-dışı varış: mağaza kendi region\'ı / listede yoksa elenir', () => {
     expect(resolveRegion(order(77), store('EU'))).toBe('EU');
     expect(resolveRegion(order(77), undefined)).toBeNull();
+  });
+
+  it('US çıkışı yapmayan kanal (eBay UK) ABD varışı olsa bile null', () => {
+    expect(resolveRegion(order(238), store('US', 'eBay-eBay-UK'))).toBeNull();
+    expect(resolveRegion(order(77), store('US', 'eBay-eBay-UK'))).toBeNull();
   });
 });
