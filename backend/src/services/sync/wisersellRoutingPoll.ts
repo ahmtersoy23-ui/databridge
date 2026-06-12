@@ -91,6 +91,9 @@ const EXCLUDED_MARKETPLACE_CODES = new Set<string>(['eBay-eBay-UK']);
 export function resolveRegion(order: WisersellOrderRow, sm: StoreMapRow | undefined): string | null {
   // US çıkışı yapmayan kanallar (eBay UK vb.) varış ABD olsa bile kapsam dışı.
   if (sm?.marketplace_code && EXCLUDED_MARKETPLACE_CODES.has(sm.marketplace_code)) return null;
+  // Wayfair mağazaları (Shukran/MDN) US deposundan çıkar — varış ABD-dışı (örn. Kanada) olsa bile
+  // US board'a düşsün (etiket Wayfair'den). Adres kuralından muaf.
+  if (sm?.marketplace_code && /^wayfair/i.test(sm.marketplace_code.trim())) return 'US';
   if (Number(order.countryId) === US_DEST_COUNTRY_ID) return 'US';
   return sm?.region === 'US' ? null : (sm?.region ?? null);
 }

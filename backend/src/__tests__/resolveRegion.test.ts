@@ -31,4 +31,11 @@ describe('resolveRegion (adres-bazlı)', () => {
     expect(resolveRegion(order(238), store('US', 'eBay-eBay-UK'))).toBeNull();
     expect(resolveRegion(order(77), store('US', 'eBay-eBay-UK'))).toBeNull();
   });
+
+  it('Wayfair mağazaları varış ABD-dışı (Kanada) olsa bile US (US deposundan çıkar)', () => {
+    expect(resolveRegion(order(238), store('US', 'Wayfair Shukran'))).toBe('US'); // ABD
+    expect(resolveRegion(order(40), store('US', 'Wayfair Shukran'))).toBe('US');  // Kanada (asıl fix)
+    expect(resolveRegion(order(40), store('US', 'Wayfair MDN'))).toBe('US');
+    expect(resolveRegion(order(undefined), store('US', 'Wayfair MDN'))).toBe('US');
+  });
 });
