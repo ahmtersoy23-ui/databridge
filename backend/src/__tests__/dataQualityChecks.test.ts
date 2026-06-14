@@ -86,6 +86,38 @@ describe('dataQualityChecks', () => {
       expect(countCheck).toBeDefined();
       expect(countCheck!.message).toContain('0 rows');
     });
+
+    it('seyrek tablo 0 satir + saglikli feed job → count INFO (alarm degil)', async () => {
+      mockQuery.mockImplementation((sql: string) => {
+        if (sql.includes('FROM sync_log')) return { rows: [{ x: 1 }] }; // sd-ads healthy
+        if (sql.includes('HAVING COUNT')) return { rows: [] };
+        if (sql.includes('today_count')) return { rows: [{ today_count: 0, yesterday_count: 2 }] };
+        if (sql.includes('IS NULL')) return { rows: [{ cnt: 0 }] };
+        if (sql.includes('adv_spend')) return { rows: [{ adv_spend: '0', tgt_spend: '0' }] };
+        if (sql.includes('SUM')) return { rows: [{ total_spend: '0', total_sales: '0' }] };
+        return { rows: [] };
+      });
+      const results = await runPostSyncChecks('2026-06-11', 'sd');
+      const c = results.find(r => r.check === 'count:ads_sd_purchased_product_report')!;
+      expect(c.severity).toBe('INFO');
+      expect(c.passed).toBe(true);
+    });
+
+    it('seyrek tablo 0 satir + olu feed job → count yine CRITICAL', async () => {
+      mockQuery.mockImplementation((sql: string) => {
+        if (sql.includes('FROM sync_log')) return { rows: [] }; // sd-ads NOT healthy
+        if (sql.includes('HAVING COUNT')) return { rows: [] };
+        if (sql.includes('today_count')) return { rows: [{ today_count: 0, yesterday_count: 2 }] };
+        if (sql.includes('IS NULL')) return { rows: [{ cnt: 0 }] };
+        if (sql.includes('adv_spend')) return { rows: [{ adv_spend: '0', tgt_spend: '0' }] };
+        if (sql.includes('SUM')) return { rows: [{ total_spend: '0', total_sales: '0' }] };
+        return { rows: [] };
+      });
+      const results = await runPostSyncChecks('2026-06-11', 'sd');
+      const c = results.find(r => r.check === 'count:ads_sd_purchased_product_report')!;
+      expect(c.severity).toBe('CRITICAL');
+      expect(c.passed).toBe(false);
+    });
   });
 
   describe('runGapDetection', () => {
@@ -118,6 +150,43 @@ describe('dataQualityChecks', () => {
       const gapCheck = results.find(r => r.check.startsWith('gap:') && !r.passed);
       expect(gapCheck).toBeDefined();
       expect(gapCheck!.message).toContain('2 missing day');
+    });
+
+    it('seyrek tablo bos gunler + saglikli feed job → gap INFO (alarm degil)', async () => {
+      mockQuery.mockImplementation((sql: string) => {
+        if (sql.includes('FROM sync_log')) return { rows: [{ x: 1 }] }; // sd-ads healthy
+        if (sql.includes('missing_date') && sql.includes('ads_sd_purchased_product_report')) {
+          return { rows: [{ missing_date: new Date('2026-05-17') }, { missing_date: new Date('2026-05-18') }] };
+        }
+        if (sql.includes('missing_date')) return { rows: [] };
+        if (sql.includes('COUNT(*)')) return { rows: [{ cnt: 100 }] };
+        if (sql.includes('child_asin')) return { rows: [] };
+        return { rows: [] };
+      });
+      const results = await runGapDetection(30);
+      const sdGap = results.find(r => r.check === 'gap:ads_sd_purchased_product_report')!;
+      expect(sdGap.severity).toBe('INFO');
+      expect(sdGap.passed).toBe(true);
+    });
+
+    it('seyrek tablo bos gunler + olu feed job → gap yine CRITICAL', async () => {
+      mockQuery.mockImplementation((sql: string) => {
+        if (sql.includes('FROM sync_log')) return { rows: [] }; // sd-ads NOT healthy
+        if (sql.includes('missing_date') && sql.includes('ads_sd_purchased_product_report')) {
+          return { rows: [
+            { missing_date: new Date('2026-05-17') }, { missing_date: new Date('2026-05-18') },
+            { missing_date: new Date('2026-05-19') }, { missing_date: new Date('2026-05-20') },
+          ] };
+        }
+        if (sql.includes('missing_date')) return { rows: [] };
+        if (sql.includes('COUNT(*)')) return { rows: [{ cnt: 100 }] };
+        if (sql.includes('child_asin')) return { rows: [] };
+        return { rows: [] };
+      });
+      const results = await runGapDetection(30);
+      const sdGap = results.find(r => r.check === 'gap:ads_sd_purchased_product_report')!;
+      expect(sdGap.severity).toBe('CRITICAL');
+      expect(sdGap.passed).toBe(false);
     });
   });
 

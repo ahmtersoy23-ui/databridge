@@ -84,6 +84,30 @@ const ADS_TABLES = [
 
 const BUSINESS_REPORT_TABLE = 'business_report';
 
+// ─── Seyrek (sparse) tablolar ───────────────────────────────────────────────
+// Bazi Amazon raporlari dogalari geregi cogu gun bos doner (orn. Sponsored
+// Display purchased-product: tek profil, gunde 0-5 satir, gunlerin yarisi bos).
+// Bunlar icin "eksik gun" = hata DEGIL; gercek arizayi besleyen sync job'in
+// son N gunde hic basarili kosmamasi yakalar. table → sync_log job_name.
+const SPARSE_TABLE_FEED_JOB: Record<string, string> = {
+  ads_sd_purchased_product_report: 'sd-ads',
+};
+
+// Besleyen job bu pencerede hic 'success' yazmadiysa → seyreklik degil arizadir.
+const SPARSE_FEED_HEALTH_DAYS = 3;
+
+/** Besleyen sync job son N gunde en az bir kez basarili kostu mu? */
+async function feedJobHealthy(jobName: string, sinceDays = SPARSE_FEED_HEALTH_DAYS): Promise<boolean> {
+  const { rows } = await pool.query(
+    `SELECT 1 FROM sync_log
+     WHERE job_name = $1 AND status = 'success'
+       AND started_at >= now() - ($2::int * INTERVAL '1 day')
+     LIMIT 1`,
+    [jobName, sinceDays],
+  );
+  return rows.length > 0;
+}
+
 // ─── Katman 1: Post-Sync Assertions ────────────────────────────────────────
 
 export type AdsProductPrefix = 'sp' | 'sb' | 'sd';
@@ -144,7 +168,13 @@ export async function runPostSyncChecks(reportDate?: string, prefix?: AdsProduct
         // Table has no recent data (possibly not yet synced) — skip silently
         results.push({ check: `count:${cfg.table}`, severity: 'INFO', message: `No data for ${targetDate} or previous day — skipped`, passed: true });
       } else if (today_count === 0) {
-        results.push({ check: `count:${cfg.table}`, severity: 'CRITICAL', message: `0 rows for ${targetDate} (yesterday: ${yesterday_count})`, passed: false });
+        // Seyrek tablo + besleyen job saglikli → bos gun normal, INFO
+        const feedJob = SPARSE_TABLE_FEED_JOB[cfg.table];
+        if (feedJob && await feedJobHealthy(feedJob)) {
+          results.push({ check: `count:${cfg.table}`, severity: 'INFO', message: `0 rows for ${targetDate} but ${feedJob} sync healthy — sparse report, expected`, passed: true });
+        } else {
+          results.push({ check: `count:${cfg.table}`, severity: 'CRITICAL', message: `0 rows for ${targetDate} (yesterday: ${yesterday_count})`, passed: false });
+        }
       } else if (yesterday_count > 0) {
         const ratio = today_count / yesterday_count;
         const deviated = ratio < 0.5 || ratio > 2;
@@ -288,13 +318,24 @@ export async function runGapDetection(lookbackDays = 30): Promise<CheckResult[]>
         }
       } else {
         const dates = rows.map(r => r.missing_date.toISOString().slice(0, 10));
-        const severity: Severity = rows.length >= 4 ? 'CRITICAL' : 'WARNING';
-        results.push({
-          check: `gap:${table}`,
-          severity,
-          message: `${rows.length} missing day(s): ${dates.slice(0, 5).join(', ')}${dates.length > 5 ? '...' : ''}`,
-          passed: false,
-        });
+        // Seyrek tablo + besleyen job saglikli → bos gunler beklenir, INFO
+        const feedJob = SPARSE_TABLE_FEED_JOB[table];
+        if (feedJob && await feedJobHealthy(feedJob)) {
+          results.push({
+            check: `gap:${table}`,
+            severity: 'INFO',
+            message: `${rows.length} empty day(s) but ${feedJob} sync healthy — sparse report, no action`,
+            passed: true,
+          });
+        } else {
+          const severity: Severity = rows.length >= 4 ? 'CRITICAL' : 'WARNING';
+          results.push({
+            check: `gap:${table}`,
+            severity,
+            message: `${rows.length} missing day(s): ${dates.slice(0, 5).join(', ')}${dates.length > 5 ? '...' : ''}`,
+            passed: false,
+          });
+        }
       }
     } catch (err: unknown) {
       results.push({ check: `gap:${table}`, severity: 'WARNING', message: `Check error: ${errMessage(err)}`, passed: false });
