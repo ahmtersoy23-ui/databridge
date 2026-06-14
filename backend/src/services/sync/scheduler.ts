@@ -11,7 +11,7 @@ import { writeInventoryData } from './inventoryDataWriter';
 // helpers import them directly from transactionDataWriter.
 import { syncWisersell } from './wisersellSync';
 import { syncWayfair } from './wayfairSync';
-import { snapshotFbmQty } from '../spApi/fbmQtyTracker';
+import { snapshotFbmQty, dailyFbmDigest } from '../spApi/fbmQtyTracker';
 import { syncFedex } from './fedexSync';
 import { syncWisersellShipments } from './wisersellShipmentSync';
 import { syncWisersellOrders } from './wisersellOrderSync';
@@ -24,7 +24,7 @@ import { syncKaufland } from './kauflandOrdersSync';
 import { runChannelPricesSync } from './channelPricesSync';
 import { runReviewTracking } from '../reviews/reviewSync';
 import logger from '../../config/logger';
-import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WISERSELL_ROUTING_POLL_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON, SYNC_CHANNEL_PRICES_CRON, FBM_QTY_TRACKING_CRON } from '../../config/constants';
+import { SYNC_INVENTORY_CRON, SYNC_SALES_CRON, SYNC_TRANSACTIONS_CRON, SYNC_WISERSELL_CRON, SYNC_WAYFAIR_CRON, SYNC_ADS_CRON, SYNC_AGING_CRON, SYNC_SKU_MASTER_DIFF_CRON, SYNC_BUSINESS_REPORT_CRON, SYNC_CAMPAIGN_SNAPSHOT_CRON, SYNC_BRAND_ANALYTICS_CRON, SYNC_SB_ADS_CRON, SYNC_SD_ADS_CRON, DATA_QUALITY_CRON, FEE_RATES_CRON, SYNC_FEDEX_TRACK_FULL_CRON, SYNC_FEDEX_TRACK_DELTA_CRON, SYNC_WISERSELL_SHIPMENT_CRON, SYNC_WISERSELL_ORDERS_CRON, SYNC_WISERSELL_PENDING_CRON, SYNC_WISERSELL_ROUTING_POLL_CRON, SYNC_WALMART_ORDERS_CRON, SYNC_BOL_ORDERS_CRON, SYNC_TAKEALOT_CRON, SYNC_KAUFLAND_CRON, SYNC_CHANNEL_PRICES_CRON, FBM_QTY_TRACKING_CRON, FBM_QTY_DIGEST_CRON } from '../../config/constants';
 import { syncAllAdsProfiles, syncAllSbProfiles, syncAllSdProfiles } from '../adsApi/adsSync';
 import { runAgingSync } from './agingSync';
 import { runSkuMasterDiff, applySkuMasterUpdate } from './skuMasterDiff';
@@ -44,6 +44,7 @@ let transactionTask: cron.ScheduledTask | null = null;
 let wisersellTask: cron.ScheduledTask | null = null;
 let wayfairTask: cron.ScheduledTask | null = null;
 let fbmQtyTrackTask: cron.ScheduledTask | null = null; // geçici diagnostik (~2026-06-24'e kadar)
+let fbmQtyDigestTask: cron.ScheduledTask | null = null; // geçici günlük Slack özeti (~2026-06-24'e kadar)
 let adsTask: cron.ScheduledTask | null = null;
 let agingTask: cron.ScheduledTask | null = null;
 let skuMasterDiffTask: cron.ScheduledTask | null = null;
@@ -650,6 +651,11 @@ export function startScheduler(): void {
       .catch(err => logger.error('[Scheduler] FBM qty tracking error:', err));
   });
 
+  fbmQtyDigestTask = scheduleWithJitter(FBM_QTY_DIGEST_CRON, () => {
+    withSyncLog('fbm-qty-digest', () => dailyFbmDigest())
+      .catch(err => logger.error('[Scheduler] FBM qty digest error:', err));
+  });
+
   adsTask = scheduleWithJitter(SYNC_ADS_CRON, () => {
     withSyncLog('ads', () => runAdsSync().then(() => undefined))
       .catch(err => logger.error('[Scheduler] Ads sync error:', err));
@@ -796,6 +802,7 @@ export function stopScheduler(): void {
   wisersellTask?.stop();
   wayfairTask?.stop();
   fbmQtyTrackTask?.stop();
+  fbmQtyDigestTask?.stop();
   adsTask?.stop();
   agingTask?.stop();
   skuMasterDiffTask?.stop();

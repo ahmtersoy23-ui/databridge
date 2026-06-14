@@ -2,6 +2,7 @@ import { getSpApiClient, getCredentialsById } from './client';
 import { getListingState } from './listingsPush';
 import { pool } from '../../config/database';
 import { withRetry } from '../../utils/retry';
+import { notify } from '../../utils/notify';
 import logger from '../../config/logger';
 
 /**
@@ -87,4 +88,46 @@ export async function snapshotFbmQty(): Promise<number> {
   }
   logger.info(`[fbmQtyTracker] ${written}/${TRACKED_FBM_SKUS.length} SKU snapshot alındı`);
   return written;
+}
+
+/**
+ * Günlük Slack özeti: son 24 saatte hangi SKU'lar 0'a düştü (>0 → 0 geçişi) + şu an 0'da olanlar.
+ * Hızlı düşüşler (ör. 13→0) dış müdahale sinyali. ~2026-06-24'ten sonra no-op.
+ */
+export async function dailyFbmDigest(): Promise<number> {
+  if (Date.now() >= END_AT) return 0;
+
+  const drops = await pool.query<{ seller_sku: string; captured_at: Date; prev_qty: number; amazon_qty: number }>(
+    `WITH w AS (
+       SELECT seller_sku, captured_at, amazon_qty,
+              lag(amazon_qty) OVER (PARTITION BY seller_sku ORDER BY captured_at) AS prev_qty
+       FROM fbm_qty_tracking
+       WHERE captured_at > now() - interval '24 hours' AND amazon_qty IS NOT NULL
+     )
+     SELECT seller_sku, captured_at, prev_qty, amazon_qty
+     FROM w WHERE prev_qty > 0 AND amazon_qty = 0
+     ORDER BY captured_at DESC`,
+  );
+
+  const nowZero = await pool.query<{ seller_sku: string; amazon_qty: number | null }>(
+    `SELECT DISTINCT ON (seller_sku) seller_sku, amazon_qty
+       FROM fbm_qty_tracking
+      WHERE captured_at > now() - interval '25 hours'
+      ORDER BY seller_sku, captured_at DESC`,
+  );
+  const currentlyZero = nowZero.rows.filter((r) => r.amazon_qty === 0).map((r) => r.seller_sku);
+
+  const dropLines = drops.rows.slice(0, 15).map((d) => {
+    const t = new Date(d.captured_at).toISOString().slice(11, 16);
+    return `  • ${d.seller_sku}: ${d.prev_qty}→0 (${t} UTC)`;
+  });
+
+  const msg =
+    `📉 FBM stok izleme (son 24s) — ${drops.rows.length} adet 0'a düşüş, şu an ${currentlyZero.length} SKU 0'da\n` +
+    (dropLines.length ? `0'a düşenler:\n${dropLines.join('\n')}${drops.rows.length > 15 ? `\n  … +${drops.rows.length - 15}` : ''}\n` : '') +
+    (currentlyZero.length ? `Şu an 0'da: ${currentlyZero.slice(0, 20).join(', ')}` : `Şu an 0'da olan yok.`);
+
+  await notify(msg);
+  logger.info(`[fbmQtyTracker] günlük digest gönderildi (${drops.rows.length} düşüş, ${currentlyZero.length} sıfır)`);
+  return drops.rows.length;
 }
