@@ -59,7 +59,7 @@ const pushSchema = z.object({
   /** Verilirse + dryRun degilse Slack'e dusurulur. */
   alert: z.string().max(2000).optional(),
   items: z
-    .array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(0) }))
+    .array(z.object({ sku: z.string().min(1), quantity: z.number().int().min(0), supplierId: z.number().int().positive().optional() }))
     .min(1)
     .max(5000),
 });
