@@ -74,8 +74,8 @@ export async function snapshotFbmQty(): Promise<number> {
         baseDelayMs: 2_000,
       });
       await pool.query(
-        'INSERT INTO fbm_qty_tracking (seller_sku, amazon_qty, listing_exists) VALUES ($1, $2, $3)',
-        [sku, st.quantity, st.exists],
+        'INSERT INTO fbm_qty_tracking (seller_sku, amazon_qty, listing_exists, listing_status, issue_errors, issue_note) VALUES ($1, $2, $3, $4, $5, $6)',
+        [sku, st.quantity, st.exists, st.status, st.issueErrors, st.issueNote],
       );
       written++;
     } catch (err) {
@@ -109,13 +109,17 @@ export async function dailyFbmDigest(): Promise<number> {
      ORDER BY captured_at DESC`,
   );
 
-  const nowZero = await pool.query<{ seller_sku: string; amazon_qty: number | null }>(
-    `SELECT DISTINCT ON (seller_sku) seller_sku, amazon_qty
+  const nowZero = await pool.query<{ seller_sku: string; amazon_qty: number | null; issue_errors: number | null; listing_status: string | null }>(
+    `SELECT DISTINCT ON (seller_sku) seller_sku, amazon_qty, issue_errors, listing_status
        FROM fbm_qty_tracking
       WHERE captured_at > now() - interval '25 hours'
       ORDER BY seller_sku, captured_at DESC`,
   );
-  const currentlyZero = nowZero.rows.filter((r) => r.amazon_qty === 0).map((r) => r.seller_sku);
+  const zeros = nowZero.rows.filter((r) => r.amazon_qty === 0);
+  // 0'da olanları ikiye ayır: issue var → listing suppressed (Amazon 0 gösteriyor) · issue yok → dış-basma şüphesi.
+  const suppressed = zeros.filter((r) => (r.issue_errors ?? 0) > 0).map((r) => r.seller_sku);
+  const cleanZero = zeros.filter((r) => (r.issue_errors ?? 0) === 0).map((r) => r.seller_sku);
+  const currentlyZero = zeros.map((r) => r.seller_sku);
 
   const dropLines = drops.rows.slice(0, 15).map((d) => {
     const t = new Date(d.captured_at).toISOString().slice(11, 16);
@@ -125,7 +129,9 @@ export async function dailyFbmDigest(): Promise<number> {
   const msg =
     `📉 FBM stok izleme (son 24s) — ${drops.rows.length} adet 0'a düşüş, şu an ${currentlyZero.length} SKU 0'da\n` +
     (dropLines.length ? `0'a düşenler:\n${dropLines.join('\n')}${drops.rows.length > 15 ? `\n  … +${drops.rows.length - 15}` : ''}\n` : '') +
-    (currentlyZero.length ? `Şu an 0'da: ${currentlyZero.slice(0, 20).join(', ')}` : `Şu an 0'da olan yok.`);
+    (cleanZero.length ? `🚨 0 + sorun YOK (dış-basma şüphesi): ${cleanZero.slice(0, 20).join(', ')}\n` : '') +
+    (suppressed.length ? `⚠️ 0 + listing sorunu (suppressed): ${suppressed.slice(0, 20).join(', ')}\n` : '') +
+    (currentlyZero.length === 0 ? `Şu an 0'da olan yok.` : '');
 
   await notify(msg);
   logger.info(`[fbmQtyTracker] günlük digest gönderildi (${drops.rows.length} düşüş, ${currentlyZero.length} sıfır)`);

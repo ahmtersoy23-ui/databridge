@@ -36,6 +36,12 @@ interface ListingState {
   quantity: number | null;
   productType: string | null;
   exists: boolean;
+  /** summaries[].status — örn "BUYABLE,DISCOVERABLE"; suppressed listing'de BUYABLE düşer. */
+  status: string | null;
+  /** severity=ERROR issue sayısı (>0 → listing suppressed/sorunlu, qty 0 sebebi dış-basma DEĞİL). */
+  issueErrors: number;
+  /** ilk ERROR issue özeti (code/message). */
+  issueNote: string | null;
 }
 
 export async function getListingState(
@@ -49,22 +55,27 @@ export async function getListingState(
       operation: 'getListingsItem',
       endpoint: 'listingsItems',
       path: { sellerId, sku },
-      query: { marketplaceIds: [marketplaceId], includedData: ['summaries', 'fulfillmentAvailability'] },
+      query: { marketplaceIds: [marketplaceId], includedData: ['summaries', 'fulfillmentAvailability', 'issues'] },
     })) as {
-      summaries?: Array<{ productType?: string }>;
+      summaries?: Array<{ productType?: string; status?: string[] }>;
       fulfillmentAvailability?: Array<{ fulfillmentChannelCode?: string; quantity?: number }>;
+      issues?: Array<{ severity?: string; code?: string; message?: string }>;
     };
     const productType = r?.summaries?.[0]?.productType ?? null;
+    const statusArr = r?.summaries?.[0]?.status;
+    const status = Array.isArray(statusArr) && statusArr.length ? statusArr.join(',') : null;
+    const errs = Array.isArray(r?.issues) ? r.issues.filter((i) => i.severity === 'ERROR') : [];
+    const issueNote = errs.length ? (errs[0].code ?? errs[0].message ?? '').slice(0, 120) : null;
     const fa = r?.fulfillmentAvailability;
     let quantity: number | null = null;
     if (Array.isArray(fa) && fa.length) {
       const def = fa.find((x) => x.fulfillmentChannelCode === 'DEFAULT') ?? fa[0];
       quantity = typeof def?.quantity === 'number' ? def.quantity : null;
     }
-    return { quantity, productType, exists: true };
+    return { quantity, productType, exists: true, status, issueErrors: errs.length, issueNote };
   } catch (err) {
     const msg = (err as { message?: string })?.message ?? '';
-    if (/not found|NOT_FOUND|\b404\b/i.test(msg)) return { quantity: null, productType: null, exists: false };
+    if (/not found|NOT_FOUND|\b404\b/i.test(msg)) return { quantity: null, productType: null, exists: false, status: null, issueErrors: 0, issueNote: null };
     throw err;
   }
 }
