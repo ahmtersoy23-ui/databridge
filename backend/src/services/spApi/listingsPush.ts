@@ -38,7 +38,7 @@ interface ListingState {
   exists: boolean;
 }
 
-async function getListingState(
+export async function getListingState(
   client: SellingPartner,
   sellerId: string,
   sku: string,
